@@ -9,7 +9,7 @@ import FontFamily from "@tiptap/extension-font-family";
 import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
-import { X, GripVertical } from "lucide-react";
+import { X, GripVertical, MoreVertical, Copy, Trash2 } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { NoteSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
@@ -21,6 +21,8 @@ interface StickyNoteProps {
   zIndex?: number;
   onDragStop: (id: string, x: number, y: number) => void;
   onDelete: (id: string) => void;
+  /** Optional: duplicate this note (e.g. create a copy on the board) */
+  onDuplicate?: (id: string) => void;
   onStartEdit: (id: string) => void;
   onSave: (id: string, title: string, content: string) => void;
   /** Optional: called on debounced content/title change while editing (for real-time sync). If not provided, debounced save is skipped. */
@@ -148,6 +150,7 @@ export function StickyNote({
   zIndex = 0,
   onDragStop,
   onDelete,
+  onDuplicate,
   onStartEdit,
   onSave,
   onContentChange,
@@ -177,6 +180,8 @@ export function StickyNote({
 
   const [activeField, setActiveField] = useState<"title" | "content">("title");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({
     width: note.width ?? DEFAULT_SIZE,
     height: note.height ?? DEFAULT_SIZE,
@@ -642,6 +647,20 @@ export function StickyNote({
 
   const edgeThickness = 6;
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  const noteColorKeys = Object.keys(NOTE_COLORS);
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
@@ -753,7 +772,7 @@ export function StickyNote({
           />
         </div>
 
-        {/* Drag handle + delete */}
+        {/* Drag handle + more menu + delete */}
         <div
           className="sticky-handle flex cursor-grab items-center justify-between px-3 pt-4 pb-1 active:cursor-grabbing"
           onClick={() => {
@@ -761,26 +780,101 @@ export function StickyNote({
           }}
         >
           <GripVertical className="h-3.5 w-3.5 text-black/20" />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Strip HTML to check if there's actual text content
-              const stripHtml = (html: string) =>
-                html.replace(/<[^>]*>/g, "").trim();
-              const hasContent =
-                !!(note.content && stripHtml(note.content).length > 0);
-              if (hasContent) {
-                setShowDeleteConfirm(true);
-              } else {
-                onDelete(note.id);
-              }
-            }}
-            className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
-            aria-label="Delete note"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <div className="relative flex items-center gap-0.5" ref={menuRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              aria-label="Note options"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Color
+                </div>
+                <div className="flex flex-nowrap items-center gap-1 px-2 pb-2">
+                  {noteColorKeys.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        onColorChange(note.id, key);
+                        setMenuOpen(false);
+                      }}
+                      className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
+                        colorKey === key
+                          ? "border-gray-700 dark:border-gray-300"
+                          : "border-transparent"
+                      } ${NOTE_COLORS[key].bg}`}
+                      title={key}
+                      aria-label={`Color ${key}`}
+                    />
+                  ))}
+                </div>
+                <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                {onDuplicate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDuplicate(note.id);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Duplicate note
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    const stripHtml = (html: string) =>
+                      html.replace(/<[^>]*>/g, "").trim();
+                    const hasContent =
+                      !!(note.content && stripHtml(note.content).length > 0);
+                    if (hasContent) {
+                      setShowDeleteConfirm(true);
+                    } else {
+                      onDelete(note.id);
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete note
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Strip HTML to check if there's actual text content
+                const stripHtml = (html: string) =>
+                  html.replace(/<[^>]*>/g, "").trim();
+                const hasContent =
+                  !!(note.content && stripHtml(note.content).length > 0);
+                if (hasContent) {
+                  setShowDeleteConfirm(true);
+                } else {
+                  onDelete(note.id);
+                }
+              }}
+              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              aria-label="Delete note"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Slide-out toolbar (visible in edit mode) */}
@@ -792,8 +886,6 @@ export function StickyNote({
         >
         <NoteToolbar
           editor={activeEditor}
-          noteColor={colorKey}
-          onNoteColorChange={handleNoteColorChange}
           noteRotation={note.rotation ?? 0}
           onNoteRotationChange={handleNoteRotationChange}
         />

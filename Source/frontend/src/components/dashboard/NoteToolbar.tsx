@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
@@ -7,19 +8,18 @@ import {
   Underline,
   Strikethrough,
   Type,
-  Palette,
-  Check,
   RotateCw,
   AlignLeft,
   AlignCenter,
   AlignRight,
   Link as LinkIcon,
+  List,
+  ChevronDown,
+  ListOrdered,
 } from "lucide-react";
 
 interface NoteToolbarProps {
   editor: Editor | null;
-  noteColor: string;
-  onNoteColorChange: (color: string) => void;
   noteRotation: number;
   onNoteRotationChange: (rotation: number) => void;
 }
@@ -44,15 +44,6 @@ const TEXT_COLORS = [
   { label: "Green", value: "#16a34a" },
   { label: "Orange", value: "#ea580c" },
   { label: "Purple", value: "#9333ea" },
-];
-
-const NOTE_COLOR_SWATCHES = [
-  { key: "yellow", swatch: "bg-yellow-300" },
-  { key: "pink", swatch: "bg-pink-300" },
-  { key: "blue", swatch: "bg-blue-300" },
-  { key: "green", swatch: "bg-green-300" },
-  { key: "orange", swatch: "bg-orange-300" },
-  { key: "purple", swatch: "bg-purple-300" },
 ];
 
 function ToolbarButton({
@@ -86,6 +77,145 @@ function ToolbarButton({
   );
 }
 
+function ListDropdownButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setDropdownStyle(null);
+      return;
+    }
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if ((target as Element).closest?.("[data-board-toolbar-portal]")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const isBullet = editor.isActive("bulletList");
+  const isOrdered = editor.isActive("orderedList");
+  const orderedType = editor.getAttributes("orderedList").type;
+  const isABC = orderedType === "A" || orderedType === "a";
+  const isNumbered = isOrdered && !isABC;
+
+  const listOptions = [
+    {
+      label: "Bullet points",
+      icon: List,
+      active: isBullet,
+      onClick: () => {
+        editor.chain().focus().toggleBulletList().run();
+        setOpen(false);
+      },
+    },
+    {
+      label: "Number points",
+      icon: ListOrdered,
+      active: isNumbered,
+      onClick: () => {
+        if (isOrdered) {
+          editor.chain().focus().updateAttributes("orderedList", { type: null }).run();
+        } else {
+          editor.chain().focus().toggleOrderedList().run();
+        }
+        setOpen(false);
+      },
+    },
+    {
+      label: "ABC points",
+      icon: ListOrdered,
+      active: isABC,
+      onClick: () => {
+        if (isOrdered) {
+          editor.chain().focus().updateAttributes("orderedList", { type: "A" }).run();
+        } else {
+          editor.chain().focus().toggleOrderedList().updateAttributes("orderedList", { type: "A" }).run();
+        }
+        setOpen(false);
+      },
+    },
+  ];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (open) {
+            setOpen(false);
+          } else {
+            const rect = buttonRef.current?.getBoundingClientRect();
+            if (rect) {
+              setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+            }
+            setOpen(true);
+          }
+        }}
+        title="Lists"
+        className={[
+          "flex h-6 items-center gap-0.5 rounded px-1.5 transition-colors",
+          isBullet || isOrdered
+            ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300/50 dark:bg-sky-900/40 dark:text-sky-200 dark:ring-sky-500/30"
+            : "text-gray-600 hover:bg-black/10 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200",
+        ].join(" ")}
+      >
+        <List className="h-3.5 w-3.5" />
+        <ChevronDown className="h-3 w-3" />
+      </button>
+      {open && dropdownStyle &&
+        createPortal(
+          <div
+            data-board-toolbar-portal
+            className="fixed z-[99999] min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            {listOptions.map((opt) => (
+            <button
+              key={opt.label}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                opt.onClick();
+              }}
+              className={[
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
+                opt.active
+                  ? "bg-sky-50 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200"
+                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+              ].join(" ")}
+            >
+              <opt.icon className="h-3.5 w-3.5 shrink-0" />
+              {opt.label}
+            </button>
+          ))}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 function parseFontSize(raw: string | undefined | null): number {
   if (!raw) return 14;
   const n = parseInt(raw, 10);
@@ -95,6 +225,7 @@ function parseFontSize(raw: string | undefined | null): number {
 function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: boolean }) {
   const [showInput, setShowInput] = useState(false);
   const [url, setUrl] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const isLink = isLinkActive;
 
   function handleSetLink() {
@@ -107,8 +238,48 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
     setShowInput(false);
   }
 
+  const noteEl =
+    showInput && wrapperRef.current
+      ? (wrapperRef.current.closest(
+          '[data-board-item="note"], [data-board-item="card"]',
+        ) as HTMLElement | null)
+      : null;
+
+  const popupContent = showInput && (
+    <div
+      className="absolute left-1/2 top-1/2 z-50 flex w-[calc(100%-40px)] max-w-[320px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSetLink();
+          if (e.key === "Escape") {
+            setShowInput(false);
+            setUrl("");
+          }
+        }}
+        placeholder="Enter URL"
+        autoFocus
+        className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+      />
+      <button
+        type="button"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          handleSetLink();
+        }}
+        className="shrink-0 rounded bg-sky-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
+      >
+        Set
+      </button>
+    </div>
+  );
+
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <ToolbarButton
         isActive={isLink}
         onClick={() => {
@@ -123,9 +294,10 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
       >
         <LinkIcon className="h-3.5 w-3.5" />
       </ToolbarButton>
-      {showInput && (
+      {noteEl && popupContent && createPortal(popupContent, noteEl)}
+      {showInput && !noteEl && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 flex gap-1 rounded border border-black/15 bg-white p-1 shadow-lg"
+          className="absolute left-1/2 top-full z-50 mt-1 flex w-64 -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <input
@@ -141,7 +313,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
             }}
             placeholder="Enter URL"
             autoFocus
-            className="h-6 w-44 rounded border border-black/15 px-2 text-[10px] text-gray-700 focus:outline-none"
+            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
           <button
             type="button"
@@ -149,7 +321,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
               e.preventDefault();
               handleSetLink();
             }}
-            className="h-6 rounded bg-black/10 px-2 text-[10px] text-gray-700 hover:bg-black/20"
+            className="shrink-0 rounded bg-sky-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-sky-700"
           >
             Set
           </button>
@@ -240,8 +412,6 @@ function FontSizeInput({ editor }: { editor: Editor }) {
 
 export function NoteToolbar({
   editor,
-  noteColor,
-  onNoteColorChange,
   noteRotation,
   onNoteRotationChange,
 }: NoteToolbarProps) {
@@ -363,6 +533,11 @@ export function NoteToolbar({
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
+        {/* List dropdown */}
+        <ListDropdownButton editor={editor} />
+
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+
         {/* Link / Unlink */}
         <LinkButton editor={editor} isLinkActive={state.isLink} />
 
@@ -392,36 +567,7 @@ export function NoteToolbar({
         </div>
       </div>
 
-      {/* Row 2: Note color */}
-      <div className="flex items-center gap-1">
-        <Palette className="mr-0.5 h-3 w-3 text-gray-500" />
-        <span className="text-[10px] text-gray-500">Note:</span>
-        {NOTE_COLOR_SWATCHES.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onNoteColorChange(c.key);
-            }}
-            title={c.key}
-            className={[
-              "relative flex h-5 w-5 items-center justify-center rounded-full border transition-transform",
-              c.swatch,
-              noteColor === c.key
-                ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                : "border-black/20 hover:scale-110",
-            ].join(" ")}
-          >
-            {noteColor === c.key && (
-              <Check className="h-3 w-3 text-gray-800" strokeWidth={3} />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Row 3: Rotation presets */}
+      {/* Row 2: Rotation presets */}
       <div className="flex items-center gap-1">
         <RotateCw className="mr-0.5 h-3 w-3 text-gray-500" />
         <span className="text-[10px] text-gray-500">Tilt:</span>

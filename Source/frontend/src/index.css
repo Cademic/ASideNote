@@ -304,6 +304,31 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Bullet & numbered lists in editor */
+.tiptap-editor-area .tiptap ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.tiptap-editor-area .tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.tiptap-editor-area .tiptap ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.tiptap-editor-area .tiptap ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
+.tiptap-editor-area .tiptap li {
+  margin: 0.1em 0;
+}
+
 .tiptap-title-area .tiptap {
   font-size: 0.875rem;
   font-weight: 600;
@@ -364,6 +389,31 @@ body {
 .note-rich-content mark {
   padding: 0 0.1em;
   border-radius: 0.2em;
+}
+
+/* Bullet & numbered lists in read mode (sticky notes) */
+.note-rich-content ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.note-rich-content ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.note-rich-content ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.note-rich-content ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
+.note-rich-content li {
+  margin: 0.1em 0;
 }
 
 /* Hyperlinks — blue with underline in all rich text */
@@ -578,6 +628,14 @@ body {
   margin: 0.25em 0;
 }
 
+.index-card-content .tiptap ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.index-card-content .tiptap ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
 .index-card-content .tiptap li {
   margin: 0.1em 0;
 }
@@ -639,6 +697,14 @@ body {
 .note-rich-content.index-card-content ol {
   list-style-type: decimal;
   padding-left: 1.25em;
+}
+
+.note-rich-content.index-card-content ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.note-rich-content.index-card-content ol[type="a"] {
+  list-style-type: lower-alpha;
 }
 
 .note-rich-content.index-card-content hr {

@@ -294,6 +294,7 @@ export function ChalkBoardPage() {
       if (!primaryNote) return;
 
       const target = e.target as Element;
+      if (target.closest("[data-board-toolbar-portal]")) return;
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       if (noteEl?.getAttribute("data-note-id") === primaryNote) return;
 

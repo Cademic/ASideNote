@@ -249,6 +249,8 @@ export function NoteBoardPage() {
       if (!primaryNote && !primaryCard) return;
 
       const target = e.target as Element;
+      if (target.closest("[data-board-toolbar-portal]")) return;
+
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       const cardEl = target.closest("[data-board-item='card'][data-card-id]");
 
@@ -2183,6 +2185,10 @@ export function NoteBoardPage() {
               onDragStart={handleNoteDragStart}
               onDragStop={handleDragStop}
               onDelete={handleDelete}
+              onDuplicate={(id) => {
+                const n = notes.find((note) => note.id === id);
+                if (n) handleDuplicateNote(n);
+              }}
               onStartEdit={handleStartEdit}
               onSave={handleSave}
               onContentChange={handleNoteContentChange}
@@ -2228,6 +2234,10 @@ export function NoteBoardPage() {
               onDragStart={handleCardDragStart}
               onDragStop={handleCardDragStop}
               onDelete={handleCardDelete}
+              onDuplicate={(id) => {
+                const c = indexCards.find((card) => card.id === id);
+                if (c) handleDuplicateCard(c);
+              }}
               onStartEdit={handleCardStartEdit}
               onSave={handleCardSave}
               onContentChange={handleCardContentChange}
