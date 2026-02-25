@@ -21,6 +21,12 @@ interface CorkBoardProps {
   backgroundTheme?: CorkBoardBackgroundTheme;
   /** Called when user right-clicks on empty canvas (not on a board item). Use to show board-level context menu. */
   onBoardContextMenu?: (e: React.MouseEvent) => void;
+  /** Canvas size (board expands with content when provided). If omitted, uses fixed 10000. */
+  canvasWidth?: number;
+  canvasHeight?: number;
+  /** Offset so content at (contentMinX, contentMinY) aligns with scroll origin. */
+  contentMinX?: number;
+  contentMinY?: number;
 }
 
 const MIN_ZOOM = 0.25;
@@ -31,7 +37,9 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu }: CorkBoardProps) {
+const DEFAULT_CANVAS_SIZE = 10000;
+
+export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0 }: CorkBoardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -71,11 +79,11 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     const itemType = e.dataTransfer.getData("application/board-item-type");
     if (!itemType || !onDropItem) return;
 
-    // Convert screen coords to canvas coords
+    // Convert screen coords to canvas coords (account for content offset)
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const canvasX = (e.clientX - rect.left) / zoom - panX;
-    const canvasY = (e.clientY - rect.top) / zoom - panY;
+    const canvasX = (e.clientX - rect.left - panX) / zoom + contentMinX;
+    const canvasY = (e.clientY - rect.top - panY) / zoom + contentMinY;
 
     onDropItem(itemType, canvasX, canvasY);
   }
@@ -84,11 +92,11 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = viewportRef.current?.getBoundingClientRect();
       if (!rect || !onBoardMouseMove) return;
-      const x = (e.clientX - rect.left) / zoom - panX;
-      const y = (e.clientY - rect.top) / zoom - panY;
+      const x = (e.clientX - rect.left - panX) / zoom + contentMinX;
+      const y = (e.clientY - rect.top - panY) / zoom + contentMinY;
       onBoardMouseMove(x, y);
     },
-    [zoom, panX, panY, onBoardMouseMove],
+    [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
   );
 
   // ---- Wheel zoom (Ctrl + scroll only) ----
@@ -273,9 +281,9 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
           ref={setCanvasRef}
           className="absolute origin-top-left"
           style={{
-            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
-            width: "10000px",
-            height: "10000px",
+            transform: `translate(${-contentMinX}px, ${-contentMinY}px) scale(${zoom}) translate(${panX}px, ${panY}px)`,
+            width: `${canvasWidth}px`,
+            height: `${canvasHeight}px`,
           }}
           onClick={(e) => {
             if (onBoardClick) onBoardClick(e);

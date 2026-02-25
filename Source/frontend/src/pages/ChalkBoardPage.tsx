@@ -1253,7 +1253,7 @@ export function ChalkBoardPage() {
       {/* Chalkboard frame - border color matches background theme */}
       <div
         className={[
-          "chalkboard-frame relative flex-1 min-h-0 flex flex-col overflow-hidden rounded-t-none",
+          "chalkboard-frame relative flex-1 min-h-0 flex flex-col overflow-auto rounded-t-none",
           backgroundTheme === "whiteboard" && "chalkboard-frame--whiteboard",
           backgroundTheme === "blackboard" && "chalkboard-frame--blackboard",
         ]
@@ -1273,10 +1273,10 @@ export function ChalkBoardPage() {
           ref={viewportRef}
           className={[
             "chalkboard-surface relative flex-1 min-h-0 w-full overflow-hidden",
-          isDragOver ? "ring-2 ring-inset ring-white/20" : "",
-          cursorClass,
-        ].join(" ")}
-        style={{ backgroundColor: chalkBg }}
+            isDragOver ? "ring-2 ring-inset ring-white/20" : "",
+            cursorClass,
+          ].join(" ")}
+          style={{ minWidth: 10000, minHeight: 10000, backgroundColor: chalkBg }}
         onMouseDown={handleViewportMouseDown}
         onMouseMove={handleChalkBoardMouseMove}
         onMouseLeave={handleChalkBoardMouseLeave}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
@@ -137,9 +137,53 @@ export function NoteBoardPage() {
 
   // --- Red-string linking state ---
   const [connections, setConnections] = useState<BoardConnectionDto[]>([]);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
   const [linkMousePos, setLinkMousePos] = useState<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+
+  const CONTENT_MARGIN = 400;
+  const MIN_CANVAS_SIZE = 1200;
+  const DEFAULT_ITEM_SIZE = 220;
+
+  const { canvasWidth, canvasHeight, contentMinX, contentMinY } = useMemo(() => {
+    let minX = 0;
+    let minY = 0;
+    let maxX = MIN_CANVAS_SIZE;
+    let maxY = MIN_CANVAS_SIZE;
+    const w = (v: number | null) => (v != null && v > 0 ? v : DEFAULT_ITEM_SIZE);
+    const h = (v: number | null) => (v != null && v > 0 ? v : DEFAULT_ITEM_SIZE);
+    const x = (v: number | null) => v ?? 0;
+    const y = (v: number | null) => v ?? 0;
+    for (const note of notes) {
+      const left = x(note.positionX);
+      const top = y(note.positionY);
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + w(note.width));
+      maxY = Math.max(maxY, top + h(note.height));
+    }
+    for (const card of indexCards) {
+      const left = x(card.positionX);
+      const top = y(card.positionY);
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + w(card.width));
+      maxY = Math.max(maxY, top + h(card.height));
+    }
+    for (const img of imageCards) {
+      const left = img.positionX;
+      const top = img.positionY;
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + w(img.width));
+      maxY = Math.max(maxY, top + h(img.height));
+    }
+    const width = Math.max(MIN_CANVAS_SIZE, maxX - minX + CONTENT_MARGIN);
+    const height = Math.max(MIN_CANVAS_SIZE, maxY - minY + CONTENT_MARGIN);
+    return { canvasWidth: width, canvasHeight: height, contentMinX: minX, contentMinY: minY };
+  }, [notes, indexCards, imageCards]);
+
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -183,6 +227,14 @@ export function NoteBoardPage() {
       }
     } catch {
       // ignore parse errors
+  // Sync scroll position from pan when board or restored pan changes (e.g. localStorage, load file)
+  useEffect(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    el.scrollLeft = panX;
+    el.scrollTop = panY;
+  }, [boardId, panX, panY]);
+
     }
   }, [boardId]);
 
@@ -232,6 +284,26 @@ export function NoteBoardPage() {
   }, [boardId, autoEnlargeNotes]);
 
   function handleViewportChange(newZoom: number, newPanX: number, newPanY: number) {
+    if (boardScrollRef.current) {
+      boardScrollRef.current.scrollLeft = newPanX;
+      boardScrollRef.current.scrollTop = newPanY;
+  function handleBoardScroll() {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    setPanX(el.scrollLeft);
+    setPanY(el.scrollTop);
+  }
+
+  function handleBoardWheel(e: React.WheelEvent) {
+    if (e.ctrlKey || e.metaKey) return;
+    const el = boardScrollRef.current;
+    if (!el) return;
+    el.scrollLeft += e.deltaX;
+    el.scrollTop += e.deltaY;
+    e.preventDefault();
+  }
+
+    }
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
@@ -2120,25 +2192,29 @@ export function NoteBoardPage() {
       {/* Board content */}
       <div className="relative flex-1 min-h-0">
         <CorkBoard
-          boardRef={boardRef}
-          onDropItem={handleBoardDrop}
-          onBoardMouseMove={handleBoardMouseMove}
-          onBoardMouseLeave={handleBoardMouseLeave}
-          onBoardClick={(e) => {
-            if (!(e.target as Element).closest("[data-board-item]")) {
-              setEditingNoteIds(new Set());
-              setEditingCardIds(new Set());
-              primaryEditingNoteIdRef.current = null;
-              primaryEditingCardIdRef.current = null;
-            }
-          }}
-          zoom={zoom}
-          panX={panX}
-          panY={panY}
-          onViewportChange={handleViewportChange}
-          backgroundTheme={backgroundTheme}
-          onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
-        >
+              boardRef={boardRef}
+              onDropItem={handleBoardDrop}
+              onBoardMouseMove={handleBoardMouseMove}
+              onBoardMouseLeave={handleBoardMouseLeave}
+              onBoardClick={(e) => {
+                if (!(e.target as Element).closest("[data-board-item]")) {
+                  setEditingNoteIds(new Set());
+                  setEditingCardIds(new Set());
+                  primaryEditingNoteIdRef.current = null;
+                  primaryEditingCardIdRef.current = null;
+                }
+              }}
+              zoom={zoom}
+              panX={panX}
+              panY={panY}
+              onViewportChange={handleViewportChange}
+              backgroundTheme={backgroundTheme}
+              onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+              contentMinX={contentMinX}
+              contentMinY={contentMinY}
+            >
           {/* Remote cursors layer (board-space coords, same transform as canvas) */}
           <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
             {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
@@ -2272,8 +2348,9 @@ export function NoteBoardPage() {
             onChange={handleImageFileSelect}
           />
         </CorkBoard>
+      </div>
 
-        {boardContextMenu && (
+      {boardContextMenu && (
           <ContextMenu
             x={boardContextMenu.x}
             y={boardContextMenu.y}
@@ -2296,7 +2373,6 @@ export function NoteBoardPage() {
             onClose={() => setItemContextMenu(null)}
           />
         )}
-      </div>
     </div>
   );
 }
