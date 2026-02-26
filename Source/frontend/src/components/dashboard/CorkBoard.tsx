@@ -82,8 +82,11 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     // Convert screen coords to canvas coords (account for content offset)
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const canvasX = (e.clientX - rect.left - panX) / zoom + contentMinX;
-    const canvasY = (e.clientY - rect.top - panY) / zoom + contentMinY;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    // Invert transform: screen = zoom * (canvas + pan)
+    const canvasX = screenX / zoom - panX + contentMinX;
+    const canvasY = screenY / zoom - panY + contentMinY;
 
     onDropItem(itemType, canvasX, canvasY);
   }
@@ -92,8 +95,10 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = viewportRef.current?.getBoundingClientRect();
       if (!rect || !onBoardMouseMove) return;
-      const x = (e.clientX - rect.left - panX) / zoom + contentMinX;
-      const y = (e.clientY - rect.top - panY) / zoom + contentMinY;
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      const x = screenX / zoom - panX + contentMinX;
+      const y = screenY / zoom - panY + contentMinY;
       onBoardMouseMove(x, y);
     },
     [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
@@ -293,8 +298,8 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
         </div>
       </div>
 
-      {/* Zoom controls (outside canvas transform) */}
-      <div className="absolute bottom-4 left-4 z-20">
+      {/* Zoom controls (above horizontal scrollbar) */}
+      <div className="absolute bottom-8 left-4 z-20">
         <ZoomControls
           zoom={zoom}
           onZoomChange={zoomToCenter}

@@ -90,6 +90,13 @@ export function ChalkBoardPage() {
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [isBoardHovered, setIsBoardHovered] = useState(false);
+  const scrollSliderXRef = useRef(0);
+  const scrollSliderYRef = useRef(0);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  panXRef.current = panX;
+  panYRef.current = panY;
   const [isPanning, setIsPanning] = useState(false);
   const [isTouchPanning, setIsTouchPanning] = useState(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
@@ -1260,14 +1267,14 @@ export function ChalkBoardPage() {
           .filter(Boolean)
           .join(" ")}
       >
-      <input
-        ref={loadFileInputRef}
-        type="file"
-        accept=".json,.asidenote-board,application/json"
-        className="hidden"
-        aria-hidden
-        onChange={handleLoadFileSelect}
-      />
+        <input
+          ref={loadFileInputRef}
+          type="file"
+          accept=".json,.asidenote-board,application/json"
+          className="hidden"
+          aria-hidden
+          onChange={handleLoadFileSelect}
+        />
         {/* Viewport (clips and captures pan/zoom events) */}
         <div
           ref={viewportRef}
@@ -1277,13 +1284,17 @@ export function ChalkBoardPage() {
             cursorClass,
           ].join(" ")}
           style={{ minWidth: 10000, minHeight: 10000, backgroundColor: chalkBg }}
-        onMouseDown={handleViewportMouseDown}
-        onMouseMove={handleChalkBoardMouseMove}
-        onMouseLeave={handleChalkBoardMouseLeave}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
+          onMouseEnter={() => setIsBoardHovered(true)}
+          onMouseLeave={() => {
+            setIsBoardHovered(false);
+            handleChalkBoardMouseLeave();
+          }}
+          onMouseDown={handleViewportMouseDown}
+          onMouseMove={handleChalkBoardMouseMove}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
         {/* Layer 1: Drawing canvas (uses fabric.js viewport transform for zoom/pan) */}
         <ChalkCanvas
           ref={canvasRef}
@@ -1360,9 +1371,71 @@ export function ChalkBoardPage() {
           ))}
         </div>
         </div>
+
+        {/* Hover-only pan scrollbars (horizontal & vertical) */}
+        {isBoardHovered && (
+          <div className="pointer-events-none absolute inset-0 z-10">
+            {/* Horizontal scrollbar (full board width, slightly above bottom border like vertical inset) */}
+            <div className="pointer-events-auto absolute bottom-2 left-3 right-3 px-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderXRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 2;
+                    const nextPanX = panXRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, nextPanX, panYRef.current);
+                  }
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderXRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderXRef.current = raw;
+                  }
+                }}
+                className="board-scrollbar-range board-scrollbar-range-h w-full h-2 cursor-pointer"
+              />
+            </div>
+            {/* Vertical scrollbar (full board height, vertical style, evenly inset from frame) */}
+            <div className="pointer-events-auto absolute top-3 bottom-3 right-3 flex items-stretch py-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderYRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 1;
+                    const nextPanY = panYRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, panXRef.current, nextPanY);
+                  }
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderYRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderYRef.current = raw;
+                  }
+                }}
+                style={{ writingMode: "vertical-rl" }}
+                className="board-scrollbar-range board-scrollbar-range-v h-full w-3 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Zoom controls and toolbar - pointer-events-none so canvas receives clicks; only the controls themselves are interactive */}
         <div className="absolute inset-0 z-20 pointer-events-none">
-          <div className="absolute bottom-4 left-4 pointer-events-auto">
+          <div className="absolute bottom-8 left-4 pointer-events-auto">
             <ZoomControls
               zoom={zoom}
               onZoomChange={zoomToCenter}

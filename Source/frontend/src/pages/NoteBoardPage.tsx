@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
@@ -137,52 +137,13 @@ export function NoteBoardPage() {
 
   // --- Red-string linking state ---
   const [connections, setConnections] = useState<BoardConnectionDto[]>([]);
-  const boardScrollRef = useRef<HTMLDivElement>(null);
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
   const [linkMousePos, setLinkMousePos] = useState<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const boardViewportRef = useRef<HTMLDivElement>(null);
 
-  const CONTENT_MARGIN = 400;
-  const MIN_CANVAS_SIZE = 1200;
-  const DEFAULT_ITEM_SIZE = 220;
-
-  const { canvasWidth, canvasHeight, contentMinX, contentMinY } = useMemo(() => {
-    let minX = 0;
-    let minY = 0;
-    let maxX = MIN_CANVAS_SIZE;
-    let maxY = MIN_CANVAS_SIZE;
-    const w = (v: number | null) => (v != null && v > 0 ? v : DEFAULT_ITEM_SIZE);
-    const h = (v: number | null) => (v != null && v > 0 ? v : DEFAULT_ITEM_SIZE);
-    const x = (v: number | null) => v ?? 0;
-    const y = (v: number | null) => v ?? 0;
-    for (const note of notes) {
-      const left = x(note.positionX);
-      const top = y(note.positionY);
-      minX = Math.min(minX, left);
-      minY = Math.min(minY, top);
-      maxX = Math.max(maxX, left + w(note.width));
-      maxY = Math.max(maxY, top + h(note.height));
-    }
-    for (const card of indexCards) {
-      const left = x(card.positionX);
-      const top = y(card.positionY);
-      minX = Math.min(minX, left);
-      minY = Math.min(minY, top);
-      maxX = Math.max(maxX, left + w(card.width));
-      maxY = Math.max(maxY, top + h(card.height));
-    }
-    for (const img of imageCards) {
-      const left = img.positionX;
-      const top = img.positionY;
-      minX = Math.min(minX, left);
-      minY = Math.min(minY, top);
-      maxX = Math.max(maxX, left + w(img.width));
-      maxY = Math.max(maxY, top + h(img.height));
-    }
-    const width = Math.max(MIN_CANVAS_SIZE, maxX - minX + CONTENT_MARGIN);
-    const height = Math.max(MIN_CANVAS_SIZE, maxY - minY + CONTENT_MARGIN);
-    return { canvasWidth: width, canvasHeight: height, contentMinX: minX, contentMinY: minY };
-  }, [notes, indexCards, imageCards]);
+  // Use a large fixed canvas; pan/zoom provide the "infinite" feel.
+  const CANVAS_SIZE = 10000;
 
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
@@ -197,6 +158,13 @@ export function NoteBoardPage() {
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [isBoardHovered, setIsBoardHovered] = useState(false);
+  const scrollSliderXRef = useRef(0);
+  const scrollSliderYRef = useRef(0);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  panXRef.current = panX;
+  panYRef.current = panY;
 
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -227,14 +195,6 @@ export function NoteBoardPage() {
       }
     } catch {
       // ignore parse errors
-  // Sync scroll position from pan when board or restored pan changes (e.g. localStorage, load file)
-  useEffect(() => {
-    const el = boardScrollRef.current;
-    if (!el) return;
-    el.scrollLeft = panX;
-    el.scrollTop = panY;
-  }, [boardId, panX, panY]);
-
     }
   }, [boardId]);
 
@@ -284,26 +244,6 @@ export function NoteBoardPage() {
   }, [boardId, autoEnlargeNotes]);
 
   function handleViewportChange(newZoom: number, newPanX: number, newPanY: number) {
-    if (boardScrollRef.current) {
-      boardScrollRef.current.scrollLeft = newPanX;
-      boardScrollRef.current.scrollTop = newPanY;
-  function handleBoardScroll() {
-    const el = boardScrollRef.current;
-    if (!el) return;
-    setPanX(el.scrollLeft);
-    setPanY(el.scrollTop);
-  }
-
-  function handleBoardWheel(e: React.WheelEvent) {
-    if (e.ctrlKey || e.metaKey) return;
-    const el = boardScrollRef.current;
-    if (!el) return;
-    el.scrollLeft += e.deltaX;
-    el.scrollTop += e.deltaY;
-    e.preventDefault();
-  }
-
-    }
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
@@ -1130,11 +1070,25 @@ export function NoteBoardPage() {
   // Sticky Note handlers
   // =============================================
 
+  function getViewportCenterInBoardCoords() {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return { x: 400, y: 300 };
+    }
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const x = centerScreenX / zoom - panX;
+    const y = centerScreenY / zoom - panY;
+    return { x, y };
+  }
+
   async function handleQuickAddNote() {
     if (!boardId) return;
     try {
-      const positionX = 30 + Math.random() * 400;
-      const positionY = 30 + Math.random() * 300;
+      const center = getViewportCenterInBoardCoords();
+      const NOTE_DEFAULT_SIZE = 270;
+      const positionX = center.x - NOTE_DEFAULT_SIZE / 2;
+      const positionY = center.y - NOTE_DEFAULT_SIZE / 2;
 
       const created = await createNote({
         content: "",
@@ -1365,8 +1319,11 @@ export function NoteBoardPage() {
 
   async function handleQuickAddCard() {
     if (!boardId) return;
-    const positionX = 30 + Math.random() * 300;
-    const positionY = 30 + Math.random() * 200;
+    const center = getViewportCenterInBoardCoords();
+    const CARD_DEFAULT_WIDTH = 450;
+    const CARD_DEFAULT_HEIGHT = 300;
+    const positionX = center.x - CARD_DEFAULT_WIDTH / 2;
+    const positionY = center.y - CARD_DEFAULT_HEIGHT / 2;
     const tempId = `temp-card-${nextTempCardId++}`;
     const now = new Date().toISOString();
 
@@ -2190,7 +2147,12 @@ export function NoteBoardPage() {
         onChange={handleLoadFileSelect}
       />
       {/* Board content */}
-      <div className="relative flex-1 min-h-0">
+      <div
+        ref={boardViewportRef}
+        className="relative flex-1 min-h-0"
+        onMouseEnter={() => setIsBoardHovered(true)}
+        onMouseLeave={() => setIsBoardHovered(false)}
+      >
         <CorkBoard
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
@@ -2210,10 +2172,8 @@ export function NoteBoardPage() {
               onViewportChange={handleViewportChange}
               backgroundTheme={backgroundTheme}
               onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-              contentMinX={contentMinX}
-              contentMinY={contentMinY}
+              canvasWidth={CANVAS_SIZE}
+              canvasHeight={CANVAS_SIZE}
             >
           {/* Remote cursors layer (board-space coords, same transform as canvas) */}
           <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
@@ -2348,6 +2308,68 @@ export function NoteBoardPage() {
             onChange={handleImageFileSelect}
           />
         </CorkBoard>
+
+        {/* Hover-only pan scrollbars (horizontal & vertical) */}
+        {isBoardHovered && (
+          <div className="pointer-events-none absolute inset-0">
+            {/* Horizontal scrollbar (full board width, slightly above bottom border like vertical inset) */}
+            <div className="pointer-events-auto absolute bottom-2 left-3 right-3 px-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderXRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 2;
+                    const nextPanX = panXRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, nextPanX, panYRef.current);
+                  }
+                  // When thumb reaches either end, snap back to center (pan unchanged)
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderXRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderXRef.current = raw;
+                  }
+                }}
+                className="board-scrollbar-range board-scrollbar-range-h w-full h-2 cursor-pointer"
+              />
+            </div>
+            {/* Vertical scrollbar (full board height, vertical style, evenly inset from frame) */}
+            <div className="pointer-events-auto absolute top-3 bottom-3 right-3 flex items-stretch py-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderYRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 1;
+                    const nextPanY = panYRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, panXRef.current, nextPanY);
+                  }
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderYRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderYRef.current = raw;
+                  }
+                }}
+                style={{ writingMode: "vertical-rl" }}
+                className="board-scrollbar-range board-scrollbar-range-v h-full w-3 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {boardContextMenu && (
