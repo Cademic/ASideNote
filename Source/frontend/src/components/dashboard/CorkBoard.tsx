@@ -31,7 +31,10 @@ interface CorkBoardProps {
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
-const ZOOM_STEP = 1.1;
+/** Zoom factor per "unit" of scroll; scaled by deltaY so zoom is proportional to scroll amount */
+const ZOOM_STEP_PER_UNIT = 1.028;
+const ZOOM_DELTA_SCALE = 55;
+const ZOOM_EXPONENT_CAP = 2.5;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -79,14 +82,14 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     const itemType = e.dataTransfer.getData("application/board-item-type");
     if (!itemType || !onDropItem) return;
 
-    // Convert screen coords to canvas coords (account for content offset)
+    // Convert viewport screen coords to board (world) coords.
+    // Transform: screen = zoom*(world + pan) - contentMin*(zoom+1)  =>  world = (screen + contentMin*(zoom+1))/zoom - pan
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
-    // Invert transform: screen = zoom * (canvas + pan)
-    const canvasX = screenX / zoom - panX + contentMinX;
-    const canvasY = screenY / zoom - panY + contentMinY;
+    const canvasX = (screenX + contentMinX * (zoom + 1)) / zoom - panX;
+    const canvasY = (screenY + contentMinY * (zoom + 1)) / zoom - panY;
 
     onDropItem(itemType, canvasX, canvasY);
   }
@@ -97,8 +100,8 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
       if (!rect || !onBoardMouseMove) return;
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
-      const x = screenX / zoom - panX + contentMinX;
-      const y = screenY / zoom - panY + contentMinY;
+      const x = (screenX + contentMinX * (zoom + 1)) / zoom - panX;
+      const y = (screenY + contentMinY * (zoom + 1)) / zoom - panY;
       onBoardMouseMove(x, y);
     },
     [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
@@ -120,20 +123,31 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      // Scale zoom change by deltaY so one wheel tick is gentle; cap exponent to avoid huge jumps
+      const exponent = Math.max(
+        -ZOOM_EXPONENT_CAP,
+        Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
+      );
+      const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
       const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
 
-      // Adjust pan so the point under the cursor stays fixed
-      // With transform: scale(z) translate(p), screen = z*(canvas+p), so canvas = screen/z - p
-      const newPanX = panX + (mouseX / newZoom - mouseX / zoom);
-      const newPanY = panY + (mouseY / newZoom - mouseY / zoom);
+      // Keep the point under the cursor fixed: world = (mouse + contentMin*(zoom+1))/zoom - pan
+      // So newPan = (mouse + contentMin*(newZoom+1))/newZoom - world = pan + (mouse + contentMin*(newZoom+1))/newZoom - (mouse + contentMin*(zoom+1))/zoom
+      const newPanX =
+        panX +
+        (mouseX + contentMinX * (newZoom + 1)) / newZoom -
+        (mouseX + contentMinX * (zoom + 1)) / zoom;
+      const newPanY =
+        panY +
+        (mouseY + contentMinY * (newZoom + 1)) / newZoom -
+        (mouseY + contentMinY * (zoom + 1)) / zoom;
 
       onViewportChange(newZoom, newPanX, newPanY);
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
-  }, [zoom, panX, panY, onViewportChange]);
+  }, [zoom, panX, panY, contentMinX, contentMinY, onViewportChange]);
 
   // ---- Pan (right-click drag, middle-click drag, or space + left-click drag) ----
 
@@ -294,7 +308,15 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
             if (onBoardClick) onBoardClick(e);
           }}
         >
-          {children}
+          <div
+            style={{
+              transform: `translate(${-contentMinX}px, ${-contentMinY}px)`,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
 

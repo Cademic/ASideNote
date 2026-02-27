@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
@@ -142,8 +142,54 @@ export function NoteBoardPage() {
   const boardRef = useRef<HTMLDivElement>(null);
   const boardViewportRef = useRef<HTMLDivElement>(null);
 
-  // Use a large fixed canvas; pan/zoom provide the "infinite" feel.
-  const CANVAS_SIZE = 10000;
+  // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
+  const CANVAS_PADDING = 300;
+  const DEFAULT_CANVAS_SIZE = 2000;
+  const NOTE_DEFAULT_SIZE = 270;
+  const INDEX_CARD_DEFAULT_W = 450;
+  const INDEX_CARD_DEFAULT_H = 300;
+  const IMAGE_CARD_DEFAULT_W = 200;
+  const IMAGE_CARD_DEFAULT_H = 150;
+  const POSITION_DEFAULT = 20;
+
+  const canvasBounds = useMemo(() => {
+    let minX = 0;
+    let minY = 0;
+    let maxX = DEFAULT_CANVAS_SIZE;
+    let maxY = DEFAULT_CANVAS_SIZE;
+    const update = (x: number, y: number, w: number, h: number) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    };
+    for (const n of notes) {
+      const x = n.positionX ?? POSITION_DEFAULT;
+      const y = n.positionY ?? POSITION_DEFAULT;
+      const w = n.width ?? NOTE_DEFAULT_SIZE;
+      const h = n.height ?? NOTE_DEFAULT_SIZE;
+      update(x, y, w, h);
+    }
+    for (const c of indexCards) {
+      const x = c.positionX ?? POSITION_DEFAULT;
+      const y = c.positionY ?? POSITION_DEFAULT;
+      const w = c.width ?? INDEX_CARD_DEFAULT_W;
+      const h = c.height ?? INDEX_CARD_DEFAULT_H;
+      update(x, y, w, h);
+    }
+    for (const img of imageCards) {
+      const x = img.positionX ?? POSITION_DEFAULT;
+      const y = img.positionY ?? POSITION_DEFAULT;
+      const w = img.width ?? IMAGE_CARD_DEFAULT_W;
+      const h = img.height ?? IMAGE_CARD_DEFAULT_H;
+      update(x, y, w, h);
+    }
+    const contentMinX = minX - CANVAS_PADDING;
+    const contentMinY = minY - CANVAS_PADDING;
+    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
+    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
+    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
+  }, [notes, indexCards, imageCards]);
 
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
@@ -166,6 +212,28 @@ export function NoteBoardPage() {
   panXRef.current = panX;
   panYRef.current = panY;
 
+  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump
+  const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
+  useEffect(() => {
+    const prev = prevContentMinRef.current;
+    if (prev === null) {
+      prevContentMinRef.current = {
+        contentMinX: canvasBounds.contentMinX,
+        contentMinY: canvasBounds.contentMinY,
+      };
+      return;
+    }
+    const dx = canvasBounds.contentMinX - prev.contentMinX;
+    const dy = canvasBounds.contentMinY - prev.contentMinY;
+    prevContentMinRef.current = {
+      contentMinX: canvasBounds.contentMinX,
+      contentMinY: canvasBounds.contentMinY,
+    };
+    if (dx === 0 && dy === 0) return;
+    setPanX((p) => p + (dx * (zoom + 1)) / zoom);
+    setPanY((p) => p + (dy * (zoom + 1)) / zoom);
+  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom]);
+
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<
@@ -182,9 +250,10 @@ export function NoteBoardPage() {
   const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
   const CURSOR_THROTTLE_MS = 60;
 
-  // Restore viewport from localStorage on mount
+  // Restore viewport from localStorage on mount; reset bounds ref so pan compensation seeds for this board
   useEffect(() => {
     if (!boardId) return;
+    prevContentMinRef.current = null;
     try {
       const saved = localStorage.getItem(`board-viewport-${boardId}`);
       if (saved) {
@@ -1077,8 +1146,9 @@ export function NoteBoardPage() {
     }
     const centerScreenX = rect.width / 2;
     const centerScreenY = rect.height / 2;
-    const x = centerScreenX / zoom - panX;
-    const y = centerScreenY / zoom - panY;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const x = (centerScreenX + contentMinX * (zoom + 1)) / zoom - panX;
+    const y = (centerScreenY + contentMinY * (zoom + 1)) / zoom - panY;
     return { x, y };
   }
 
@@ -1086,7 +1156,6 @@ export function NoteBoardPage() {
     if (!boardId) return;
     try {
       const center = getViewportCenterInBoardCoords();
-      const NOTE_DEFAULT_SIZE = 270;
       const positionX = center.x - NOTE_DEFAULT_SIZE / 2;
       const positionY = center.y - NOTE_DEFAULT_SIZE / 2;
 
@@ -1320,10 +1389,8 @@ export function NoteBoardPage() {
   async function handleQuickAddCard() {
     if (!boardId) return;
     const center = getViewportCenterInBoardCoords();
-    const CARD_DEFAULT_WIDTH = 450;
-    const CARD_DEFAULT_HEIGHT = 300;
-    const positionX = center.x - CARD_DEFAULT_WIDTH / 2;
-    const positionY = center.y - CARD_DEFAULT_HEIGHT / 2;
+    const positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
+    const positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
     const tempId = `temp-card-${nextTempCardId++}`;
     const now = new Date().toISOString();
 
@@ -2172,8 +2239,10 @@ export function NoteBoardPage() {
               onViewportChange={handleViewportChange}
               backgroundTheme={backgroundTheme}
               onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
-              canvasWidth={CANVAS_SIZE}
-              canvasHeight={CANVAS_SIZE}
+              canvasWidth={canvasBounds.canvasWidth}
+              canvasHeight={canvasBounds.canvasHeight}
+              contentMinX={canvasBounds.contentMinX}
+              contentMinY={canvasBounds.contentMinY}
             >
           {/* Remote cursors layer (board-space coords, same transform as canvas) */}
           <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>

@@ -342,14 +342,18 @@ export function StickyNote({
     }
   }, [note.content, isEditing, contentEditor]);
 
-  // Debounced content push while typing so other clients see updates in real time (only when onContentChange provided)
-  const SAVE_DEBOUNCE_MS = 200;
+  // Save immediately while typing (minimal debounce); on exit edit flush so text is never lost
+  const SAVE_DEBOUNCE_MS = 0;
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   useEffect(() => {
     if (!onContentChangeRef.current || !isEditing || !titleEditor || !contentEditor) return;
     const flush = () => {
+      if (saveDebounceRef.current) {
+        clearTimeout(saveDebounceRef.current);
+        saveDebounceRef.current = null;
+      }
       onContentChangeRef.current?.(note.id, titleEditor.getHTML(), contentEditor.getHTML());
     };
     const onUpdate = () => {
@@ -363,6 +367,7 @@ export function StickyNote({
       contentEditor.off("update", onUpdate);
       if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
       saveDebounceRef.current = null;
+      flush();
     };
   }, [isEditing, note.id, titleEditor, contentEditor]);
 

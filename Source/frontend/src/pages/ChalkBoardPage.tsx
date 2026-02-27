@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { ChalkCanvas, CHALKBOARD_BG, RESOLUTION_FACTOR, type ChalkCanvasHandle } from "../components/chalkboard/ChalkCanvas";
@@ -26,7 +26,10 @@ import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon } from "luci
 const MIN_ZOOM = 0.25;
 const AUTO_SAVE_DELAY_MS = 300; // 300ms after last change for faster server sync
 const MAX_ZOOM = 2.0;
-const ZOOM_STEP = 1.1;
+/** Zoom factor per "unit" of scroll; scaled by deltaY so zoom is proportional to scroll amount */
+const ZOOM_STEP_PER_UNIT = 1.028;
+const ZOOM_DELTA_SCALE = 55;
+const ZOOM_EXPONENT_CAP = 2.5;
 const CHALK_WHITEBOARD_BG = "#faf9f6";
 const CHALK_BLACKBOARD_BG = "#1a1a1a";
 
@@ -97,6 +100,34 @@ export function ChalkBoardPage() {
   const panYRef = useRef(panY);
   panXRef.current = panX;
   panYRef.current = panY;
+
+  // Fixed-size notes layer that expands when notes are placed or dragged outside current bounds.
+  const CANVAS_PADDING = 300;
+  const DEFAULT_CANVAS_SIZE = 2000;
+  const NOTE_DEFAULT_SIZE = 270;
+  const POSITION_DEFAULT = 20;
+  const chalkNotesBounds = useMemo(() => {
+    let minX = 0;
+    let minY = 0;
+    let maxX = DEFAULT_CANVAS_SIZE;
+    let maxY = DEFAULT_CANVAS_SIZE;
+    for (const n of notes) {
+      const x = n.positionX ?? POSITION_DEFAULT;
+      const y = n.positionY ?? POSITION_DEFAULT;
+      const w = n.width ?? NOTE_DEFAULT_SIZE;
+      const h = n.height ?? NOTE_DEFAULT_SIZE;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    }
+    const contentMinX = minX - CANVAS_PADDING;
+    const contentMinY = minY - CANVAS_PADDING;
+    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
+    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
+    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
+  }, [notes]);
+
   const [isPanning, setIsPanning] = useState(false);
   const [isTouchPanning, setIsTouchPanning] = useState(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
@@ -207,7 +238,11 @@ export function ChalkBoardPage() {
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const factor = e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      const exponent = Math.max(
+        -ZOOM_EXPONENT_CAP,
+        Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
+      );
+      const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
       const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
       const vpScale = zoom / RESOLUTION_FACTOR;
       const newVpScale = newZoom / RESOLUTION_FACTOR;
@@ -1283,7 +1318,7 @@ export function ChalkBoardPage() {
             isDragOver ? "ring-2 ring-inset ring-white/20" : "",
             cursorClass,
           ].join(" ")}
-          style={{ minWidth: 10000, minHeight: 10000, backgroundColor: chalkBg }}
+          style={{ backgroundColor: chalkBg }}
           onMouseEnter={() => setIsBoardHovered(true)}
           onMouseLeave={() => {
             setIsBoardHovered(false);
@@ -1308,13 +1343,13 @@ export function ChalkBoardPage() {
           backgroundColor={chalkBg}
         />
 
-        {/* Layer 2: Sticky notes (uses CSS transform for zoom/pan, matches Fabric viewport) */}
+        {/* Layer 2: Sticky notes (expandable canvas; uses CSS transform for zoom/pan, matches Fabric viewport) */}
         <div
           className="absolute origin-top-left"
           style={{
-            transform: `scale(${zoom / RESOLUTION_FACTOR}) translate(${panX}px, ${panY}px)`,
-            width: "10000px",
-            height: "10000px",
+            transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px) scale(${zoom / RESOLUTION_FACTOR}) translate(${panX}px, ${panY}px)`,
+            width: `${chalkNotesBounds.canvasWidth}px`,
+            height: `${chalkNotesBounds.canvasHeight}px`,
             pointerEvents: mode === "select" && !isSpaceHeld && !isPanning ? "auto" : "none",
           }}
           onClick={(e) => {
@@ -1324,51 +1359,59 @@ export function ChalkBoardPage() {
             }
           }}
         >
-          {/* Remote cursors (board-space coordinates) */}
-          <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
-            {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
-              <div
-                key={userId}
-                className="absolute z-[9999] flex items-center gap-1 overflow-visible"
-                style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 32 32"
-                  width="32"
-                  height="32"
-                  className="drop-shadow-lg"
+          <div
+            style={{
+              transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px)`,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {/* Remote cursors (board-space coordinates) */}
+            <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+              {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
+                <div
+                  key={userId}
+                  className="absolute z-[9999] flex items-center gap-1 overflow-visible"
+                  style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
                 >
-                  <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
-                </svg>
-              </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 32 32"
+                    width="32"
+                    height="32"
+                    className="drop-shadow-lg"
+                  >
+                    <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
+                  </svg>
+                </div>
+              ))}
+            </div>
+            {notes.map((note) => (
+              <StickyNote
+                key={note.id}
+                note={note}
+                isEditing={editingNoteIds.has(note.id)}
+                enlargeWhenEditing={autoEnlargeNotes}
+                focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
+                zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
+                onDrag={handleNoteDrag}
+                onDragStart={handleNoteDragStart}
+                onDragStop={handleDragStop}
+                onDelete={handleDelete}
+                onStartEdit={handleStartEdit}
+                onSave={handleSave}
+                onContentChange={handleNoteContentChange}
+                onResize={handleResize}
+                onColorChange={handleColorChange}
+                onRotationChange={handleRotationChange}
+                onBringToFront={bringToFront}
+                onUnmount={handleNoteUnmount}
+                onExitEdit={handleExitEditNote}
+                onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
+                zoom={zoom / RESOLUTION_FACTOR}
+              />
             ))}
           </div>
-          {notes.map((note) => (
-            <StickyNote
-              key={note.id}
-              note={note}
-              isEditing={editingNoteIds.has(note.id)}
-              enlargeWhenEditing={autoEnlargeNotes}
-              focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
-              zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
-              onDrag={handleNoteDrag}
-              onDragStart={handleNoteDragStart}
-              onDragStop={handleDragStop}
-              onDelete={handleDelete}
-              onStartEdit={handleStartEdit}
-              onSave={handleSave}
-              onContentChange={handleNoteContentChange}
-              onResize={handleResize}
-              onColorChange={handleColorChange}
-              onRotationChange={handleRotationChange}
-              onBringToFront={bringToFront}
-              onUnmount={handleNoteUnmount}
-              onExitEdit={handleExitEditNote}
-              onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
-              zoom={zoom / RESOLUTION_FACTOR}
-            />
-          ))}
         </div>
         </div>
 
