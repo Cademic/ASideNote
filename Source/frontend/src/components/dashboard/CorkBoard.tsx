@@ -1,5 +1,6 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { isWheelOverEditableText, wheelEventDeltaPixels } from "../../lib/boardWheelPan";
+import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { corkPanToScroll, corkScrollInnerLayout, corkScrollToPan, corkZoomAroundScreenPoint } from "../../lib/boardViewportScroll";
+import { isWheelOverEditableText } from "../../lib/boardWheelPan";
 import { ZoomControls } from "./ZoomControls";
 import { useTouchViewport } from "../../hooks/useTouchViewport";
 
@@ -30,6 +31,8 @@ interface CorkBoardProps {
   /** Offset so content at (contentMinX, contentMinY) aligns with scroll origin. */
   contentMinX?: number;
   contentMinY?: number;
+  /** Ref to the scroll viewport (overflow surface) for parent measurements (e.g. menu zoom). */
+  scrollContainerRef?: RefObject<HTMLDivElement | null>;
 }
 
 const MIN_ZOOM = 0.25;
@@ -47,13 +50,18 @@ function clamp(value: number, min: number, max: number) {
 
 const DEFAULT_CANVAS_SIZE = 10000;
 
-export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0 }: CorkBoardProps) {
+const SCROLL_EPS = 0.5;
+const PAN_EPS = 1e-4;
+
+export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0, scrollContainerRef }: CorkBoardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+  /** Ignore scroll events while applying scrollLeft/Top from React pan state */
+  const syncingScrollFromPanRef = useRef(false);
 
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
@@ -68,6 +76,45 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
 
   const onViewportChangeRef = useRef(onViewportChange);
   onViewportChangeRef.current = onViewportChange;
+
+  const setViewportNode = useCallback(
+    (el: HTMLDivElement | null) => {
+      (viewportRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      if (scrollContainerRef) {
+        (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      }
+    },
+    [scrollContainerRef],
+  );
+
+  const { scrollWidth, scrollHeight, canvasLeft, canvasTop } = corkScrollInnerLayout(
+    canvasWidth,
+    canvasHeight,
+    zoom,
+  );
+
+  // Keep native scroll position aligned with pan/zoom from props (zoom, persistence, contentMin nudge, etc.)
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const { scrollLeft: sl, scrollTop: st } = corkPanToScroll(panX, panY, zoom);
+    if (Math.abs(el.scrollLeft - sl) < SCROLL_EPS && Math.abs(el.scrollTop - st) < SCROLL_EPS) return;
+    syncingScrollFromPanRef.current = true;
+    el.scrollLeft = sl;
+    el.scrollTop = st;
+    queueMicrotask(() => {
+      syncingScrollFromPanRef.current = false;
+    });
+  }, [panX, panY, zoom, scrollWidth, scrollHeight]);
+
+  const handleViewportScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el || syncingScrollFromPanRef.current) return;
+    const z = zoomRef.current;
+    const { panX: nx, panY: ny } = corkScrollToPan(el.scrollLeft, el.scrollTop, z);
+    if (Math.abs(nx - panXRef.current) < PAN_EPS && Math.abs(ny - panYRef.current) < PAN_EPS) return;
+    onViewportChangeRef.current(z, nx, ny);
+  }, []);
 
   // Bridge boardRef to point at the canvas div
   const setCanvasRef = useCallback(
@@ -126,35 +173,10 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
     [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
   );
 
-  // ---- Wheel: Ctrl/Cmd + scroll = zoom; two-finger / trackpad scroll (or mouse wheel) = pan ----
-  // Pan deltas are coalesced per animation frame so diagonal trackpad motion stays smooth (fewer React updates).
-
+  // ---- Wheel: Ctrl/Cmd + scroll = zoom; otherwise native scroll on this viewport pans ----
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-
-    const wheelPanAccum = { dx: 0, dy: 0 };
-    let wheelPanRaf: number | null = null;
-
-    function flushWheelPan() {
-      wheelPanRaf = null;
-      const dx = wheelPanAccum.dx;
-      const dy = wheelPanAccum.dy;
-      wheelPanAccum.dx = 0;
-      wheelPanAccum.dy = 0;
-      if (dx === 0 && dy === 0) return;
-      const z = zoomRef.current;
-      const nx = panXRef.current - dx / z;
-      const ny = panYRef.current - dy / z;
-      panXRef.current = nx;
-      panYRef.current = ny;
-      onViewportChangeRef.current(z, nx, ny);
-    }
-
-    function scheduleWheelPan() {
-      if (wheelPanRaf !== null) return;
-      wheelPanRaf = requestAnimationFrame(flushWheelPan);
-    }
 
     function onWheel(e: WheelEvent) {
       // Zoom when Ctrl (or Cmd on Mac) is held — including pinch-zoom on trackpads
@@ -194,22 +216,12 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
       }
 
       if (isWheelOverEditableText(e.target)) return;
-
-      const wheelEl = viewportRef.current;
-      if (!wheelEl) return;
-      const { dx, dy } = wheelEventDeltaPixels(e, wheelEl);
-      if (dx === 0 && dy === 0) return;
-
-      e.preventDefault();
-      wheelPanAccum.dx += dx;
-      wheelPanAccum.dy += dy;
-      scheduleWheelPan();
+      // Non-Ctrl: let the overflow:auto viewport handle wheel / trackpad pan (onScroll updates pan)
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       viewport.removeEventListener("wheel", onWheel);
-      if (wheelPanRaf !== null) cancelAnimationFrame(wheelPanRaf);
     };
   }, []);
 
@@ -310,16 +322,24 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
   // ---- Zoom controls ----
 
   function zoomToCenter(newZoom: number) {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    if (!rect) {
+    const el = viewportRef.current;
+    if (!el) {
       onViewportChange(newZoom, panX, panY);
       return;
     }
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const newPanX = panX + (centerX / newZoom - centerX / zoom);
-    const newPanY = panY + (centerY / newZoom - centerY / zoom);
-    onViewportChange(newZoom, newPanX, newPanY);
+    const cx = el.clientWidth / 2;
+    const cy = el.clientHeight / 2;
+    const { panX: nx, panY: ny } = corkZoomAroundScreenPoint(
+      panX,
+      panY,
+      zoom,
+      newZoom,
+      cx,
+      cy,
+      contentMinX,
+      contentMinY,
+    );
+    onViewportChange(newZoom, nx, ny);
   }
 
   function handleZoomReset() {
@@ -348,16 +368,17 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
           <div className="px-2 py-1.5 sm:px-3 sm:py-2">{topBar}</div>
         </div>
       ) : null}
-      {/* Viewport (clips and captures events) */}
+      {/* Viewport: native scroll encodes pan (see boardViewportScroll); canvas has no translate(pan) */}
       <div
-        ref={viewportRef}
+        ref={setViewportNode}
         className={[
-          "corkboard-surface relative min-h-0 w-full flex-1 overflow-hidden transition-shadow duration-150",
+          "corkboard-surface relative min-h-0 w-full flex-1 overflow-auto transition-shadow duration-150",
           backgroundTheme === "whiteboard" ? "corkboard-surface--whiteboard" : "",
           backgroundTheme === "blackboard" ? "corkboard-surface--blackboard" : "",
           isDragOver ? "ring-2 ring-inset ring-primary/40" : "",
           cursorClass,
         ].join(" ")}
+        onScroll={handleViewportScroll}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -365,27 +386,36 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
         onMouseMove={onBoardMouseMove ? handleViewportMouseMove : undefined}
         onMouseLeave={onBoardMouseLeave}
       >
-        {/* Canvas (transformed layer) */}
         <div
-          ref={setCanvasRef}
-          className="absolute origin-top-left"
+          className="relative"
           style={{
-            transform: `translate(${-contentMinX}px, ${-contentMinY}px) scale(${zoom}) translate(${panX}px, ${panY}px)`,
-            width: `${canvasWidth}px`,
-            height: `${canvasHeight}px`,
-          }}
-          onClick={(e) => {
-            if (onBoardClick) onBoardClick(e);
+            width: `${scrollWidth}px`,
+            height: `${scrollHeight}px`,
           }}
         >
           <div
+            ref={setCanvasRef}
+            className="absolute origin-top-left"
             style={{
-              transform: `translate(${-contentMinX}px, ${-contentMinY}px)`,
-              width: "100%",
-              height: "100%",
+              left: `${canvasLeft}px`,
+              top: `${canvasTop}px`,
+              transform: `translate(${-contentMinX}px, ${-contentMinY}px) scale(${zoom})`,
+              width: `${canvasWidth}px`,
+              height: `${canvasHeight}px`,
+            }}
+            onClick={(e) => {
+              if (onBoardClick) onBoardClick(e);
             }}
           >
-            {children}
+            <div
+              style={{
+                transform: `translate(${-contentMinX}px, ${-contentMinY}px)`,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              {children}
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { ChalkCanvas, CHALKBOARD_BG, RESOLUTION_FACTOR, type ChalkCanvasHandle } from "../components/chalkboard/ChalkCanvas";
@@ -23,7 +23,10 @@ import {
   buildBoardExportFilename,
   parseBoardExportFile,
 } from "../lib/boardExport";
-import { isWheelOverEditableText, wheelEventDeltaPixels } from "../lib/boardWheelPan";
+import { chalkPanToScroll, chalkScrollInnerLayout, chalkScrollToPan } from "../lib/boardViewportScroll";
+import { chalkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
+import { persistBoardViewport, readBoardViewport } from "../lib/boardViewportStorage";
+import { isWheelOverEditableText } from "../lib/boardWheelPan";
 import type { BoardSummaryDto, NoteSummaryDto } from "../types";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon } from "lucide-react";
@@ -39,6 +42,9 @@ const ZOOM_DELTA_SCALE_PIXEL = 30;
 const ZOOM_EXPONENT_CAP = 2.5;
 const CHALK_WHITEBOARD_BG = "#faf9f6";
 const CHALK_BLACKBOARD_BG = "#1a1a1a";
+
+const SCROLL_EPS = 0.5;
+const CHALK_PAN_EPS = 1e-4;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -117,9 +123,7 @@ export function ChalkBoardPage() {
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
-  const [isBoardHovered, setIsBoardHovered] = useState(false);
-  const scrollSliderXRef = useRef(0);
-  const scrollSliderYRef = useRef(0);
+  const syncingChalkScrollFromPanRef = useRef(false);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
   const zoomRef = useRef(zoom);
@@ -152,6 +156,11 @@ export function ChalkBoardPage() {
     const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
     return { contentMinX, contentMinY, canvasWidth, canvasHeight };
   }, [notes]);
+
+  const chalkScrollLayout = useMemo(
+    () => chalkScrollInnerLayout(chalkNotesBounds.canvasWidth, chalkNotesBounds.canvasHeight, zoom, RESOLUTION_FACTOR),
+    [chalkNotesBounds.canvasWidth, chalkNotesBounds.canvasHeight, zoom],
+  );
 
   const [isPanning, setIsPanning] = useState(false);
   const [isTouchPanning, setIsTouchPanning] = useState(false);
@@ -186,29 +195,27 @@ export function ChalkBoardPage() {
   // Restore viewport from localStorage on mount
   useEffect(() => {
     if (!boardId) return;
-    try {
-      const saved = localStorage.getItem(`board-viewport-${boardId}`);
-      if (saved) {
-        const { zoom: z, panX: px, panY: py } = JSON.parse(saved);
-        if (typeof z === "number") setZoom(z);
-        if (typeof px === "number") setPanX(px);
-        if (typeof py === "number") setPanY(py);
-      }
-    } catch {
-      // ignore parse errors
-    }
+    const { zoom: z, panX: px, panY: py } = readBoardViewport(boardId);
+    if (z !== undefined) setZoom(z);
+    if (px !== undefined) setPanX(px);
+    if (py !== undefined) setPanY(py);
   }, [boardId]);
 
-  // Persist viewport to localStorage (debounced)
+  // Persist viewport to localStorage (debounced); flush on cleanup and pagehide so last view is not lost
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!boardId) return;
+    if (boardId === undefined || boardId === "") return;
+    const id = boardId;
+    function flush() {
+      persistBoardViewport(id, zoomRef.current, panXRef.current, panYRef.current);
+    }
     if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
-    viewportTimerRef.current = setTimeout(() => {
-      localStorage.setItem(`board-viewport-${boardId}`, JSON.stringify({ zoom, panX, panY }));
-    }, 300);
+    viewportTimerRef.current = setTimeout(flush, 300);
+    window.addEventListener("pagehide", flush);
     return () => {
+      window.removeEventListener("pagehide", flush);
       if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
+      flush();
     };
   }, [boardId, zoom, panX, panY]);
 
@@ -250,35 +257,54 @@ export function ChalkBoardPage() {
     setPanY(newPanY);
   }, []);
 
-  // --- Wheel: Ctrl/Cmd + scroll = zoom; two-finger / trackpad scroll (or mouse wheel) = pan ---
-  // Pan deltas are coalesced per animation frame for smooth diagonal motion.
+  /** View menu zoom: anchor on center of visible chalk surface (same as Fabric / wheel zoom). */
+  const handleBoardMenuZoomChange = useCallback(
+    (newZoom: number) => {
+      const el = viewportRef.current;
+      if (!el) {
+        handleViewportChange(newZoom, panX, panY);
+        return;
+      }
+      const { panX: nx, panY: ny } = chalkZoomAroundScreenPoint(
+        panX,
+        panY,
+        zoom,
+        newZoom,
+        el.clientWidth / 2,
+        el.clientHeight / 2,
+        RESOLUTION_FACTOR,
+      );
+      handleViewportChange(newZoom, nx, ny);
+    },
+    [handleViewportChange, panX, panY, zoom],
+  );
+
+  const handleChalkViewportScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el || syncingChalkScrollFromPanRef.current) return;
+    const z = zoomRef.current;
+    const { panX: nx, panY: ny } = chalkScrollToPan(el.scrollLeft, el.scrollTop, z, RESOLUTION_FACTOR);
+    if (Math.abs(nx - panXRef.current) < CHALK_PAN_EPS && Math.abs(ny - panYRef.current) < CHALK_PAN_EPS) return;
+    handleViewportChange(z, nx, ny);
+  }, [handleViewportChange]);
+
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const { scrollLeft: sl, scrollTop: st } = chalkPanToScroll(panX, panY, zoom, RESOLUTION_FACTOR);
+    if (Math.abs(el.scrollLeft - sl) < SCROLL_EPS && Math.abs(el.scrollTop - st) < SCROLL_EPS) return;
+    syncingChalkScrollFromPanRef.current = true;
+    el.scrollLeft = sl;
+    el.scrollTop = st;
+    queueMicrotask(() => {
+      syncingChalkScrollFromPanRef.current = false;
+    });
+  }, [panX, panY, zoom, chalkScrollLayout.scrollWidth, chalkScrollLayout.scrollHeight]);
+
+  // --- Wheel: Ctrl/Cmd + scroll = zoom; otherwise native scroll on viewport pans ---
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-
-    const wheelPanAccum = { dx: 0, dy: 0 };
-    let wheelPanRaf: number | null = null;
-
-    function flushWheelPan() {
-      wheelPanRaf = null;
-      const dx = wheelPanAccum.dx;
-      const dy = wheelPanAccum.dy;
-      wheelPanAccum.dx = 0;
-      wheelPanAccum.dy = 0;
-      if (dx === 0 && dy === 0) return;
-      const z = zoomRef.current;
-      const rf = RESOLUTION_FACTOR;
-      const nx = panXRef.current - (rf * dx) / z;
-      const ny = panYRef.current - (rf * dy) / z;
-      panXRef.current = nx;
-      panYRef.current = ny;
-      handleViewportChange(z, nx, ny);
-    }
-
-    function scheduleWheelPan() {
-      if (wheelPanRaf !== null) return;
-      wheelPanRaf = requestAnimationFrame(flushWheelPan);
-    }
 
     function onWheel(e: WheelEvent) {
       if (e.ctrlKey || e.metaKey) {
@@ -311,22 +337,11 @@ export function ChalkBoardPage() {
       }
 
       if (isWheelOverEditableText(e.target)) return;
-
-      const wheelEl = viewportRef.current;
-      if (!wheelEl) return;
-      const { dx, dy } = wheelEventDeltaPixels(e, wheelEl);
-      if (dx === 0 && dy === 0) return;
-
-      e.preventDefault();
-      wheelPanAccum.dx += dx;
-      wheelPanAccum.dy += dy;
-      scheduleWheelPan();
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       viewport.removeEventListener("wheel", onWheel);
-      if (wheelPanRaf !== null) cancelAnimationFrame(wheelPanRaf);
     };
   }, [handleViewportChange]);
 
@@ -488,18 +503,21 @@ export function ChalkBoardPage() {
 
   // --- Zoom controls ---
   function zoomToCenter(newZoom: number) {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    if (!rect) {
+    const el = viewportRef.current;
+    if (!el) {
       handleViewportChange(newZoom, panX, panY);
       return;
     }
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const vpScale = zoom / RESOLUTION_FACTOR;
-    const newVpScale = newZoom / RESOLUTION_FACTOR;
-    const newPanX = panX + centerX * (1 / newVpScale - 1 / vpScale);
-    const newPanY = panY + centerY * (1 / newVpScale - 1 / vpScale);
-    handleViewportChange(newZoom, newPanX, newPanY);
+    const { panX: nx, panY: ny } = chalkZoomAroundScreenPoint(
+      panX,
+      panY,
+      zoom,
+      newZoom,
+      el.clientWidth / 2,
+      el.clientHeight / 2,
+      RESOLUTION_FACTOR,
+    );
+    handleViewportChange(newZoom, nx, ny);
   }
 
   function handleZoomReset() {
@@ -1366,7 +1384,7 @@ export function ChalkBoardPage() {
         <BoardMenuBar
           boardType="ChalkBoard"
           zoom={zoom}
-          onZoomChange={(z) => handleViewportChange(z, panX, panY)}
+          onZoomChange={handleBoardMenuZoomChange}
           onSaveToFile={handleSaveToFile}
           onLoadFromFile={handleLoadFromFile}
           onUndo={triggerMenuUndo}
@@ -1394,7 +1412,7 @@ export function ChalkBoardPage() {
       {/* Chalkboard frame — menu sits inside the frame (notepad strip + spiral), like the note board */}
       <div
         className={[
-          "chalkboard-frame relative flex min-h-0 flex-1 flex-col overflow-auto",
+          "chalkboard-frame relative flex min-h-0 flex-1 flex-col overflow-hidden",
           backgroundTheme === "whiteboard" && "chalkboard-frame--whiteboard",
           backgroundTheme === "blackboard" && "chalkboard-frame--blackboard",
         ]
@@ -1413,18 +1431,17 @@ export function ChalkBoardPage() {
           <div className="notepad-spiral-strip !border-b-0" />
           <div className="px-2 py-1.5 sm:px-3 sm:py-2">{chalkBoardTopBar}</div>
         </div>
-        {/* Viewport (clips and captures pan/zoom events) */}
+        {/* Viewport: native scroll encodes pan; drawing + notes overlay stays fixed to visible area */}
         <div
           ref={viewportRef}
           className={[
-            "chalkboard-surface relative flex-1 min-h-0 w-full overflow-hidden",
+            "chalkboard-surface relative flex-1 min-h-0 w-full overflow-auto",
             isDragOver ? "ring-2 ring-inset ring-white/20" : "",
             cursorClass,
           ].join(" ")}
           style={{ backgroundColor: chalkBg }}
-          onMouseEnter={() => setIsBoardHovered(true)}
+          onScroll={handleChalkViewportScroll}
           onMouseLeave={() => {
-            setIsBoardHovered(false);
             handleChalkBoardMouseLeave();
           }}
           onMouseDown={handleViewportMouseDown}
@@ -1433,153 +1450,104 @@ export function ChalkBoardPage() {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-        {/* Layer 1: Drawing canvas (uses fabric.js viewport transform for zoom/pan) */}
-        <ChalkCanvas
-          ref={canvasRef}
-          isActive={mode === "draw" && !isSpaceHeld && !isPanning}
-          brushColor={brushColor}
-          brushSize={brushSize}
-          zoom={zoom}
-          panX={panX}
-          panY={panY}
-          onChange={handleCanvasChange}
-          backgroundColor={chalkBg}
-        />
-
-        {/* Layer 2: Sticky notes (expandable canvas; uses CSS transform for zoom/pan, matches Fabric viewport) */}
-        <div
-          className="absolute origin-top-left"
-          style={{
-            transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px) scale(${zoom / RESOLUTION_FACTOR}) translate(${panX}px, ${panY}px)`,
-            width: `${chalkNotesBounds.canvasWidth}px`,
-            height: `${chalkNotesBounds.canvasHeight}px`,
-            pointerEvents: mode === "select" && !isSpaceHeld && !isPanning ? "auto" : "none",
-          }}
-          onClick={(e) => {
-            if (!(e.target as Element).closest("[data-board-item]")) {
-              setEditingNoteIds(new Set());
-              primaryEditingNoteIdRef.current = null;
-              setRichTextToolbar(null);
-            }
-          }}
-        >
           <div
+            aria-hidden
+            className="pointer-events-none"
             style={{
-              transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px)`,
-              width: "100%",
-              height: "100%",
+              width: `${chalkScrollLayout.scrollWidth}px`,
+              height: `${chalkScrollLayout.scrollHeight}px`,
             }}
-          >
-            {/* Remote cursors (board-space coordinates) */}
-            <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
-              {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
-                <div
-                  key={userId}
-                  className="absolute z-[9999] flex items-center gap-1 overflow-visible"
-                  style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 32 32"
-                    width="32"
-                    height="32"
-                    className="drop-shadow-lg"
-                  >
-                    <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
-                  </svg>
-                </div>
-              ))}
-            </div>
-            {notes.map((note) => (
-              <StickyNote
-                key={note.id}
-                note={note}
-                isEditing={editingNoteIds.has(note.id)}
-                enlargeWhenEditing={autoEnlargeNotes}
-                focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
-                zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
-                onDrag={handleNoteDrag}
-                onDragStart={handleNoteDragStart}
-                onDragStop={handleDragStop}
-                onDelete={handleDelete}
-                onStartEdit={handleStartEdit}
-                onSave={handleSave}
-                onContentChange={handleNoteContentChange}
-                onResize={handleResize}
-                onColorChange={handleColorChange}
-                onRotationChange={handleRotationChange}
-                onBringToFront={bringToFront}
-                onUnmount={handleNoteUnmount}
-                onExitEdit={handleExitEditNote}
-                onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
-                zoom={zoom / RESOLUTION_FACTOR}
-                onRichTextToolbarChange={handleRichTextToolbarChange}
-              />
-            ))}
-          </div>
-        </div>
-        </div>
+          />
+          <div className="absolute inset-0 z-[1]">
+            <ChalkCanvas
+              ref={canvasRef}
+              isActive={mode === "draw" && !isSpaceHeld && !isPanning}
+              brushColor={brushColor}
+              brushSize={brushSize}
+              zoom={zoom}
+              panX={panX}
+              panY={panY}
+              onChange={handleCanvasChange}
+              backgroundColor={chalkBg}
+            />
 
-        {/* Hover-only pan scrollbars (horizontal & vertical) */}
-        {isBoardHovered && (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            {/* Horizontal scrollbar (full board width, slightly above bottom border like vertical inset) */}
-            <div className="pointer-events-auto absolute bottom-2 left-3 right-3 px-3">
-              <input
-                type="range"
-                min={-5000}
-                max={5000}
-                defaultValue={0}
-                onChange={(e) => {
-                  const raw = Number(e.target.value || 0);
-                  if (Number.isNaN(raw)) return;
-                  const prev = scrollSliderXRef.current;
-                  const delta = raw - prev;
-                  if (delta !== 0) {
-                    const SCROLL_SPEED = 2;
-                    const nextPanX = panXRef.current - delta * SCROLL_SPEED;
-                    handleViewportChange(zoom, nextPanX, panYRef.current);
-                  }
-                  if (raw <= -5000 || raw >= 5000) {
-                    scrollSliderXRef.current = 0;
-                    e.currentTarget.value = "0";
-                  } else {
-                    scrollSliderXRef.current = raw;
-                  }
+            <div
+              className="absolute origin-top-left"
+              style={{
+                transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px) scale(${zoom / RESOLUTION_FACTOR}) translate(${panX}px, ${panY}px)`,
+                width: `${chalkNotesBounds.canvasWidth}px`,
+                height: `${chalkNotesBounds.canvasHeight}px`,
+                pointerEvents: mode === "select" && !isSpaceHeld && !isPanning ? "auto" : "none",
+              }}
+              onClick={(e) => {
+                if (!(e.target as Element).closest("[data-board-item]")) {
+                  setEditingNoteIds(new Set());
+                  primaryEditingNoteIdRef.current = null;
+                  setRichTextToolbar(null);
+                }
+              }}
+            >
+              <div
+                style={{
+                  transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px)`,
+                  width: "100%",
+                  height: "100%",
                 }}
-                className="board-scrollbar-range board-scrollbar-range-h w-full h-2 cursor-pointer"
-              />
-            </div>
-            {/* Vertical scrollbar (full board height, vertical style, evenly inset from frame) */}
-            <div className="pointer-events-auto absolute top-3 bottom-3 right-3 flex items-stretch py-3">
-              <input
-                type="range"
-                min={-5000}
-                max={5000}
-                defaultValue={0}
-                onChange={(e) => {
-                  const raw = Number(e.target.value || 0);
-                  if (Number.isNaN(raw)) return;
-                  const prev = scrollSliderYRef.current;
-                  const delta = raw - prev;
-                  if (delta !== 0) {
-                    const SCROLL_SPEED = 1;
-                    const nextPanY = panYRef.current - delta * SCROLL_SPEED;
-                    handleViewportChange(zoom, panXRef.current, nextPanY);
-                  }
-                  if (raw <= -5000 || raw >= 5000) {
-                    scrollSliderYRef.current = 0;
-                    e.currentTarget.value = "0";
-                  } else {
-                    scrollSliderYRef.current = raw;
-                  }
-                }}
-                style={{ writingMode: "vertical-rl" }}
-                className="board-scrollbar-range board-scrollbar-range-v h-full w-3 cursor-pointer"
-              />
+              >
+                <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+                  {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
+                    <div
+                      key={userId}
+                      className="absolute z-[9999] flex items-center gap-1 overflow-visible"
+                      style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 32 32"
+                        width="32"
+                        height="32"
+                        className="drop-shadow-lg"
+                      >
+                        <path
+                          d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z"
+                          fill={color}
+                          stroke="rgba(255,255,255,0.9)"
+                          strokeWidth="0.5"
+                        />
+                      </svg>
+                    </div>
+                  ))}
+                </div>
+                {notes.map((note) => (
+                  <StickyNote
+                    key={note.id}
+                    note={note}
+                    isEditing={editingNoteIds.has(note.id)}
+                    enlargeWhenEditing={autoEnlargeNotes}
+                    focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
+                    zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
+                    onDrag={handleNoteDrag}
+                    onDragStart={handleNoteDragStart}
+                    onDragStop={handleDragStop}
+                    onDelete={handleDelete}
+                    onStartEdit={handleStartEdit}
+                    onSave={handleSave}
+                    onContentChange={handleNoteContentChange}
+                    onResize={handleResize}
+                    onColorChange={handleColorChange}
+                    onRotationChange={handleRotationChange}
+                    onBringToFront={bringToFront}
+                    onUnmount={handleNoteUnmount}
+                    onExitEdit={handleExitEditNote}
+                    onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
+                    zoom={zoom / RESOLUTION_FACTOR}
+                    onRichTextToolbarChange={handleRichTextToolbarChange}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Zoom controls and toolbar - pointer-events-none so canvas receives clicks; only the controls themselves are interactive */}
         <div className="absolute inset-0 z-20 pointer-events-none">
