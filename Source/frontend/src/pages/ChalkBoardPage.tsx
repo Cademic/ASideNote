@@ -25,7 +25,7 @@ import {
 } from "../lib/boardExport";
 import { chalkPanToScroll, chalkScrollInnerLayout, chalkScrollToPan } from "../lib/boardViewportScroll";
 import { chalkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
-import { persistBoardViewport, readBoardViewport } from "../lib/boardViewportStorage";
+import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { isWheelOverEditableText } from "../lib/boardWheelPan";
 import type { BoardSummaryDto, NoteSummaryDto } from "../types";
 import { ContextMenu } from "../components/ui/ContextMenu";
@@ -119,10 +119,10 @@ export function ChalkBoardPage() {
   const [brushColor, setBrushColor] = useState("#ffffff");
   const [brushSize, setBrushSize] = useState(5);
 
-  // --- Viewport state (zoom & pan) ---
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  // --- Viewport state (zoom & pan); seed from last session for this board ---
+  const [zoom, setZoom] = useState(() => readBoardViewportDefaults(boardId).zoom);
+  const [panX, setPanX] = useState(() => readBoardViewportDefaults(boardId).panX);
+  const [panY, setPanY] = useState(() => readBoardViewportDefaults(boardId).panY);
   const syncingChalkScrollFromPanRef = useRef(false);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);

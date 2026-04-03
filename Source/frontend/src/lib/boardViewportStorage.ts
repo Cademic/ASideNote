@@ -52,3 +52,18 @@ export function readBoardViewport(boardId: string): BoardViewportPartial {
     return {};
   }
 }
+
+/** Full defaults for useState initializers — last saved view when available. */
+export function readBoardViewportDefaults(boardId: string | undefined): {
+  zoom: number;
+  panX: number;
+  panY: number;
+} {
+  if (!boardId) return { zoom: 1, panX: 0, panY: 0 };
+  const v = readBoardViewport(boardId);
+  return {
+    zoom: v.zoom ?? 1,
+    panX: v.panX ?? 0,
+    panY: v.panY ?? 0,
+  };
+}

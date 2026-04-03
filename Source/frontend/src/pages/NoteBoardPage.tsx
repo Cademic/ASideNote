@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
@@ -50,7 +50,7 @@ import {
   parseBoardExportFile,
 } from "../lib/boardExport";
 import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
-import { persistBoardViewport, readBoardViewport } from "../lib/boardViewportStorage";
+import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
@@ -237,20 +237,22 @@ export function NoteBoardPage() {
   const noteNavAnchorRef = useRef<string | null>(null);
   const [pendingImageDrop, setPendingImageDrop] = useState<{ x: number; y: number } | null>(null);
 
-  // --- Viewport state (pan & zoom) ---
-  const [zoom, setZoom] = useState(1);
+  // --- Viewport state (pan & zoom); seed from last session for this board ---
+  const [zoom, setZoom] = useState(() => readBoardViewportDefaults(boardId).zoom);
   const zoomRef = useRef(zoom);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  const [panX, setPanX] = useState(() => readBoardViewportDefaults(boardId).panX);
+  const [panY, setPanY] = useState(() => readBoardViewportDefaults(boardId).panY);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
   zoomRef.current = zoom;
   panXRef.current = panX;
   panYRef.current = panY;
 
-  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump
+  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump.
+  // Skip until the board has finished loading so placeholder bounds → real notes don't erase restored pan/zoom.
   const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
   useEffect(() => {
+    if (isLoading) return;
     const prev = prevContentMinRef.current;
     if (prev === null) {
       prevContentMinRef.current = {
@@ -268,7 +270,7 @@ export function NoteBoardPage() {
     if (dx === 0 && dy === 0) return;
     setPanX((p) => p + (dx * (zoom + 1)) / zoom);
     setPanY((p) => p + (dy * (zoom + 1)) / zoom);
-  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom]);
+  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom, isLoading]);
 
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -462,6 +464,11 @@ export function NoteBoardPage() {
     } finally {
       setIsLoading(false);
     }
+  }, [boardId]);
+
+  useLayoutEffect(() => {
+    if (!boardId) return;
+    setIsLoading(true);
   }, [boardId]);
 
   useEffect(() => {
