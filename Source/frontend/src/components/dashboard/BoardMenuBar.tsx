@@ -1,10 +1,36 @@
-import { useEffect, useRef, useState } from "react";
-import { Save, Upload, ChevronRight, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon, Check } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
+import {
+  Save,
+  Upload,
+  StickyNote as StickyNoteIcon,
+  CreditCard,
+  Image as ImageIcon,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+} from "lucide-react";
+import { NoteToolbar } from "./NoteToolbar";
+import { dividerClass, HoverSubmenu, menuItemClass } from "./boardMenuShared";
+import {
+  BoardMenuMobileEditToolkit,
+  BoardMenuMobileInsertToolkit,
+  BoardMenuMobileViewToolkit,
+} from "./BoardMenuMobileToolkit";
+import { nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
 
 const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200];
 
 type OpenMenu = "file" | "edit" | "insert" | "view" | null;
 export type BoardBackgroundTheme = "whiteboard" | "blackboard" | "default";
+
+/** Active TipTap context for the sticky note / index card being edited (shown in the menu bar). */
+export interface BoardRichTextToolbarState {
+  sourceId: string;
+  editor: Editor | null;
+}
 
 interface BoardMenuBarProps {
   boardType: "NoteBoard" | "ChalkBoard";
@@ -23,63 +49,12 @@ interface BoardMenuBarProps {
   onBackgroundThemeChange: (theme: BoardBackgroundTheme) => void;
   autoEnlargeNotes: boolean;
   onAutoEnlargeNotesChange: (enabled: boolean) => void;
-}
-
-const menuItemClass =
-  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-amber-50 hover:text-foreground dark:hover:bg-amber-900/20 flex items-center gap-2";
-const menuItemWithSubmenuClass =
-  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-amber-50 hover:text-foreground dark:hover:bg-amber-900/20 flex items-center justify-between gap-2";
-const dividerClass = "my-1 border-t border-border/50";
-const submenuClass =
-  "absolute left-full top-0 -ml-1 pl-1 z-[60] min-w-[160px] rounded-lg border border-border bg-background py-1 shadow-xl";
-
-function HoverSubmenu({
-  label,
-  children,
-}: {
-  label: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-  useEffect(() => () => clearCloseTimer(), []);
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => {
-        clearCloseTimer();
-        setOpen(true);
-      }}
-      onMouseLeave={() => {
-        closeTimerRef.current = setTimeout(() => setOpen(false), 150);
-      }}
-    >
-      <div className={menuItemWithSubmenuClass}>
-        {label}
-        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-      </div>
-      {open && (
-        <div
-          className={submenuClass}
-          onMouseEnter={() => {
-            clearCloseTimer();
-            setOpen(true);
-          }}
-          onMouseLeave={() => {
-            closeTimerRef.current = setTimeout(() => setOpen(false), 150);
-          }}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  );
+  /** When a note or index card is in edit mode, formatting controls appear in this bar. */
+  richTextToolbar?: BoardRichTextToolbarState | null;
+  /** NoteBoard: jump viewport to previous/next sticky note in creation order. */
+  onNavigatePreviousNote?: () => void;
+  onNavigateNextNote?: () => void;
+  noteNavigationDisabled?: boolean;
 }
 
 export function BoardMenuBar({
@@ -99,22 +74,48 @@ export function BoardMenuBar({
   onBackgroundThemeChange,
   autoEnlargeNotes,
   onAutoEnlargeNotesChange,
+  richTextToolbar = null,
+  onNavigatePreviousNote,
+  onNavigateNextNote,
+  noteNavigationDisabled = false,
 }: BoardMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
 
   const closeMenu = () => setOpenMenu(null);
 
+  useLayoutEffect(() => {
+    if (!openMenu || !dropdownPanelRef.current) return;
+    const el = dropdownPanelRef.current;
+    const run = () => nudgeAbsoluteElementIntoViewport(el);
+    run();
+    const ro = new ResizeObserver(run);
+    ro.observe(el);
+    window.addEventListener("resize", run);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", run);
+    };
+  }, [openMenu]);
+
   useEffect(() => {
-    if (!openMenu) return;
+    if (!openMenu || isCollapsed) return;
     function onPointerDown(e: PointerEvent) {
-      if (menuBarRef.current && !menuBarRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
+      const t = e.target as Node;
+      if (menuBarRef.current?.contains(t)) return;
+      // TipTap toolbar panels are portaled to document.body; still treat as part of the bar.
+      if ((e.target as Element).closest?.("[data-board-toolbar-portal]")) return;
+      closeMenu();
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [openMenu]);
+  }, [openMenu, isCollapsed]);
+
+  useEffect(() => {
+    if (isCollapsed) setOpenMenu(null);
+  }, [isCollapsed]);
 
   const menuTriggerClass = (menu: OpenMenu) =>
     `px-3 py-1.5 text-sm transition-colors rounded-md ${
@@ -124,10 +125,15 @@ export function BoardMenuBar({
     }`;
 
   const dropdownClass =
-    "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[280px] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
+    "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
 
   return (
-    <div ref={menuBarRef} className="flex items-center gap-1 px-2 py-1.5">
+    <div
+      ref={menuBarRef}
+      data-board-menu-bar
+      className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1.5"
+    >
+      <div className={isCollapsed ? "hidden" : "flex flex-shrink-0 items-center gap-1"}>
       {/* File */}
       <div className="relative">
         <button
@@ -138,7 +144,7 @@ export function BoardMenuBar({
           File
         </button>
         {openMenu === "file" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <button
               type="button"
               className={menuItemClass}
@@ -175,7 +181,7 @@ export function BoardMenuBar({
           Edit
         </button>
         {openMenu === "edit" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <button
               type="button"
               className={menuItemClass}
@@ -200,6 +206,7 @@ export function BoardMenuBar({
               Redo
               <span className="ml-auto text-xs text-foreground/50">Ctrl+Y</span>
             </button>
+            <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
       </div>
@@ -214,7 +221,7 @@ export function BoardMenuBar({
           Insert
         </button>
         {openMenu === "insert" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <button
               type="button"
               className={menuItemClass}
@@ -252,6 +259,7 @@ export function BoardMenuBar({
                 Image
               </button>
             )}
+            <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
       </div>
@@ -266,7 +274,7 @@ export function BoardMenuBar({
           View
         </button>
         {openMenu === "view" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <HoverSubmenu label="Background">
               <button
                 type="button"
@@ -316,6 +324,39 @@ export function BoardMenuBar({
                 </button>
               ))}
             </HoverSubmenu>
+            {onNavigatePreviousNote && onNavigateNextNote && (
+              <>
+                <div className={dividerClass} />
+                <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/45">
+                  Notes
+                </p>
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  disabled={noteNavigationDisabled}
+                  onClick={() => {
+                    closeMenu();
+                    onNavigatePreviousNote();
+                  }}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  Previous note
+                </button>
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  disabled={noteNavigationDisabled}
+                  onClick={() => {
+                    closeMenu();
+                    onNavigateNextNote();
+                  }}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  Next note
+                </button>
+              </>
+            )}
+            <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
             <div className={dividerClass} />
             <button
               type="button"
@@ -337,6 +378,25 @@ export function BoardMenuBar({
           </div>
         )}
       </div>
+      </div>
+
+      <div
+        className={isCollapsed ? "hidden" : "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center"}
+      >
+        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+          <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setIsCollapsed((prev) => !prev)}
+        title={isCollapsed ? "Expand menu" : "Minimize menu"}
+        aria-label={isCollapsed ? "Expand menu" : "Minimize menu"}
+        className="absolute bottom-0 left-1/2 z-[100] flex h-7 px-2 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-md border border-border/50 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] text-foreground/75 shadow-sm transition-colors hover:bg-foreground/5 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)]"
+      >
+        {isCollapsed ? <ChevronDown className="h-4 w-4" strokeWidth={2.5} /> : <ChevronUp className="h-4 w-4" strokeWidth={2.5} />}
+      </button>
     </div>
   );
 }

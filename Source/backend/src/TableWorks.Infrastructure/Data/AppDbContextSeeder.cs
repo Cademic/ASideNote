@@ -12,7 +12,6 @@ public static class AppDbContextSeeder
     private static readonly Guid Admin2Id = Guid.Parse("00000000-0000-0000-0000-000000000006");
     private static readonly Guid TestUser1Id = Guid.Parse("00000000-0000-0000-0000-000000000002");
     private static readonly Guid TestUser2Id = Guid.Parse("00000000-0000-0000-0000-000000000003");
-    private static readonly Guid TestUser3Id = Guid.Parse("00000000-0000-0000-0000-000000000004");
 
     /// <summary>Shared password for seeded verified test users (localhost only).</summary>
     public const string TestUserPassword = "Password1!";
@@ -131,30 +130,6 @@ public static class AppDbContextSeeder
                 UpdatedAt = DateTime.UtcNow
             });
             logger.LogInformation("Seeded verified test user: testuser2@localhost (using shared local test password).");
-        }
-
-        if (!await dbContext.Users.AnyAsync(u => u.Email == "testuser3@localhost" || u.Username == "testuser3"))
-        {
-            await dbContext.Users.AddAsync(new User
-            {
-                Id = TestUser3Id,
-                Username = "testuser3",
-                Email = "testuser3@localhost",
-                PasswordHash = passwordHash,
-                Role = "User",
-                CreatedAt = DateTime.UtcNow,
-                IsActive = true,
-                IsEmailVerified = true,
-                EmailVerifiedAt = DateTime.UtcNow
-            });
-            await dbContext.UserPreferences.AddAsync(new UserPreferences
-            {
-                Id = Guid.NewGuid(),
-                UserId = TestUser3Id,
-                Theme = "System",
-                UpdatedAt = DateTime.UtcNow
-            });
-            logger.LogInformation("Seeded verified test user: testuser3@localhost (using shared local test password).");
         }
     }
 

@@ -2,6 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Board hover scrollbars (range inputs styled as bar thumbs) */
+.board-scrollbar-range {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.board-scrollbar-range:focus {
+  outline: none;
+}
+
+.board-scrollbar-range::-webkit-slider-runnable-track {
+  height: 4px;
+  /* Match the light scrollbar styling used elsewhere */
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+/* Thicker horizontal track for left-right scrollbar */
+.board-scrollbar-range-h::-webkit-slider-runnable-track {
+  height: 8px;
+}
+
+/* Make vertical scrollbar track thicker (left/right scrollbar) */
+/* Horizontal thumbs */
+.board-scrollbar-range-h::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 180px;
+  height: 8px;
+  border-radius: 3px;
+  background-color: rgba(160, 160, 160, 0.95);
+  cursor: pointer;
+  /* Match 8px track height so thumb fits evenly */
+  margin-top: 0;
+}
+
+.dark .board-scrollbar-range::-webkit-slider-runnable-track {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark .board-scrollbar-range-h::-webkit-slider-thumb {
+  background-color: rgba(210, 210, 210, 0.95);
+}
+
+.board-scrollbar-range::-moz-range-track {
+  height: 4px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.board-scrollbar-range-h::-moz-range-track {
+  height: 8px;
+}
+
+.board-scrollbar-range-h::-moz-range-thumb {
+  width: 180px;
+  height: 8px;
+  border-radius: 3px;
+  background-color: rgba(160, 160, 160, 0.95);
+  cursor: pointer;
+}
+
+.dark .board-scrollbar-range::-moz-range-track {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.dark .board-scrollbar-range-h::-moz-range-thumb {
+  background-color: rgba(210, 210, 210, 0.95);
+}
+
+/* Vertical thumbs */
+.board-scrollbar-range-v::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 8px;
+  height: 180px;
+  border-radius: 3px;
+  background-color: rgba(160, 160, 160, 0.95);
+  cursor: pointer;
+  margin-top: -88px; /* center over 4px track when vertical-rl */
+}
+
+.dark .board-scrollbar-range-v::-webkit-slider-thumb {
+  background-color: rgba(210, 210, 210, 0.95);
+}
+
+.board-scrollbar-range-v::-moz-range-thumb {
+  width: 8px;
+  height: 180px;
+  border-radius: 3px;
+  background-color: rgba(160, 160, 160, 0.95);
+  cursor: pointer;
+}
+
+.dark .board-scrollbar-range-v::-moz-range-thumb {
+  background-color: rgba(210, 210, 210, 0.95);
+}
+
 /* Thin scrollbar for narrow panels */
 .scrollbar-thin {
   scrollbar-width: thin;
@@ -304,6 +400,31 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Bullet & numbered lists in editor */
+.tiptap-editor-area .tiptap ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.tiptap-editor-area .tiptap ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.tiptap-editor-area .tiptap ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.tiptap-editor-area .tiptap ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
+.tiptap-editor-area .tiptap li {
+  margin: 0.1em 0;
+}
+
 .tiptap-title-area .tiptap {
   font-size: 0.875rem;
   font-weight: 600;
@@ -364,6 +485,31 @@ body {
 .note-rich-content mark {
   padding: 0 0.1em;
   border-radius: 0.2em;
+}
+
+/* Bullet & numbered lists in read mode (sticky notes) */
+.note-rich-content ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.note-rich-content ol {
+  list-style-type: decimal;
+  padding-left: 1.25em;
+  margin: 0.25em 0;
+}
+
+.note-rich-content ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.note-rich-content ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
+.note-rich-content li {
+  margin: 0.1em 0;
 }
 
 /* Hyperlinks — blue with underline in all rich text */
@@ -578,6 +724,14 @@ body {
   margin: 0.25em 0;
 }
 
+.index-card-content .tiptap ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.index-card-content .tiptap ol[type="a"] {
+  list-style-type: lower-alpha;
+}
+
 .index-card-content .tiptap li {
   margin: 0.1em 0;
 }
@@ -639,6 +793,14 @@ body {
 .note-rich-content.index-card-content ol {
   list-style-type: decimal;
   padding-left: 1.25em;
+}
+
+.note-rich-content.index-card-content ol[type="A"] {
+  list-style-type: upper-alpha;
+}
+
+.note-rich-content.index-card-content ol[type="a"] {
+  list-style-type: lower-alpha;
 }
 
 .note-rich-content.index-card-content hr {

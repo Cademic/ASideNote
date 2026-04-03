@@ -14,12 +14,25 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
-import { X, GripVertical } from "lucide-react";
+import Highlight from "@tiptap/extension-highlight";
+import { X, GripVertical, MoreVertical, Copy, Trash2, RotateCw } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { IndexCardSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
 import { INDEX_CARD_COLORS } from "./indexCardColors";
-import { IndexCardToolbar } from "./IndexCardToolbar";
+import type { BoardRichTextToolbarState } from "./BoardMenuBar";
+import { ROTATION_PRESETS } from "./noteToolbarConstants";
+import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
+
+/** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
+const INDEX_CARD_SWATCH: Record<string, string> = {
+  white: "bg-gray-100 dark:bg-gray-300",
+  ivory: "bg-amber-200 dark:bg-amber-400",
+  sky: "bg-sky-200 dark:bg-sky-400",
+  rose: "bg-rose-200 dark:bg-rose-400",
+  mint: "bg-emerald-200 dark:bg-emerald-400",
+  lavender: "bg-violet-200 dark:bg-violet-400",
+};
 
 interface IndexCardProps {
   card: IndexCardSummaryDto;
@@ -27,6 +40,8 @@ interface IndexCardProps {
   zIndex?: number;
   onDragStop: (id: string, x: number, y: number) => void;
   onDelete: (id: string) => void;
+  /** Optional: duplicate this card (e.g. create a copy on the board) */
+  onDuplicate?: (id: string) => void;
   onStartEdit: (id: string) => void;
   onSave: (id: string, title: string, content: string) => void;
   /** Optional: called on debounced content/title change while editing (for real-time sync). If not provided, debounced save is skipped. */
@@ -49,6 +64,7 @@ interface IndexCardProps {
   zoom?: number;
   /** When true, visually scale the card when editing (for better readability) */
   enlargeWhenEditing?: boolean;
+  onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
 }
 
 const DEFAULT_WIDTH = 450;
@@ -90,6 +106,7 @@ export function IndexCard({
   zIndex = 0,
   onDragStop,
   onDelete,
+  onDuplicate,
   onStartEdit,
   onSave,
   onContentChange,
@@ -106,6 +123,7 @@ export function IndexCard({
   onContextMenu,
   zoom = 1,
   enlargeWhenEditing = false,
+  onRichTextToolbarChange,
 }: IndexCardProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastDragEndRef = useRef<number>(0);
@@ -115,6 +133,8 @@ export function IndexCard({
 
   const [activeField, setActiveField] = useState<"title" | "content">("title");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({
     width: card.width ?? DEFAULT_WIDTH,
     height: card.height ?? DEFAULT_HEIGHT,
@@ -134,6 +154,7 @@ export function IndexCard({
     FontSize,
     TextAlign.configure({ types: ["paragraph"] }),
     Link.configure({ openOnClick: false }),
+    Highlight.configure({ multicolor: true }),
   ];
 
   const titleEditor = useEditor({
@@ -364,19 +385,23 @@ export function IndexCard({
     [titleEditor, contentEditor, card.id, onSave],
   );
 
-  const handleCardColorChange = useCallback(
-    (newColor: string) => {
-      onColorChange(card.id, newColor);
-    },
-    [card.id, onColorChange],
-  );
+  useEffect(() => {
+    if (!onRichTextToolbarChange) return;
+    if (!isEditing) {
+      onRichTextToolbarChange(null, card.id);
+      return;
+    }
+    onRichTextToolbarChange({
+      sourceId: card.id,
+      editor: activeEditor,
+    });
+  }, [isEditing, activeEditor, activeField, titleEditor, contentEditor, card.id, onRichTextToolbarChange]);
 
-  const handleCardRotationChange = useCallback(
-    (newRotation: number) => {
-      onRotationChange(card.id, newRotation);
-    },
-    [card.id, onRotationChange],
-  );
+  useEffect(() => {
+    return () => {
+      onRichTextToolbarChange?.(null, card.id);
+    };
+  }, [onRichTextToolbarChange, card.id]);
 
   // --- Resize logic ---
   const resizeRef = useRef<{
@@ -516,6 +541,20 @@ export function IndexCard({
 
   const edgeThickness = 6;
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  const cardColorKeys = Object.keys(INDEX_CARD_COLORS);
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
@@ -553,7 +592,7 @@ export function IndexCard({
       >
         <div
           className={[
-            "index-card relative overflow-visible rounded-md shadow-lg transition-shadow hover:shadow-xl",
+            "index-card relative flex min-h-0 flex-col overflow-visible rounded-md shadow-lg transition-shadow hover:shadow-xl",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
             focusedBy?.length ? "ring-[3px]" : "",
             color.bg,
@@ -599,7 +638,7 @@ export function IndexCard({
               onStartEdit(card.id);
             }
           }}
-        >
+          >
           {/* Pin */}
           <div
             data-pin-note-id={card.id}
@@ -624,7 +663,7 @@ export function IndexCard({
             />
           </div>
 
-          {/* Header band with drag handle + delete + red rule line */}
+          {/* Header band with drag handle + more menu + delete + red rule line */}
           <div className={`rounded-t-md ${color.headerBg}`}>
             <div
               className="index-card-handle flex cursor-grab items-center justify-between px-3 pt-4 pb-1 active:cursor-grabbing"
@@ -633,25 +672,121 @@ export function IndexCard({
               }}
             >
               <GripVertical className="h-3.5 w-3.5 text-black/20" />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const stripHtml = (html: string) =>
-                    html.replace(/<[^>]*>/g, "").trim();
-                  const hasContent =
-                    !!(card.content && stripHtml(card.content).length > 0);
-                  if (hasContent) {
-                    setShowDeleteConfirm(true);
-                  } else {
-                    onDelete(card.id);
-                  }
-                }}
-                className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
-                aria-label="Delete index card"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <div className="relative flex items-center gap-0.5" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen((open) => !open);
+                  }}
+                  className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+                  aria-label="Index card options"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
+                {menuOpen && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                      Color
+                    </div>
+                    <div className="flex flex-nowrap items-center gap-1.5 px-2 pb-2">
+                      {cardColorKeys.map((key) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            onColorChange(card.id, key);
+                            setMenuOpen(false);
+                          }}
+                          className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
+                            colorKey === key
+                              ? "border-gray-700 ring-2 ring-gray-400 ring-offset-1 dark:border-gray-300 dark:ring-gray-500"
+                              : "border-gray-300 dark:border-gray-500"
+                          } ${INDEX_CARD_SWATCH[key] ?? INDEX_CARD_COLORS[key].bg}`}
+                          title={key}
+                          aria-label={`Color ${key}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <RotateCw className="h-3 w-3" />
+                      Tilt
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                      {ROTATION_PRESETS.map((deg) => (
+                        <button
+                          key={deg}
+                          type="button"
+                          onClick={() => {
+                            onRotationChange(card.id, deg);
+                            setMenuOpen(false);
+                          }}
+                          className={[
+                            "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
+                            (card.rotation ?? 0) === deg
+                              ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
+                              : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                          ].join(" ")}
+                          title={`${deg}°`}
+                        >
+                          {deg === 0 ? "0°" : `${deg > 0 ? "+" : ""}${deg}°`}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                    {onDuplicate && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onDuplicate(card.id);
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Duplicate card
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        const hasContent =
+                          !!(card.content && stripHtmlForPlainText(card.content).length > 0);
+                        if (hasContent) {
+                          setShowDeleteConfirm(true);
+                        } else {
+                          onDelete(card.id);
+                        }
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete card
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const hasContent =
+                      !!(card.content && stripHtmlForPlainText(card.content).length > 0);
+                    if (hasContent) {
+                      setShowDeleteConfirm(true);
+                    } else {
+                      onDelete(card.id);
+                    }
+                  }}
+                  className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+                  aria-label="Delete index card"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Title area inside header */}
@@ -691,24 +826,8 @@ export function IndexCard({
             <div className="index-card-header-rule" />
           </div>
 
-          {/* Slide-out toolbar (visible in edit mode) */}
-          <div
-            className={[
-              "overflow-hidden transition-all duration-200",
-              isEditing ? "max-h-[250px] opacity-100" : "max-h-0 opacity-0",
-            ].join(" ")}
-          >
-            <IndexCardToolbar
-              editor={activeEditor}
-              cardColor={colorKey}
-              onCardColorChange={handleCardColorChange}
-              cardRotation={card.rotation ?? 0}
-              onCardRotationChange={handleCardRotationChange}
-            />
-          </div>
-
-          {/* Content area with ruled lines */}
-          <div className="overflow-hidden index-card-ruled">
+          {/* Content area with ruled lines (toolbar is absolutely positioned to the left) */}
+          <div className="index-card-ruled min-w-0 flex-1 overflow-hidden">
             {isEditing ? (
               <div className="px-3 pb-4 pt-2 space-y-1.5" onBlur={handleBlur} onKeyDown={handleKeyDown}>
                 <div

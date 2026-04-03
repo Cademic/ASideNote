@@ -77,12 +77,14 @@ After this, exporting a notebook as PDF via the API will work locally.
 dotnet run --project src/TableWorks.API/ASideNote.API.csproj -- --seed
 ```
 
-Seeding creates an admin user and, when the app has a password hasher available, two **verified** test users for localhost:
+Seeding creates a legacy admin record (no password login) and, when the app has a password hasher available, **two verified Admin** and **two verified User** accounts for localhost:
 
-| Email                 | Password   |
-|-----------------------|------------|
-| `testuser1@localhost` | `Password1!` |
-| `testuser2@localhost` | `Password1!` |
+| Username   | Email                 | Role  | Password    |
+|------------|----------------------|-------|-------------|
+| `admin1`   | `admin1@localhost`   | Admin | `Password1!` |
+| `admin2`   | `admin2@localhost`   | Admin | `Password1!` |
+| `testuser1`| `testuser1@localhost`| User  | `Password1!` |
+| `testuser2`| `testuser2@localhost`| User  | `Password1!` |
 
 ## Docker Compose Commands
 

@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
-import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
+import {
+  BoardMenuBar,
+  type BoardBackgroundTheme,
+  type BoardRichTextToolbarState,
+} from "../components/dashboard/BoardMenuBar";
 import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
 import { CorkBoard } from "../components/dashboard/CorkBoard";
-import { StickyNote } from "../components/dashboard/StickyNote";
+import { StickyNote, STICKY_NOTE_DEFAULT_SIZE } from "../components/dashboard/StickyNote";
 import { IndexCard } from "../components/dashboard/IndexCard";
 import { ImageCard } from "../components/dashboard/ImageCard";
 import { RedStringLayer } from "../components/dashboard/RedStringLayer";
@@ -52,11 +56,14 @@ let nextTempCardId = 1;
 
 export function NoteBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
-  const { setBoardName, openBoard, setBoardPresence, connectedUsers } = useOutletContext<AppLayoutContext>();
+  const { setBoardName, openBoard, setBoardPresence, connectedUsers, setBoardHubConnected } =
+    useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
   const currentUserId = user?.userId ?? null;
 
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
+  const boardNameRef = useRef<string>(board?.name ?? "");
+  boardNameRef.current = board?.name ?? "";
   const [notes, setNotes] = useState<NoteSummaryDto[]>([]);
   const [indexCards, setIndexCards] = useState<IndexCardSummaryDto[]>([]);
   const [imageCards, setImageCards] = useState<BoardImageSummaryDto[]>([]);
@@ -64,6 +71,7 @@ export function NoteBoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
   const [editingCardIds, setEditingCardIds] = useState<Set<string>>(new Set());
+  const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const primaryEditingCardIdRef = useRef<string | null>(null);
   const loadFileInputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +104,7 @@ export function NoteBoardPage() {
   type BoardUndoEntry =
     | { type: "note-position"; noteId: string; prevPositionX: number; prevPositionY: number }
     | { type: "note-size"; noteId: string; prevWidth: number | null; prevHeight: number | null }
-    | { type: "note-delete"; note: NoteSummaryDto }
+    | { type: "note-delete"; note: NoteSummaryDto; removedConnections: BoardConnectionDto[] }
     | { type: "connection-create"; connection: BoardConnectionDto }
     | { type: "connection-delete"; connection: BoardConnectionDto }
     | { type: "image-add"; image: BoardImageSummaryDto }
@@ -106,7 +114,8 @@ export function NoteBoardPage() {
     | { type: "card-position"; cardId: string; prevPositionX: number; prevPositionY: number }
     | { type: "card-size"; cardId: string; prevWidth: number | null; prevHeight: number | null }
     | { type: "card-delete"; card: IndexCardSummaryDto }
-    | { type: "card-create"; card: IndexCardSummaryDto };
+    | { type: "card-create"; card: IndexCardSummaryDto }
+    | { type: "note-create"; note: NoteSummaryDto };
   type BoardRedoEntry =
     | { type: "note-position"; noteId: string; positionX: number; positionY: number }
     | { type: "note-size"; noteId: string; width: number; height: number }
@@ -120,7 +129,8 @@ export function NoteBoardPage() {
     | { type: "card-position"; cardId: string; positionX: number; positionY: number }
     | { type: "card-size"; cardId: string; width: number; height: number }
     | { type: "card-delete"; cardId: string }
-    | { type: "card-create"; card: IndexCardSummaryDto };
+    | { type: "card-create"; card: IndexCardSummaryDto }
+    | { type: "note-create"; note: NoteSummaryDto };
   const boardUndoStackRef = useRef<BoardUndoEntry[]>([]);
   const boardRedoStackRef = useRef<BoardRedoEntry[]>([]);
   const notesRef = useRef(notes);
@@ -135,11 +145,83 @@ export function NoteBoardPage() {
     setZIndexMap((prev) => ({ ...prev, [id]: next }));
   }
 
+  const handleRichTextToolbarChange = useCallback(
+    (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => {
+      if (state === null && clearedSourceId !== undefined) {
+        setRichTextToolbar((prev) => (prev?.sourceId === clearedSourceId ? null : prev));
+        return;
+      }
+      if (state === null) {
+        setRichTextToolbar(null);
+        return;
+      }
+      setRichTextToolbar((prev) => {
+        if (prev && prev.sourceId === state.sourceId && prev.editor === state.editor) {
+          return prev;
+        }
+        return state;
+      });
+    },
+    [],
+  );
+
   // --- Red-string linking state ---
   const [connections, setConnections] = useState<BoardConnectionDto[]>([]);
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
   const [linkMousePos, setLinkMousePos] = useState<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  /** Same element as RedStringLayer’s SVG — use for linking cursor coords (must match SVG viewport, not outer canvas). */
+  const redStringSvgRef = useRef<SVGSVGElement>(null);
+  const boardViewportRef = useRef<HTMLDivElement>(null);
+
+  // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
+  const CANVAS_PADDING = 300;
+  const DEFAULT_CANVAS_SIZE = 2000;
+  const INDEX_CARD_DEFAULT_W = 450;
+  const INDEX_CARD_DEFAULT_H = 300;
+  const IMAGE_CARD_DEFAULT_W = 200;
+  const IMAGE_CARD_DEFAULT_H = 150;
+  const POSITION_DEFAULT = 20;
+
+  const canvasBounds = useMemo(() => {
+    let minX = 0;
+    let minY = 0;
+    let maxX = DEFAULT_CANVAS_SIZE;
+    let maxY = DEFAULT_CANVAS_SIZE;
+    const update = (x: number, y: number, w: number, h: number) => {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    };
+    for (const n of notes) {
+      const x = n.positionX ?? POSITION_DEFAULT;
+      const y = n.positionY ?? POSITION_DEFAULT;
+      const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
+      const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
+      update(x, y, w, h);
+    }
+    for (const c of indexCards) {
+      const x = c.positionX ?? POSITION_DEFAULT;
+      const y = c.positionY ?? POSITION_DEFAULT;
+      const w = c.width ?? INDEX_CARD_DEFAULT_W;
+      const h = c.height ?? INDEX_CARD_DEFAULT_H;
+      update(x, y, w, h);
+    }
+    for (const img of imageCards) {
+      const x = img.positionX ?? POSITION_DEFAULT;
+      const y = img.positionY ?? POSITION_DEFAULT;
+      const w = img.width ?? IMAGE_CARD_DEFAULT_W;
+      const h = img.height ?? IMAGE_CARD_DEFAULT_H;
+      update(x, y, w, h);
+    }
+    const contentMinX = minX - CANVAS_PADDING;
+    const contentMinY = minY - CANVAS_PADDING;
+    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
+    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
+    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
+  }, [notes, indexCards, imageCards]);
+
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -147,12 +229,45 @@ export function NoteBoardPage() {
   const deletedImageIdsRef = useRef<Set<string>>(new Set());
   const deletedNoteIdsRef = useRef<Set<string>>(new Set());
   const deletedCardIdsRef = useRef<Set<string>>(new Set());
+  /** Last note id jumped to via View → Previous/Next note (for cycling order). */
+  const noteNavAnchorRef = useRef<string | null>(null);
   const [pendingImageDrop, setPendingImageDrop] = useState<{ x: number; y: number } | null>(null);
 
   // --- Viewport state (pan & zoom) ---
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [isBoardHovered, setIsBoardHovered] = useState(false);
+  const scrollSliderXRef = useRef(0);
+  const scrollSliderYRef = useRef(0);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  zoomRef.current = zoom;
+  panXRef.current = panX;
+  panYRef.current = panY;
+
+  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump
+  const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
+  useEffect(() => {
+    const prev = prevContentMinRef.current;
+    if (prev === null) {
+      prevContentMinRef.current = {
+        contentMinX: canvasBounds.contentMinX,
+        contentMinY: canvasBounds.contentMinY,
+      };
+      return;
+    }
+    const dx = canvasBounds.contentMinX - prev.contentMinX;
+    const dy = canvasBounds.contentMinY - prev.contentMinY;
+    prevContentMinRef.current = {
+      contentMinX: canvasBounds.contentMinX,
+      contentMinY: canvasBounds.contentMinY,
+    };
+    if (dx === 0 && dy === 0) return;
+    setPanX((p) => p + (dx * (zoom + 1)) / zoom);
+    setPanY((p) => p + (dy * (zoom + 1)) / zoom);
+  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom]);
 
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -170,9 +285,10 @@ export function NoteBoardPage() {
   const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
   const CURSOR_THROTTLE_MS = 60;
 
-  // Restore viewport from localStorage on mount
+  // Restore viewport from localStorage on mount; reset bounds ref so pan compensation seeds for this board
   useEffect(() => {
     if (!boardId) return;
+    prevContentMinRef.current = null;
     try {
       const saved = localStorage.getItem(`board-viewport-${boardId}`);
       if (saved) {
@@ -249,6 +365,9 @@ export function NoteBoardPage() {
       if (!primaryNote && !primaryCard) return;
 
       const target = e.target as Element;
+      if (target.closest("[data-board-toolbar-portal]")) return;
+      if (target.closest("[data-board-menu-bar]")) return;
+
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       const cardEl = target.closest("[data-board-item='card'][data-card-id]");
 
@@ -259,6 +378,7 @@ export function NoteBoardPage() {
       setEditingCardIds(new Set());
       primaryEditingNoteIdRef.current = null;
       primaryEditingCardIdRef.current = null;
+      setRichTextToolbar(null);
     }
     document.addEventListener("mousedown", handleDocumentMouseDown, true);
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown, true);
@@ -549,7 +669,7 @@ export function NoteBoardPage() {
     setConnections((prev) => prev.filter((c) => c.fromItemId !== cardId && c.toItemId !== cardId));
   }, []);
 
-  const { sendFocus, sendCursor, sendTextCursor } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, sendCursor, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onIndexCardUpdated: mergeCardPayload,
@@ -564,6 +684,11 @@ export function NoteBoardPage() {
     onImageCardAdded: handleImageCardAdded,
     onImageCardUpdated: mergeImageCardPayload,
   });
+
+  useEffect(() => {
+    setBoardHubConnected(isHubConnected);
+    return () => setBoardHubConnected(false);
+  }, [isHubConnected, setBoardHubConnected]);
 
   useEffect(() => {
     const primaryNote = primaryEditingNoteIdRef.current;
@@ -726,6 +851,8 @@ export function NoteBoardPage() {
           patchNote(entry.noteId, { width: w, height: h }).catch(() => {});
         } else if (entry.type === "note-delete") {
           const displayColorKey = resolveNoteColorKey(entry.note);
+          const oldNoteId = entry.note.id;
+          const removedConnections = entry.removedConnections ?? [];
           createNote({
             content: entry.note.content,
             boardId: boardId ?? undefined,
@@ -737,12 +864,51 @@ export function NoteBoardPage() {
             color: displayColorKey,
             rotation: entry.note.rotation ?? undefined,
           })
-            .then((created) => {
+            .then(async (created) => {
               boardRedoStackRef.current.push({ type: "note-delete", noteId: created.id });
               const restored = { ...created, color: displayColorKey, rotation: entry.note.rotation ?? created.rotation };
               setNotes((prev) => (prev.some((n) => n.id === created.id) ? prev : [...prev, restored]));
+              if (removedConnections.length === 0 || !boardId) return;
+              try {
+                const newConns = await Promise.all(
+                  removedConnections.map((conn) =>
+                    createConnection({
+                      fromItemId: conn.fromItemId === oldNoteId ? created.id : conn.fromItemId,
+                      toItemId: conn.toItemId === oldNoteId ? created.id : conn.toItemId,
+                      boardId,
+                    }),
+                  ),
+                );
+                setConnections((prev) => {
+                  let next = prev;
+                  for (const nc of newConns) {
+                    if (!next.some((c) => c.id === nc.id)) next = [...next, nc];
+                  }
+                  return next;
+                });
+              } catch {
+                // connections best-effort
+              }
             })
             .catch(() => {});
+        } else if (entry.type === "note-create") {
+          boardRedoStackRef.current.push({ type: "note-create", note: { ...entry.note } });
+          deletedNoteIdsRef.current.add(entry.note.id);
+          setTimeout(() => deletedNoteIdsRef.current.delete(entry.note.id), 2000);
+          setNotes((prev) => prev.filter((n) => n.id !== entry.note.id));
+          setEditingNoteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(entry.note.id);
+            if (primaryEditingNoteIdRef.current === entry.note.id) {
+              primaryEditingNoteIdRef.current = next.size ? next.values().next().value ?? null : null;
+            }
+            return next;
+          });
+          setRichTextToolbar((prev) => (prev?.sourceId === entry.note.id ? null : prev));
+          setConnections((prev) =>
+            prev.filter((c) => c.fromItemId !== entry.note.id && c.toItemId !== entry.note.id),
+          );
+          deleteNote(entry.note.id).catch(() => fetchData());
         } else if (entry.type === "connection-create") {
           boardRedoStackRef.current.push({
             type: "connection-delete",
@@ -1045,6 +1211,24 @@ export function NoteBoardPage() {
               setIndexCards((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, restored]));
             })
             .catch(() => {});
+        } else if (entry.type === "note-create") {
+          const displayColorKey = resolveNoteColorKey(entry.note);
+          createNote({
+            content: entry.note.content,
+            boardId: boardId ?? undefined,
+            title: entry.note.title ?? undefined,
+            positionX: entry.note.positionX ?? 20,
+            positionY: entry.note.positionY ?? 20,
+            width: entry.note.width ?? undefined,
+            height: entry.note.height ?? undefined,
+            color: displayColorKey,
+            rotation: entry.note.rotation ?? undefined,
+          })
+            .then((created) => {
+              const restored = { ...created, color: displayColorKey, rotation: entry.note.rotation ?? created.rotation };
+              setNotes((prev) => (prev.some((n) => n.id === created.id) ? prev : [...prev, restored]));
+            })
+            .catch(() => {});
         }
       }
     }
@@ -1056,19 +1240,115 @@ export function NoteBoardPage() {
   // Sticky Note handlers
   // =============================================
 
+  function getViewportCenterInBoardCoords() {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return { x: 400, y: 300 };
+    }
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const x = (centerScreenX + contentMinX * (zoom + 1)) / zoom - panX;
+    const y = (centerScreenY + contentMinY * (zoom + 1)) / zoom - panY;
+    return { x, y };
+  }
+
+  function panViewportToBoardPoint(centerX: number, centerY: number) {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const newPanX = (centerScreenX + contentMinX * (zoom + 1)) / zoom - centerX;
+    const newPanY = (centerScreenY + contentMinY * (zoom + 1)) / zoom - centerY;
+    handleViewportChange(zoom, newPanX, newPanY);
+  }
+
+  function getStickyNoteCenter(n: NoteSummaryDto) {
+    const x = n.positionX ?? POSITION_DEFAULT;
+    const y = n.positionY ?? POSITION_DEFAULT;
+    const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
+    const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function sortNotesByCreatedAt(list: NoteSummaryDto[]) {
+    return [...list].sort((a, b) => {
+      const t = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (t !== 0) return t;
+      return a.id.localeCompare(b.id);
+    });
+  }
+
+  function navigateRelativeNote(delta: -1 | 1) {
+    const sorted = sortNotesByCreatedAt(notes);
+    if (sorted.length === 0) return;
+    const n = sorted.length;
+    let idx = 0;
+    const openNoteId = primaryEditingNoteIdRef.current;
+    let navigatedFromOpenNote = false;
+    if (openNoteId && sorted.some((note) => note.id === openNoteId)) {
+      idx = sorted.findIndex((note) => note.id === openNoteId);
+      navigatedFromOpenNote = true;
+    } else {
+      const anchor = noteNavAnchorRef.current;
+      if (anchor && sorted.some((note) => note.id === anchor)) {
+        idx = sorted.findIndex((note) => note.id === anchor);
+      } else {
+        const vp = getViewportCenterInBoardCoords();
+        let best = 0;
+        let bestD = Infinity;
+        sorted.forEach((note, i) => {
+          const c = getStickyNoteCenter(note);
+          const d = (c.x - vp.x) ** 2 + (c.y - vp.y) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        });
+        idx = best;
+      }
+    }
+    const nextIdx = ((idx + delta) % n + n) % n;
+    const target = sorted[nextIdx];
+    noteNavAnchorRef.current = target.id;
+    const c = getStickyNoteCenter(target);
+    panViewportToBoardPoint(c.x, c.y);
+    if (navigatedFromOpenNote) {
+      setEditingNoteIds(new Set([target.id]));
+      setEditingCardIds(new Set());
+      primaryEditingNoteIdRef.current = target.id;
+      primaryEditingCardIdRef.current = null;
+      bringToFront(target.id);
+    }
+  }
+
+  function handleNavigatePreviousNote() {
+    navigateRelativeNote(-1);
+  }
+
+  function handleNavigateNextNote() {
+    navigateRelativeNote(1);
+  }
+
   async function handleQuickAddNote() {
     if (!boardId) return;
     try {
-      const positionX = 30 + Math.random() * 400;
-      const positionY = 30 + Math.random() * 300;
+      const center = getViewportCenterInBoardCoords();
+      const positionX = center.x - STICKY_NOTE_DEFAULT_SIZE / 2;
+      const positionY = center.y - STICKY_NOTE_DEFAULT_SIZE / 2;
 
       const created = await createNote({
         content: "",
         boardId,
         positionX,
         positionY,
+        width: STICKY_NOTE_DEFAULT_SIZE,
+        height: STICKY_NOTE_DEFAULT_SIZE,
       });
 
+      boardRedoStackRef.current = [];
+      boardUndoStackRef.current.push({ type: "note-create", note: created });
       setNotes((prev) => [created, ...prev]);
       setEditingNoteIds((prev) => new Set(prev).add(created.id));
       primaryEditingNoteIdRef.current = created.id;
@@ -1239,7 +1519,7 @@ export function NoteBoardPage() {
     }
   }
 
-  async function handleRotationChange(id: string, rotation: number) {
+  const handleRotationChange = useCallback(async (id: string, rotation: number) => {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, rotation } : n)),
     );
@@ -1249,7 +1529,7 @@ export function NoteBoardPage() {
     } catch {
       // Silently fail
     }
-  }
+  }, []);
 
   async function handleDelete(id: string) {
     deletedNoteIdsRef.current.add(id);
@@ -1262,8 +1542,15 @@ export function NoteBoardPage() {
     }
     const deletedNote = notesRef.current.find((n) => n.id === id);
     if (deletedNote) {
+      const removedConnections = connectionsRef.current
+        .filter((c) => c.fromItemId === id || c.toItemId === id)
+        .map((c) => ({ ...c }));
       boardRedoStackRef.current = [];
-      boardUndoStackRef.current.push({ type: "note-delete", note: { ...deletedNote } });
+      boardUndoStackRef.current.push({
+        type: "note-delete",
+        note: { ...deletedNote },
+        removedConnections,
+      });
     }
     setNotes((prev) => prev.filter((n) => n.id !== id));
     setEditingNoteIds((prev) => {
@@ -1291,8 +1578,9 @@ export function NoteBoardPage() {
 
   async function handleQuickAddCard() {
     if (!boardId) return;
-    const positionX = 30 + Math.random() * 300;
-    const positionY = 30 + Math.random() * 200;
+    const center = getViewportCenterInBoardCoords();
+    const positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
+    const positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
     const tempId = `temp-card-${nextTempCardId++}`;
     const now = new Date().toISOString();
 
@@ -1467,7 +1755,7 @@ export function NoteBoardPage() {
     }
   }
 
-  async function handleCardRotationChange(id: string, rotation: number) {
+  const handleCardRotationChange = useCallback(async (id: string, rotation: number) => {
     setIndexCards((prev) =>
       prev.map((c) => (c.id === id ? { ...c, rotation } : c)),
     );
@@ -1477,7 +1765,7 @@ export function NoteBoardPage() {
     } catch {
       // Silently fail
     }
-  }
+  }, []);
 
   async function handleQuickAddImage() {
     if (!boardId) return;
@@ -1730,18 +2018,34 @@ export function NoteBoardPage() {
   // =============================================
 
   function handleSaveToFile() {
-    const payload = createBoardExportPayload("NoteBoard", board?.name ?? "Board", {
-      notes,
-      indexCards,
-      imageCards,
-      connections,
-      viewport: { zoom, panX, panY },
+    const boardName = boardNameRef.current || "Board";
+    const payload = createBoardExportPayload("NoteBoard", boardName, {
+      notes: notesRef.current,
+      indexCards: indexCardsRef.current,
+      imageCards: imageCardsRef.current,
+      connections: connectionsRef.current,
+      viewport: { zoom: zoomRef.current, panX: panXRef.current, panY: panYRef.current },
     });
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
-    triggerBoardDownload(blob, buildBoardExportFilename(board?.name ?? "board"));
+    triggerBoardDownload(blob, buildBoardExportFilename(boardName));
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.defaultPrevented) return;
+      if (e.key.toLowerCase() !== "s") return;
+
+      e.preventDefault();
+      handleSaveToFile();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [boardId]);
 
   function handleLoadFromFile() {
     loadFileInputRef.current?.click();
@@ -1761,6 +2065,7 @@ export function NoteBoardPage() {
       setEditingCardIds(new Set());
       primaryEditingNoteIdRef.current = null;
       primaryEditingCardIdRef.current = null;
+      setRichTextToolbar(null);
       const idMap = new Map<string, string>();
 
       // Delete existing items
@@ -1900,7 +2205,11 @@ export function NoteBoardPage() {
           boardId,
           positionX: x,
           positionY: y,
+          width: STICKY_NOTE_DEFAULT_SIZE,
+          height: STICKY_NOTE_DEFAULT_SIZE,
         });
+        boardRedoStackRef.current = [];
+        boardUndoStackRef.current.push({ type: "note-create", note: created });
         setNotes((prev) => [...prev, created]);
         setEditingNoteIds((prev) => new Set(prev).add(created.id));
         primaryEditingNoteIdRef.current = created.id;
@@ -1992,8 +2301,8 @@ export function NoteBoardPage() {
     if (!linkingFrom) return;
 
     function onMouseMove(e: MouseEvent) {
-      if (!boardRef.current) return;
-      const rect = boardRef.current.getBoundingClientRect();
+      const rect = redStringSvgRef.current?.getBoundingClientRect();
+      if (!rect) return;
       setLinkMousePos({
         x: (e.clientX - rect.left) / zoom,
         y: (e.clientY - rect.top) / zoom,
@@ -2078,14 +2387,10 @@ export function NoteBoardPage() {
 
   const isEmpty = notes.length === 0 && indexCards.length === 0 && imageCards.length === 0;
 
-  return (
-    <div className="relative flex h-full flex-col">
-      {/* Menu bar - paper style with online users on left */}
-      <div className="notepad-card flex-shrink-0 !overflow-visible border-b border-border/50 z-10">
-        <div className="notepad-spiral-strip" />
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <BoardMenuBar
+  const boardTopBar = (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className="min-w-0 flex-1">
+        <BoardMenuBar
           boardType="NoteBoard"
           zoom={zoom}
           onZoomChange={(z) => handleViewportChange(z, panX, panY)}
@@ -2102,11 +2407,18 @@ export function NoteBoardPage() {
           onBackgroundThemeChange={setBackgroundTheme}
           autoEnlargeNotes={autoEnlargeNotes}
           onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+          richTextToolbar={richTextToolbar}
+          onNavigatePreviousNote={handleNavigatePreviousNote}
+          onNavigateNextNote={handleNavigateNextNote}
+          noteNavigationDisabled={notes.length === 0}
         />
-          </div>
-          <BoardConnectedUsers users={connectedUsers} />
-        </div>
       </div>
+      {!isHubConnected && <BoardConnectedUsers users={connectedUsers} />}
+    </div>
+  );
+
+  return (
+    <div className="relative flex h-full flex-col">
       <input
         ref={loadFileInputRef}
         type="file"
@@ -2115,28 +2427,39 @@ export function NoteBoardPage() {
         aria-hidden
         onChange={handleLoadFileSelect}
       />
-      {/* Board content */}
-      <div className="relative flex-1 min-h-0">
+      {/* Board: menu sits inside the cork frame, just below the top wood edge */}
+      <div
+        ref={boardViewportRef}
+        className="relative flex-1 min-h-0"
+        onMouseEnter={() => setIsBoardHovered(true)}
+        onMouseLeave={() => setIsBoardHovered(false)}
+      >
         <CorkBoard
-          boardRef={boardRef}
-          onDropItem={handleBoardDrop}
-          onBoardMouseMove={handleBoardMouseMove}
-          onBoardMouseLeave={handleBoardMouseLeave}
-          onBoardClick={(e) => {
-            if (!(e.target as Element).closest("[data-board-item]")) {
-              setEditingNoteIds(new Set());
-              setEditingCardIds(new Set());
-              primaryEditingNoteIdRef.current = null;
-              primaryEditingCardIdRef.current = null;
-            }
-          }}
-          zoom={zoom}
-          panX={panX}
-          panY={panY}
-          onViewportChange={handleViewportChange}
-          backgroundTheme={backgroundTheme}
-          onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
-        >
+              topBar={boardTopBar}
+              boardRef={boardRef}
+              onDropItem={handleBoardDrop}
+              onBoardMouseMove={handleBoardMouseMove}
+              onBoardMouseLeave={handleBoardMouseLeave}
+              onBoardClick={(e) => {
+                if (!(e.target as Element).closest("[data-board-item]")) {
+                  setEditingNoteIds(new Set());
+                  setEditingCardIds(new Set());
+                  primaryEditingNoteIdRef.current = null;
+                  primaryEditingCardIdRef.current = null;
+                  setRichTextToolbar(null);
+                }
+              }}
+              zoom={zoom}
+              panX={panX}
+              panY={panY}
+              onViewportChange={handleViewportChange}
+              backgroundTheme={backgroundTheme}
+              onBoardContextMenu={(e) => setBoardContextMenu({ x: e.clientX, y: e.clientY })}
+              canvasWidth={canvasBounds.canvasWidth}
+              canvasHeight={canvasBounds.canvasHeight}
+              contentMinX={canvasBounds.contentMinX}
+              contentMinY={canvasBounds.contentMinY}
+            >
           {/* Remote cursors layer (board-space coords, same transform as canvas) */}
           <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
             {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
@@ -2159,6 +2482,7 @@ export function NoteBoardPage() {
           </div>
 
           <RedStringLayer
+            ref={redStringSvgRef}
             connections={connections}
             linkingFrom={linkingFrom}
             mousePos={linkMousePos}
@@ -2183,6 +2507,10 @@ export function NoteBoardPage() {
               onDragStart={handleNoteDragStart}
               onDragStop={handleDragStop}
               onDelete={handleDelete}
+              onDuplicate={(id) => {
+                const n = notes.find((note) => note.id === id);
+                if (n) handleDuplicateNote(n);
+              }}
               onStartEdit={handleStartEdit}
               onSave={handleSave}
               onContentChange={handleNoteContentChange}
@@ -2196,6 +2524,7 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "note", note })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              onRichTextToolbarChange={handleRichTextToolbarChange}
             />
           ))}
 
@@ -2228,6 +2557,10 @@ export function NoteBoardPage() {
               onDragStart={handleCardDragStart}
               onDragStop={handleCardDragStop}
               onDelete={handleCardDelete}
+              onDuplicate={(id) => {
+                const c = indexCards.find((card) => card.id === id);
+                if (c) handleDuplicateCard(c);
+              }}
               onStartEdit={handleCardStartEdit}
               onSave={handleCardSave}
               onContentChange={handleCardContentChange}
@@ -2240,6 +2573,7 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "card", card })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              onRichTextToolbarChange={handleRichTextToolbarChange}
             />
           ))}
 
@@ -2263,7 +2597,70 @@ export function NoteBoardPage() {
           />
         </CorkBoard>
 
-        {boardContextMenu && (
+        {/* Hover-only pan scrollbars (horizontal & vertical) */}
+        {isBoardHovered && (
+          <div className="pointer-events-none absolute inset-0">
+            {/* Horizontal scrollbar (full board width, slightly above bottom border like vertical inset) */}
+            <div className="pointer-events-auto absolute bottom-2 left-3 right-3 px-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderXRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 2;
+                    const nextPanX = panXRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, nextPanX, panYRef.current);
+                  }
+                  // When thumb reaches either end, snap back to center (pan unchanged)
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderXRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderXRef.current = raw;
+                  }
+                }}
+                className="board-scrollbar-range board-scrollbar-range-h w-full h-2 cursor-pointer"
+              />
+            </div>
+            {/* Vertical scrollbar (full board height, vertical style, evenly inset from frame) */}
+            <div className="pointer-events-auto absolute top-3 bottom-3 right-3 flex items-stretch py-3">
+              <input
+                type="range"
+                min={-5000}
+                max={5000}
+                defaultValue={0}
+                onChange={(e) => {
+                  const raw = Number(e.target.value || 0);
+                  if (Number.isNaN(raw)) return;
+                  const prev = scrollSliderYRef.current;
+                  const delta = raw - prev;
+                  if (delta !== 0) {
+                    const SCROLL_SPEED = 1;
+                    const nextPanY = panYRef.current - delta * SCROLL_SPEED;
+                    handleViewportChange(zoom, panXRef.current, nextPanY);
+                  }
+                  if (raw <= -5000 || raw >= 5000) {
+                    scrollSliderYRef.current = 0;
+                    e.currentTarget.value = "0";
+                  } else {
+                    scrollSliderYRef.current = raw;
+                  }
+                }}
+                style={{ writingMode: "vertical-rl" }}
+                className="board-scrollbar-range board-scrollbar-range-v h-full w-3 cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {boardContextMenu && (
           <ContextMenu
             x={boardContextMenu.x}
             y={boardContextMenu.y}
@@ -2286,7 +2683,6 @@ export function NoteBoardPage() {
             onClose={() => setItemContextMenu(null)}
           />
         )}
-      </div>
     </div>
   );
 }

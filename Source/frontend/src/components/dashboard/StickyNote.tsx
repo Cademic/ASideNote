@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -9,11 +9,15 @@ import FontFamily from "@tiptap/extension-font-family";
 import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
-import { X, GripVertical } from "lucide-react";
+import Highlight from "@tiptap/extension-highlight";
+import { X, GripVertical, MoreVertical, Copy, Trash2, RotateCw } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { NoteSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
-import { NoteToolbar } from "./NoteToolbar";
+import type { BoardRichTextToolbarState } from "./BoardMenuBar";
+import { ROTATION_PRESETS } from "./noteToolbarConstants";
+import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
+import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -21,6 +25,8 @@ interface StickyNoteProps {
   zIndex?: number;
   onDragStop: (id: string, x: number, y: number) => void;
   onDelete: (id: string) => void;
+  /** Optional: duplicate this note (e.g. create a copy on the board) */
+  onDuplicate?: (id: string) => void;
   onStartEdit: (id: string) => void;
   onSave: (id: string, title: string, content: string) => void;
   /** Optional: called on debounced content/title change while editing (for real-time sync). If not provided, debounced save is skipped. */
@@ -49,14 +55,29 @@ interface StickyNoteProps {
   zoom?: number;
   /** When true, visually scale the note when editing (for better readability) */
   enlargeWhenEditing?: boolean;
+  /** Registers the active TipTap editor with the board menu bar while editing */
+  onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
 }
 
-const DEFAULT_SIZE = 270;
+/** Default width and height for sticky notes on boards (square). */
+export const STICKY_NOTE_DEFAULT_SIZE = 270;
+/** Hard cap on note height when resizing (px). */
+export const STICKY_NOTE_MAX_HEIGHT = 600;
+const DEFAULT_SIZE = STICKY_NOTE_DEFAULT_SIZE;
 const MIN_SIZE = 120;
 const MAX_WIDTH = 600;
-const MAX_HEIGHT = 600;
-const MAX_CONTENT_LENGTH = 1000;
-const MAX_TITLE_LENGTH = 100;
+/** Plain-text character budget for note body (TipTap CharacterCount). */
+const MAX_CONTENT_TEXT_LENGTH = 1000;
+/** Max paragraph blocks (Enter). Existing notes above this can still be edited down. */
+const MAX_CONTENT_PARAGRAPHS = 40;
+/** Max soft line breaks (Shift+Enter). */
+const MAX_CONTENT_HARD_BREAKS = 60;
+/** Title plain-text length; matches API validators (`MaximumLength(500)` on note title). */
+const MAX_TITLE_TEXT_LENGTH = 500;
+/** Title is a single paragraph block (Enter cannot add another). */
+const MAX_TITLE_PARAGRAPHS = 1;
+/** Soft line breaks allowed in title (Shift+Enter). */
+const MAX_TITLE_HARD_BREAKS = 20;
 
 type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -148,6 +169,7 @@ export function StickyNote({
   zIndex = 0,
   onDragStop,
   onDelete,
+  onDuplicate,
   onStartEdit,
   onSave,
   onContentChange,
@@ -167,6 +189,7 @@ export function StickyNote({
   onContextMenu,
   zoom = 1,
   enlargeWhenEditing = false,
+  onRichTextToolbarChange,
 }: StickyNoteProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const ignoreBlurUntilRef = useRef<number>(0);
@@ -177,6 +200,8 @@ export function StickyNote({
 
   const [activeField, setActiveField] = useState<"title" | "content">("title");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({
     width: note.width ?? DEFAULT_SIZE,
     height: note.height ?? DEFAULT_SIZE,
@@ -196,6 +221,7 @@ export function StickyNote({
     FontSize,
     TextAlign.configure({ types: ["paragraph"] }),
     Link.configure({ openOnClick: false }),
+    Highlight.configure({ multicolor: true }),
   ];
 
   const sendTextCursorIfNeeded = useCallback(
@@ -210,7 +236,11 @@ export function StickyNote({
   const titleEditor = useEditor({
     extensions: [
       ...sharedExtensions,
-      CharacterCount.configure({ limit: MAX_TITLE_LENGTH }),
+      CharacterCount.configure({ limit: MAX_TITLE_TEXT_LENGTH }),
+      NoteBodyLimits.configure({
+        maxParagraphs: MAX_TITLE_PARAGRAPHS,
+        maxHardBreaks: MAX_TITLE_HARD_BREAKS,
+      }),
     ],
     content: note.title || "",
     editable: isEditing,
@@ -230,7 +260,11 @@ export function StickyNote({
   const contentEditor = useEditor({
     extensions: [
       ...sharedExtensions,
-      CharacterCount.configure({ limit: MAX_CONTENT_LENGTH }),
+      CharacterCount.configure({ limit: MAX_CONTENT_TEXT_LENGTH }),
+      NoteBodyLimits.configure({
+        maxParagraphs: MAX_CONTENT_PARAGRAPHS,
+        maxHardBreaks: MAX_CONTENT_HARD_BREAKS,
+      }),
     ],
     content: note.content || "",
     editable: isEditing,
@@ -245,6 +279,16 @@ export function StickyNote({
       setActiveField("content");
       sendTextCursorIfNeeded(editor, "content");
     },
+  });
+
+  const titleCharCount = useEditorState({
+    editor: titleEditor,
+    selector: ({ editor }) => editor?.storage.characterCount?.characters() ?? 0,
+  });
+
+  const contentCharCount = useEditorState({
+    editor: contentEditor,
+    selector: ({ editor }) => editor?.storage.characterCount?.characters() ?? 0,
   });
 
   const activeEditor =
@@ -302,17 +346,15 @@ export function StickyNote({
   // Sync title editor from props
   useEffect(() => {
     if (!titleEditor) return;
+    if (isEditing && titleEditor.isFocused) return;
     const currentHtml = titleEditor.getHTML();
     const propHtml = note.title ?? "";
     if (currentHtml !== propHtml && propHtml !== undefined) {
-      // When not editing, only sync if editor is not focused
-      // When editing, always sync to show remote changes (collaborative editing)
       if (!isEditing) {
         if (!titleEditor.isFocused) {
           titleEditor.commands.setContent(propHtml || "", { emitUpdate: false });
         }
       } else {
-        // When editing, sync remote changes even if focused
         titleEditor.commands.setContent(propHtml || "", { emitUpdate: false });
       }
     }
@@ -321,30 +363,32 @@ export function StickyNote({
   // Sync content editor from props
   useEffect(() => {
     if (!contentEditor) return;
+    if (isEditing && contentEditor.isFocused) return;
     const currentHtml = contentEditor.getHTML();
     const propHtml = note.content ?? "";
     if (currentHtml !== propHtml && propHtml !== undefined) {
-      // When not editing, only sync if editor is not focused
-      // When editing, always sync to show remote changes (collaborative editing)
       if (!isEditing) {
         if (!contentEditor.isFocused) {
           contentEditor.commands.setContent(propHtml || "", { emitUpdate: false });
         }
       } else {
-        // When editing, sync remote changes even if focused
         contentEditor.commands.setContent(propHtml || "", { emitUpdate: false });
       }
     }
   }, [note.content, isEditing, contentEditor]);
 
-  // Debounced content push while typing so other clients see updates in real time (only when onContentChange provided)
-  const SAVE_DEBOUNCE_MS = 200;
+  // Save immediately while typing (minimal debounce); on exit edit flush so text is never lost
+  const SAVE_DEBOUNCE_MS = 0;
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   useEffect(() => {
     if (!onContentChangeRef.current || !isEditing || !titleEditor || !contentEditor) return;
     const flush = () => {
+      if (saveDebounceRef.current) {
+        clearTimeout(saveDebounceRef.current);
+        saveDebounceRef.current = null;
+      }
       onContentChangeRef.current?.(note.id, titleEditor.getHTML(), contentEditor.getHTML());
     };
     const onUpdate = () => {
@@ -358,6 +402,7 @@ export function StickyNote({
       contentEditor.off("update", onUpdate);
       if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
       saveDebounceRef.current = null;
+      flush();
     };
   }, [isEditing, note.id, titleEditor, contentEditor]);
 
@@ -490,19 +535,23 @@ export function StickyNote({
     [titleEditor, contentEditor, note.id, onSave],
   );
 
-  const handleNoteColorChange = useCallback(
-    (newColor: string) => {
-      onColorChange(note.id, newColor);
-    },
-    [note.id, onColorChange],
-  );
+  useEffect(() => {
+    if (!onRichTextToolbarChange) return;
+    if (!isEditing) {
+      onRichTextToolbarChange(null, note.id);
+      return;
+    }
+    onRichTextToolbarChange({
+      sourceId: note.id,
+      editor: activeEditor,
+    });
+  }, [isEditing, activeEditor, activeField, titleEditor, contentEditor, note.id, onRichTextToolbarChange]);
 
-  const handleNoteRotationChange = useCallback(
-    (newRotation: number) => {
-      onRotationChange(note.id, newRotation);
-    },
-    [note.id, onRotationChange],
-  );
+  useEffect(() => {
+    return () => {
+      onRichTextToolbarChange?.(null, note.id);
+    };
+  }, [onRichTextToolbarChange, note.id]);
 
   // --- Resize logic using a single stable ref for all mutable state ---
   const resizeRef = useRef<{
@@ -579,19 +628,19 @@ export function StickyNote({
           }
         }
         if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
+          newH = Math.min(STICKY_NOTE_MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
         }
         if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
           const proposed = rs.startH - dy;
-          if (proposed >= MIN_SIZE && proposed <= MAX_HEIGHT) {
+          if (proposed >= MIN_SIZE && proposed <= STICKY_NOTE_MAX_HEIGHT) {
             newH = proposed;
             newY = rs.startPosY + dy;
           } else if (proposed < MIN_SIZE) {
             newH = MIN_SIZE;
             newY = rs.startPosY + (rs.startH - MIN_SIZE);
           } else {
-            newH = MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MAX_HEIGHT);
+            newH = STICKY_NOTE_MAX_HEIGHT;
+            newY = rs.startPosY + (rs.startH - STICKY_NOTE_MAX_HEIGHT);
           }
         }
 
@@ -642,6 +691,20 @@ export function StickyNote({
 
   const edgeThickness = 6;
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  const noteColorKeys = Object.keys(NOTE_COLORS);
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
@@ -680,7 +743,7 @@ export function StickyNote({
       >
         <div
           className={[
-            "relative overflow-visible rounded shadow-lg transition-shadow hover:shadow-xl",
+            "relative flex min-h-0 flex-col overflow-visible rounded shadow-lg transition-shadow hover:shadow-xl",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
             focusedBy?.length ? "ring-[3px]" : "",
             color.bg,
@@ -753,7 +816,7 @@ export function StickyNote({
           />
         </div>
 
-        {/* Drag handle + delete */}
+        {/* Drag handle + more menu + delete */}
         <div
           className="sticky-handle flex cursor-grab items-center justify-between px-3 pt-4 pb-1 active:cursor-grabbing"
           onClick={() => {
@@ -761,46 +824,125 @@ export function StickyNote({
           }}
         >
           <GripVertical className="h-3.5 w-3.5 text-black/20" />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Strip HTML to check if there's actual text content
-              const stripHtml = (html: string) =>
-                html.replace(/<[^>]*>/g, "").trim();
-              const hasContent =
-                !!(note.content && stripHtml(note.content).length > 0);
-              if (hasContent) {
-                setShowDeleteConfirm(true);
-              } else {
-                onDelete(note.id);
-              }
-            }}
-            className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
-            aria-label="Delete note"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          <div className="relative flex items-center gap-0.5" ref={menuRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              aria-label="Note options"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Color
+                </div>
+                <div className="flex flex-nowrap items-center gap-1 px-2 pb-2">
+                  {noteColorKeys.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        onColorChange(note.id, key);
+                        setMenuOpen(false);
+                      }}
+                      className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
+                        colorKey === key
+                          ? "border-gray-700 dark:border-gray-300"
+                          : "border-transparent"
+                      } ${NOTE_COLORS[key].bg}`}
+                      title={key}
+                      aria-label={`Color ${key}`}
+                    />
+                  ))}
+                </div>
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <RotateCw className="h-3 w-3" />
+                  Tilt
+                </div>
+                <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                  {ROTATION_PRESETS.map((deg) => (
+                    <button
+                      key={deg}
+                      type="button"
+                      onClick={() => {
+                        onRotationChange(note.id, deg);
+                        setMenuOpen(false);
+                      }}
+                      className={[
+                        "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
+                        (note.rotation ?? 0) === deg
+                          ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
+                          : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                      ].join(" ")}
+                      title={`${deg}°`}
+                    >
+                      {deg === 0 ? "0°" : `${deg > 0 ? "+" : ""}${deg}°`}
+                    </button>
+                  ))}
+                </div>
+                <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                {onDuplicate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDuplicate(note.id);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Duplicate note
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    const hasContent =
+                      !!(note.content && stripHtmlForPlainText(note.content).length > 0);
+                    if (hasContent) {
+                      setShowDeleteConfirm(true);
+                    } else {
+                      onDelete(note.id);
+                    }
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete note
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const hasContent =
+                  !!(note.content && stripHtmlForPlainText(note.content).length > 0);
+                if (hasContent) {
+                  setShowDeleteConfirm(true);
+                } else {
+                  onDelete(note.id);
+                }
+              }}
+              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              aria-label="Delete note"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* Slide-out toolbar (visible in edit mode) */}
-        <div
-          className={[
-            "overflow-hidden transition-all duration-200",
-            isEditing ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0",
-          ].join(" ")}
-        >
-        <NoteToolbar
-          editor={activeEditor}
-          noteColor={colorKey}
-          onNoteColorChange={handleNoteColorChange}
-          noteRotation={note.rotation ?? 0}
-          onNoteRotationChange={handleNoteRotationChange}
-        />
-        </div>
-
-        {/* Content area */}
-        <div className="overflow-hidden">
+        {/* Body: full-width editors (toolbar is absolutely positioned to the left) */}
+        <div className="min-w-0 flex-1 overflow-hidden">
           {isEditing || (focusedBy && focusedBy.length > 0) ? (
             <div className="px-3 pb-4 space-y-1.5" onBlur={handleBlur} onKeyDown={handleKeyDown}>
               {/* Title rich text editor */}
@@ -821,13 +963,12 @@ export function StickyNote({
               <div className="flex justify-end -mt-0.5 mb-0.5">
                 <span
                   className={`text-[10px] ${
-                    (titleEditor?.storage.characterCount?.characters() ?? 0) >=
-                    MAX_TITLE_LENGTH
+                    (titleCharCount ?? 0) >= MAX_TITLE_TEXT_LENGTH
                       ? "text-red-600 font-semibold"
                       : "text-gray-500/60"
                   }`}
                 >
-                  {titleEditor?.storage.characterCount?.characters() ?? 0}/{MAX_TITLE_LENGTH}
+                  {titleCharCount ?? 0}/{MAX_TITLE_TEXT_LENGTH}
                 </span>
               </div>
 
@@ -854,13 +995,12 @@ export function StickyNote({
               <div className="flex justify-end">
                 <span
                   className={`text-[10px] ${
-                    (contentEditor?.storage.characterCount?.characters() ?? 0) >=
-                    MAX_CONTENT_LENGTH
+                    (contentCharCount ?? 0) >= MAX_CONTENT_TEXT_LENGTH
                       ? "text-red-600 font-semibold"
                       : "text-gray-500/60"
                   }`}
                 >
-                  {contentEditor?.storage.characterCount?.characters() ?? 0}/{MAX_CONTENT_LENGTH}
+                  {contentCharCount ?? 0}/{MAX_CONTENT_TEXT_LENGTH}
                 </span>
               </div>
             </div>

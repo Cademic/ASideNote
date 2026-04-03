@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { constrainFixedBox, DROPDOWN_VIEWPORT_PADDING } from "../../lib/dropdown-viewport";
 
 export interface ContextMenuItem {
   label: React.ReactNode;
@@ -17,8 +18,6 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
-const MENU_PADDING = 8;
-
 export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
@@ -34,16 +33,17 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
     const menu = menuRef.current;
     if (!menu || typeof window === "undefined") return;
     const rect = menu.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let left = x;
-    let top = y;
-    if (left + rect.width > vw - MENU_PADDING) left = vw - rect.width - MENU_PADDING;
-    if (left < MENU_PADDING) left = MENU_PADDING;
-    if (top + rect.height > vh - MENU_PADDING) top = vh - rect.height - MENU_PADDING;
-    if (top < MENU_PADDING) top = MENU_PADDING;
+    const { left, top } = constrainFixedBox(rect.left, rect.top, rect.width, rect.height, DROPDOWN_VIEWPORT_PADDING);
     setPosition({ left, top });
-  }, [x, y]);
+    const maxH = window.innerHeight - 2 * DROPDOWN_VIEWPORT_PADDING;
+    if (rect.height > maxH) {
+      menu.style.maxHeight = `${maxH}px`;
+      menu.style.overflowY = "auto";
+    } else {
+      menu.style.maxHeight = "";
+      menu.style.overflowY = "";
+    }
+  }, [x, y, rawItems.length]);
 
   useEffect(() => {
     function handlePointerDown(e: PointerEvent) {
@@ -65,7 +65,7 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
   const menuContent = (
     <div
       ref={menuRef}
-      className="fixed z-[100] min-w-[220px] max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+      className="fixed z-[100] min-w-[220px] max-w-[min(95vw,calc(100vw-1rem))] max-h-[min(400px,calc(100vh-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
       style={{
         left: position.left,
         top: position.top,

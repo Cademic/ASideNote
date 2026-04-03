@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { Printer, Upload, ChevronRight, Search, Link as LinkIcon } from "lucide-react";
 import type { NotebookVersionDto } from "../../types";
-
-const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Times", value: "Times, 'Times New Roman', serif" },
-];
+import { nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
+import { FontFamilySearchMenu } from "../dashboard/FontFamilySearch";
+import { FontSizeSearchMenu, parseFontSizeAttr } from "../dashboard/FontSizeSearch";
 
 const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+const NOTEBOOK_MIN_FONT = 8;
+const NOTEBOOK_MAX_FONT = 72;
 
 const ZOOM_PRESETS = [50, 75, 90, 100, 125, 150, 175, 200];
 
@@ -60,7 +58,7 @@ const menuItemWithSubmenuClass =
 const menuSectionClass = "px-2 py-1 text-xs font-medium text-foreground/60";
 const dividerClass = "my-1 border-t border-border/50";
 const submenuClass =
-  "absolute left-full top-0 -ml-1 pl-1 z-[60] min-w-[160px] rounded-lg border border-border bg-background py-1 shadow-xl";
+  "absolute left-full top-0 z-[60] min-w-[160px] max-w-[min(320px,calc(100vw-1rem))] -ml-3 rounded-lg border border-border bg-background py-1 pl-2 shadow-xl";
 
 function HoverSubmenu({
   label,
@@ -74,6 +72,7 @@ function HoverSubmenu({
   submenuClass: string;
 }) {
   const [open, setOpen] = useState(false);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearCloseTimer = () => {
     if (closeTimerRef.current) {
@@ -82,6 +81,21 @@ function HoverSubmenu({
     }
   };
   useEffect(() => () => clearCloseTimer(), []);
+
+  useLayoutEffect(() => {
+    if (!open || !submenuRef.current) return;
+    const el = submenuRef.current;
+    const run = () => nudgeAbsoluteElementIntoViewport(el);
+    run();
+    const ro = new ResizeObserver(run);
+    ro.observe(el);
+    window.addEventListener("resize", run);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", run);
+    };
+  }, [open]);
+
   return (
     <div
       className="relative"
@@ -99,6 +113,7 @@ function HoverSubmenu({
       </div>
       {open && (
         <div
+          ref={submenuRef}
           className={submenuClass}
           onMouseEnter={() => {
             clearCloseTimer();
@@ -211,11 +226,26 @@ export function NotebookMenuBar({
   const [linkPopupOpen, setLinkPopupOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const menuBarRef = useRef<HTMLDivElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
   /** Selection when Format menu was opened; restored when applying font size so it applies to the right text. */
   const formatMenuSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   const closeMenu = () => setOpenMenu(null);
+
+  useLayoutEffect(() => {
+    if (!openMenu || !dropdownPanelRef.current) return;
+    const el = dropdownPanelRef.current;
+    const run = () => nudgeAbsoluteElementIntoViewport(el);
+    run();
+    const ro = new ResizeObserver(run);
+    ro.observe(el);
+    window.addEventListener("resize", run);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", run);
+    };
+  }, [openMenu]);
 
   const openLinkPopup = () => {
     closeMenu();
@@ -252,6 +282,11 @@ export function NotebookMenuBar({
 
   if (!editor) return null;
 
+  const currentFontSizePx = parseFontSizeAttr(
+    editor.getAttributes("textStyle").fontSize as string | undefined,
+    12,
+  );
+
   const menuTriggerClass = (menu: OpenMenu) =>
     `px-3 py-1.5 text-sm transition-colors rounded-md ${
       openMenu === menu
@@ -260,7 +295,7 @@ export function NotebookMenuBar({
     }`;
 
   const dropdownClass =
-    "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[320px] max-h-[400px] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
+    "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(320px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
 
   const captureFormatSelection = () => {
     const sel = editor?.state.selection;
@@ -288,7 +323,7 @@ export function NotebookMenuBar({
           File
         </button>
         {openMenu === "file" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <div className={menuSectionClass}>Print</div>
             <button type="button" className={menuItemClass} onClick={() => { closeMenu(); onPrint(); }}>
               <Printer className="h-3.5 w-3.5" />
@@ -364,7 +399,7 @@ export function NotebookMenuBar({
           Edit
         </button>
         {openMenu === "edit" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <button
               type="button"
               className={menuItemClass}
@@ -454,7 +489,7 @@ export function NotebookMenuBar({
           Format
         </button>
         {openMenu === "format" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <button
               type="button"
               className={menuItemClass}
@@ -508,54 +543,43 @@ export function NotebookMenuBar({
             <HoverSubmenu
               label="Font"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}
-              submenuClass={submenuClass}
+              submenuClass={`${submenuClass} min-w-[220px]`}
             >
-              {FONT_FAMILIES.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  className={menuItemClass}
-                  onClick={() => { closeMenu(); editor.chain().focus().setFontFamily(f.value).run(); }}
-                >
-                  {f.label}
-                </button>
-              ))}
+              <FontFamilySearchMenu
+                currentFontValue={editor.getAttributes("textStyle").fontFamily as string | undefined}
+                onPick={(value) => {
+                  closeMenu();
+                  editor.chain().focus().setFontFamily(value).run();
+                }}
+              />
             </HoverSubmenu>
             <div className={dividerClass} />
             <HoverSubmenu
               label="Font size"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}
-              submenuClass={submenuClass}
+              submenuClass={`${submenuClass} min-w-[220px]`}
             >
-              <div className="flex flex-wrap gap-1 px-2 py-1">
-                {FONT_SIZE_PRESETS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="rounded px-2 py-1 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const size = s;
-                      const saved = formatMenuSelectionRef.current;
-                      if (saved) {
-                        editor
-                          .chain()
-                          .focus()
-                          .setTextSelection({ from: saved.from, to: saved.to })
-                          .setFontSize(`${size}px`)
-                          .run();
-                        formatMenuSelectionRef.current = null;
-                      } else {
-                        editor.chain().focus().setFontSize(`${size}px`).run();
-                      }
-                      requestAnimationFrame(() => closeMenu());
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <FontSizeSearchMenu
+                currentSizePx={currentFontSizePx}
+                presets={FONT_SIZE_PRESETS}
+                minSize={NOTEBOOK_MIN_FONT}
+                maxSize={NOTEBOOK_MAX_FONT}
+                onPick={(px) => {
+                  const saved = formatMenuSelectionRef.current;
+                  if (saved) {
+                    editor
+                      .chain()
+                      .focus()
+                      .setTextSelection({ from: saved.from, to: saved.to })
+                      .setFontSize(`${px}px`)
+                      .run();
+                    formatMenuSelectionRef.current = null;
+                  } else {
+                    editor.chain().focus().setFontSize(`${px}px`).run();
+                  }
+                  requestAnimationFrame(() => closeMenu());
+                }}
+              />
             </HoverSubmenu>
             <div className={dividerClass} />
             <button
@@ -623,7 +647,7 @@ export function NotebookMenuBar({
           Insert
         </button>
         {openMenu === "insert" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <HoverSubmenu
               label="Image"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}
@@ -719,7 +743,7 @@ export function NotebookMenuBar({
           View
         </button>
         {openMenu === "view" && (
-          <div className={dropdownClass}>
+          <div ref={dropdownPanelRef} className={dropdownClass}>
             <HoverSubmenu
               label="Zoom"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}

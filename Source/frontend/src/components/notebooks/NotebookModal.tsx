@@ -25,7 +25,7 @@ import { getNotebookById, updateNotebookContent, downloadNotebookExport } from "
 import type { NotebookDetailDto } from "../../types";
 import { PaperShell } from "./PaperShell";
 import { ZoomablePaperShell } from "./ZoomablePaperShell";
-import { IndexCardToolbar } from "../dashboard/IndexCardToolbar";
+import { NoteToolbar } from "../dashboard/NoteToolbar";
 
 const SAVE_DEBOUNCE_MS = 800;
 const DEFAULT_DOC = { type: "doc", content: [] } as const;
@@ -333,15 +333,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
           <div className="flex items-center gap-2">
             {editor && (
               <div className="hidden sm:block">
-                <IndexCardToolbar
-                  editor={editor}
-                  cardColor="white"
-                  onCardColorChange={() => {}}
-                  cardRotation={0}
-                  onCardRotationChange={() => {}}
-                  hideCardColor
-                  hideTilt
-                />
+                <NoteToolbar editor={editor} />
               </div>
             )}
             {editor && (

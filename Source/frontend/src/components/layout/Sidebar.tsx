@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import type { OpenedBoard } from "./AppLayout";
+import type { BoardPresenceUser, OpenedBoard } from "./AppLayout";
+import { BoardConnectedUsersSidebar } from "../dashboard/BoardConnectedUsers";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 
 interface SidebarProps {
@@ -35,6 +36,9 @@ interface SidebarProps {
   onUnpinBoard: (id: string) => void;
   onUnpinProject: (id: string) => void;
   onUnpinNotebook: (id: string) => void;
+  /** When the board SignalR hub is connected, presence is shown here instead of the board toolbar. */
+  connectedUsers: BoardPresenceUser[];
+  boardHubConnected: boolean;
 }
 
 const NAV_ITEMS = [
@@ -119,7 +123,22 @@ function getBoardPath(board: OpenedBoard): string {
   return `/boards/${board.id}`;
 }
 
-export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCloseBoard, pinnedBoards, pinnedProjects, pinnedNotebooks, onOpenNotebook, onUnpinBoard, onUnpinProject, onUnpinNotebook }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onToggle,
+  isDrawer = false,
+  openedBoards,
+  onCloseBoard,
+  pinnedBoards,
+  pinnedProjects,
+  pinnedNotebooks,
+  onOpenNotebook,
+  onUnpinBoard,
+  onUnpinProject,
+  onUnpinNotebook,
+  connectedUsers,
+  boardHubConnected,
+}: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -254,7 +273,7 @@ export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCl
               Pinned
             </span>
           )}
-          {!isOpen && (
+          {!isOpen && !isDrawer && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               <Pin className="mx-auto h-3 w-3" />
             </span>
@@ -399,7 +418,7 @@ export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCl
               Opened
             </span>
           )}
-          {!isOpen && (
+          {!isOpen && !isDrawer && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               Open
             </span>
@@ -450,6 +469,10 @@ export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCl
 
       {/* Spacer to push board tools and user section to bottom */}
       <div className="flex-1" />
+
+      {isOnAnyBoardPage && boardHubConnected && connectedUsers.length > 0 && (
+        <BoardConnectedUsersSidebar users={connectedUsers} expanded={expanded} />
+      )}
 
       {/* Board Tools — draggable stationery items */}
       {isOnAnyBoardPage && (
