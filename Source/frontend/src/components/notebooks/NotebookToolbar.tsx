@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import imageCompression from "browser-image-compression";
 import { uploadNotebookImage } from "../../api/notebooks";
 import type { Editor } from "@tiptap/react";
@@ -32,16 +32,8 @@ import {
   Menu,
   ChevronRight,
 } from "lucide-react";
-
-const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Helvetica", value: "Helvetica, Arial, sans-serif" },
-  { label: "Times", value: "Times, 'Times New Roman', serif" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-];
+import { FontFamilySearch } from "../dashboard/FontFamilySearch";
+import { FontSizeSearch } from "../dashboard/FontSizeSearch";
 
 const MIN_FONT_SIZE = 8;
 const MAX_FONT_SIZE = 72;
@@ -348,31 +340,14 @@ function WordStyleColorPicker({
 function FontSizeWithButtons({ editor }: { editor: Editor }) {
   const currentRaw = editor.getAttributes("textStyle").fontSize as string | undefined;
   const currentNum = parseFontSize(currentRaw);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [inputValue, setInputValue] = useState(String(currentNum));
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setInputValue(String(currentNum));
-  }, [currentNum]);
 
   function applySize(num: number) {
     const clamped = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, num));
     editor.chain().focus().setFontSize(`${clamped}px`).run();
-    setInputValue(String(clamped));
-  }
-
-  function applyFromInput() {
-    const n = parseInt(inputValue, 10);
-    if (!Number.isNaN(n) && n >= MIN_FONT_SIZE && n <= MAX_FONT_SIZE) {
-      applySize(n);
-    } else {
-      setInputValue(String(currentNum));
-    }
   }
 
   return (
-    <div ref={containerRef} className="flex items-center rounded-md border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800">
+    <div className="flex min-w-0 items-center rounded-md border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800">
       <button
         type="button"
         onMouseDown={(e) => {
@@ -381,61 +356,22 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
         }}
         disabled={currentNum <= MIN_FONT_SIZE}
         title="Decrease font size"
-        className="flex h-8 w-7 items-center justify-center rounded-l-md border-r border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-l-md border-r border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
       >
         <Minus className="h-3.5 w-3.5" />
       </button>
-      <div className="relative flex min-w-[3rem] items-center">
-        <input
-          type="text"
-          inputMode="numeric"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value.replace(/\D/g, "").slice(0, 3))}
-          onFocus={(e) => {
-            setShowDropdown(true);
-            e.target.select();
-          }}
-          onBlur={() => {
-            applyFromInput();
-            setShowDropdown(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              applyFromInput();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          title="Font size (edit or select from dropdown)"
-          className="h-8 w-10 flex-1 border-0 bg-transparent px-1 text-center text-sm text-gray-700 focus:outline-none dark:text-gray-200"
+      <div className="min-w-0 flex-1 px-0.5" onMouseDown={(e) => e.stopPropagation()}>
+        <FontSizeSearch
+          editor={editor}
+          size="menu"
+          variant="horizontal"
+          presets={FONT_SIZE_PRESETS}
+          minSize={MIN_FONT_SIZE}
+          maxSize={MAX_FONT_SIZE}
+          defaultSize={12}
+          className="w-full min-w-0"
+          inputClassName="h-8 w-full min-w-[3.25rem] border-0 bg-transparent text-center text-sm text-gray-700 shadow-none focus:outline-none focus:ring-0 dark:text-gray-200"
         />
-        {showDropdown && (
-          <div
-            className="absolute left-0 top-full z-50 mt-1 max-h-80 min-w-[4rem] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-gray-800"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {FONT_SIZE_PRESETS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  applySize(s);
-                  setShowDropdown(false);
-                  (containerRef.current?.querySelector("input") as HTMLInputElement | null)?.blur();
-                }}
-                className={`block w-full px-3 py-1 text-left text-sm ${
-                  s === currentNum
-                    ? "bg-amber-50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
-                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
       <button
         type="button"
@@ -445,7 +381,7 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
         }}
         disabled={currentNum >= MAX_FONT_SIZE}
         title="Increase font size"
-        className="flex h-8 w-7 items-center justify-center rounded-r-md border-l border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-r-md border-l border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -846,13 +782,6 @@ export function NotebookToolbar({
   onDownloadPdf,
   pdfExporting = false,
 }: NotebookToolbarProps) {
-  const setFontFamily = useCallback(
-    (value: string) => {
-      editor?.chain().focus().setFontFamily(value).run();
-    },
-    [editor],
-  );
-
   const activeState = useEditorState({
     editor,
     selector: (ctx) => {
@@ -1056,17 +985,9 @@ export function NotebookToolbar({
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-              <select
-                value={state.fontFamily ?? FONT_FAMILIES[0].value}
-                onChange={(e) => setFontFamily(e.target.value)}
-                onMouseDown={(e) => e.stopPropagation()}
-                title="Font"
-                className={`${selectClassName} min-w-[100px]`}
-              >
-                {FONT_FAMILIES.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
+              <div onMouseDown={(e) => e.stopPropagation()} className="min-w-[10rem] max-w-[18rem]">
+                <FontFamilySearch editor={editor} size="menu" variant="horizontal" />
+              </div>
               <FontSizeWithButtons editor={editor} />
               <select
                 value={state.lineHeight ?? ""}

@@ -56,7 +56,8 @@ let nextTempCardId = 1;
 
 export function NoteBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
-  const { setBoardName, openBoard, setBoardPresence, connectedUsers } = useOutletContext<AppLayoutContext>();
+  const { setBoardName, openBoard, setBoardPresence, connectedUsers, setBoardHubConnected } =
+    useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
   const currentUserId = user?.userId ?? null;
 
@@ -668,7 +669,7 @@ export function NoteBoardPage() {
     setConnections((prev) => prev.filter((c) => c.fromItemId !== cardId && c.toItemId !== cardId));
   }, []);
 
-  const { sendFocus, sendCursor, sendTextCursor } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, sendCursor, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onIndexCardUpdated: mergeCardPayload,
@@ -683,6 +684,11 @@ export function NoteBoardPage() {
     onImageCardAdded: handleImageCardAdded,
     onImageCardUpdated: mergeImageCardPayload,
   });
+
+  useEffect(() => {
+    setBoardHubConnected(isHubConnected);
+    return () => setBoardHubConnected(false);
+  }, [isHubConnected, setBoardHubConnected]);
 
   useEffect(() => {
     const primaryNote = primaryEditingNoteIdRef.current;
@@ -2407,7 +2413,7 @@ export function NoteBoardPage() {
           noteNavigationDisabled={notes.length === 0}
         />
       </div>
-      <BoardConnectedUsers users={connectedUsers} />
+      {!isHubConnected && <BoardConnectedUsers users={connectedUsers} />}
     </div>
   );
 

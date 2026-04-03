@@ -16,21 +16,13 @@ import {
   Underline,
 } from "lucide-react";
 import {
-  FONT_FAMILIES,
-  FONT_SIZE_PRESETS,
   HIGHLIGHT_COLORS,
   hexForColorInput,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
   TEXT_COLORS,
 } from "./noteToolbarConstants";
+import { FontFamilySearchMenu } from "./FontFamilySearch";
+import { FontSizeSearchMenu, parseFontSizeAttr } from "./FontSizeSearch";
 import { dividerClass, HoverSubmenu, menuItemClass } from "./boardMenuShared";
-
-function parseFontSize(raw: string | undefined | null): number {
-  if (!raw) return 14;
-  const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? 14 : n;
-}
 
 function itemActiveClass(active: boolean) {
   return active ? " bg-sky-50 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100" : "";
@@ -154,53 +146,27 @@ function BoardMenuMobileEditToolkitActive({
     highlightColor: "#fef08a",
   };
   const currentColor = s.color ?? "#1f2937";
-  const currentSize = parseFontSize(editor.getAttributes("textStyle").fontSize as string | undefined);
+  const currentSize = parseFontSizeAttr(editor.getAttributes("textStyle").fontSize as string | undefined, 14);
 
   return (
     <div>
       <div className={dividerClass} />
       <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/45">Text</p>
       <HoverSubmenu label="Font family">
-        {FONT_FAMILIES.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            className={menuItemClass}
-            onClick={() => {
-              editor.chain().focus().setFontFamily(f.value).run();
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+        <FontFamilySearchMenu
+          currentFontValue={editor.getAttributes("textStyle").fontFamily as string | undefined}
+          onPick={(value) => {
+            editor.chain().focus().setFontFamily(value).run();
+          }}
+        />
       </HoverSubmenu>
       <HoverSubmenu label="Font size">
-        {FONT_SIZE_PRESETS.map((size) => (
-          <button
-            key={size}
-            type="button"
-            className={`${menuItemClass}${currentSize === size ? " bg-sky-50 dark:bg-sky-900/30" : ""}`}
-            onClick={() => {
-              editor.chain().focus().setFontSize(`${size}px`).run();
-            }}
-          >
-            {size}px
-          </button>
-        ))}
-        <button
-          type="button"
-          className={menuItemClass}
-          onClick={() => {
-            const raw = window.prompt("Font size (px)", String(currentSize));
-            if (raw === null) return;
-            let n = parseInt(raw, 10);
-            if (Number.isNaN(n)) n = 14;
-            n = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, n));
-            editor.chain().focus().setFontSize(`${n}px`).run();
+        <FontSizeSearchMenu
+          currentSizePx={currentSize}
+          onPick={(px) => {
+            editor.chain().focus().setFontSize(`${px}px`).run();
           }}
-        >
-          Custom…
-        </button>
+        />
       </HoverSubmenu>
       <button
         type="button"

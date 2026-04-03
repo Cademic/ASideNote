@@ -3,15 +3,12 @@ import type { Editor } from "@tiptap/react";
 import { Printer, Upload, ChevronRight, Search, Link as LinkIcon } from "lucide-react";
 import type { NotebookVersionDto } from "../../types";
 import { nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
-
-const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Times", value: "Times, 'Times New Roman', serif" },
-];
+import { FontFamilySearchMenu } from "../dashboard/FontFamilySearch";
+import { FontSizeSearchMenu, parseFontSizeAttr } from "../dashboard/FontSizeSearch";
 
 const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+const NOTEBOOK_MIN_FONT = 8;
+const NOTEBOOK_MAX_FONT = 72;
 
 const ZOOM_PRESETS = [50, 75, 90, 100, 125, 150, 175, 200];
 
@@ -285,6 +282,11 @@ export function NotebookMenuBar({
 
   if (!editor) return null;
 
+  const currentFontSizePx = parseFontSizeAttr(
+    editor.getAttributes("textStyle").fontSize as string | undefined,
+    12,
+  );
+
   const menuTriggerClass = (menu: OpenMenu) =>
     `px-3 py-1.5 text-sm transition-colors rounded-md ${
       openMenu === menu
@@ -541,54 +543,43 @@ export function NotebookMenuBar({
             <HoverSubmenu
               label="Font"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}
-              submenuClass={submenuClass}
+              submenuClass={`${submenuClass} min-w-[220px]`}
             >
-              {FONT_FAMILIES.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  className={menuItemClass}
-                  onClick={() => { closeMenu(); editor.chain().focus().setFontFamily(f.value).run(); }}
-                >
-                  {f.label}
-                </button>
-              ))}
+              <FontFamilySearchMenu
+                currentFontValue={editor.getAttributes("textStyle").fontFamily as string | undefined}
+                onPick={(value) => {
+                  closeMenu();
+                  editor.chain().focus().setFontFamily(value).run();
+                }}
+              />
             </HoverSubmenu>
             <div className={dividerClass} />
             <HoverSubmenu
               label="Font size"
               menuItemWithSubmenuClass={menuItemWithSubmenuClass}
-              submenuClass={submenuClass}
+              submenuClass={`${submenuClass} min-w-[220px]`}
             >
-              <div className="flex flex-wrap gap-1 px-2 py-1">
-                {FONT_SIZE_PRESETS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="rounded px-2 py-1 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const size = s;
-                      const saved = formatMenuSelectionRef.current;
-                      if (saved) {
-                        editor
-                          .chain()
-                          .focus()
-                          .setTextSelection({ from: saved.from, to: saved.to })
-                          .setFontSize(`${size}px`)
-                          .run();
-                        formatMenuSelectionRef.current = null;
-                      } else {
-                        editor.chain().focus().setFontSize(`${size}px`).run();
-                      }
-                      requestAnimationFrame(() => closeMenu());
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <FontSizeSearchMenu
+                currentSizePx={currentFontSizePx}
+                presets={FONT_SIZE_PRESETS}
+                minSize={NOTEBOOK_MIN_FONT}
+                maxSize={NOTEBOOK_MAX_FONT}
+                onPick={(px) => {
+                  const saved = formatMenuSelectionRef.current;
+                  if (saved) {
+                    editor
+                      .chain()
+                      .focus()
+                      .setTextSelection({ from: saved.from, to: saved.to })
+                      .setFontSize(`${px}px`)
+                      .run();
+                    formatMenuSelectionRef.current = null;
+                  } else {
+                    editor.chain().focus().setFontSize(`${px}px`).run();
+                  }
+                  requestAnimationFrame(() => closeMenu());
+                }}
+              />
             </HoverSubmenu>
             <div className={dividerClass} />
             <button

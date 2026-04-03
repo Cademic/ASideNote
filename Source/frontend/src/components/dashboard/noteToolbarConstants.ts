@@ -1,11 +1,6 @@
 export const ROTATION_PRESETS = [-10, -5, -3, 0, 3, 5, 10];
 
-export const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-  { label: "Cursive", value: "'Segoe Script', 'Comic Sans MS', cursive" },
-];
+export { FONT_FAMILIES } from "../../lib/fontFamilies";
 
 export const MIN_FONT_SIZE = 8;
 export const MAX_FONT_SIZE = 48;

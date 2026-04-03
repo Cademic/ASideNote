@@ -40,6 +40,9 @@ export interface AppLayoutContext {
   refreshPinnedNotebooks: () => void;
   /** Desktop only: true when sidebar is expanded (w-60), false when collapsed (w-16). */
   isSidebarOpen: boolean;
+  /** SignalR hub joined the current board (project boards only); drives sidebar vs toolbar presence UI. */
+  boardHubConnected: boolean;
+  setBoardHubConnected: (connected: boolean) => void;
 }
 
 export function AppLayout() {
@@ -50,6 +53,7 @@ export function AppLayout() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < SIDEBAR_BREAKPOINT);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [connectedUsers, setBoardPresence] = useState<BoardPresenceUser[]>([]);
+  const [boardHubConnected, setBoardHubConnected] = useState(false);
   const [openedBoards, setOpenedBoards] = useState<OpenedBoard[]>([]);
   const [pinnedBoards, setPinnedBoards] = useState<BoardSummaryDto[]>([]);
   const [pinnedProjects, setPinnedProjects] = useState<ProjectSummaryDto[]>([]);
@@ -199,7 +203,10 @@ export function AppLayout() {
   useEffect(() => {
     const onBoard = /^\/boards\/[^/]+$/.test(location.pathname) || /^\/chalkboards\/[^/]+$/.test(location.pathname);
     const onNotebookEditor = /^\/notebooks\/[^/]+$/.test(location.pathname);
-    if (!onBoard && !onNotebookEditor) setBoardPresence([]);
+    if (!onBoard && !onNotebookEditor) {
+      setBoardPresence([]);
+      setBoardHubConnected(false);
+    }
   }, [location.pathname]);
 
   // Fetch pinned boards, projects, and notebooks when authenticated
@@ -222,6 +229,8 @@ export function AppLayout() {
     openNotebook,
     refreshPinnedNotebooks,
     isSidebarOpen,
+    boardHubConnected,
+    setBoardHubConnected,
   };
 
   /** Note or chalk board detail — hide global navbar for maximum canvas space */
@@ -246,6 +255,8 @@ export function AppLayout() {
           onUnpinBoard={handleUnpinBoard}
           onUnpinProject={handleUnpinProject}
           onUnpinNotebook={handleUnpinNotebook}
+          connectedUsers={connectedUsers}
+          boardHubConnected={boardHubConnected}
         />
       )}
       {isMobile && (
@@ -280,6 +291,8 @@ export function AppLayout() {
               onUnpinBoard={handleUnpinBoard}
               onUnpinProject={handleUnpinProject}
               onUnpinNotebook={handleUnpinNotebook}
+              connectedUsers={connectedUsers}
+              boardHubConnected={boardHubConnected}
             />
           </div>
         </>

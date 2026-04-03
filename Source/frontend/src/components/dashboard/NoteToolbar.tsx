@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
@@ -18,14 +18,12 @@ import {
   ListOrdered,
 } from "lucide-react";
 import {
-  FONT_FAMILIES,
-  FONT_SIZE_PRESETS,
   HIGHLIGHT_COLORS,
   hexForColorInput,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
   TEXT_COLORS,
 } from "./noteToolbarConstants";
+import { FontFamilySearch } from "./FontFamilySearch";
+import { FontSizeSearch } from "./FontSizeSearch";
 import { fitFixedDropdownToViewport, nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
 
 interface NoteToolbarProps {
@@ -238,12 +236,6 @@ function ListDropdownButton({
   );
 }
 
-function parseFontSize(raw: string | undefined | null): number {
-  if (!raw) return 14;
-  const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? 14 : n;
-}
-
 function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: boolean }) {
   const [showInput, setShowInput] = useState(false);
   const [url, setUrl] = useState("");
@@ -358,85 +350,6 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
         </div>
       )}
     </div>
-  );
-}
-
-function FontSizeInput({ editor }: { editor: Editor }) {
-  const currentRaw = editor.getAttributes("textStyle").fontSize as
-    | string
-    | undefined;
-  const currentNum = parseFontSize(currentRaw);
-  const [isCustom, setIsCustom] = useState(false);
-  const [customValue, setCustomValue] = useState(String(currentNum));
-
-  function applySize(val: string) {
-    let num = parseInt(val, 10);
-    if (Number.isNaN(num)) num = 14;
-    num = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, num));
-    setCustomValue(String(num));
-    editor.chain().focus().setFontSize(`${num}px`).run();
-  }
-
-  if (isCustom) {
-    return (
-      <input
-        autoFocus
-        type="number"
-        min={MIN_FONT_SIZE}
-        max={MAX_FONT_SIZE}
-        value={customValue}
-        onChange={(e) => setCustomValue(e.target.value)}
-        onBlur={(e) => {
-          applySize(e.target.value);
-          setIsCustom(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            applySize((e.target as HTMLInputElement).value);
-            setIsCustom(false);
-            e.preventDefault();
-          }
-          if (e.key === "Escape") {
-            setIsCustom(false);
-          }
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        title="Font size (px)"
-        className="h-6 w-14 rounded border border-black/15 bg-white/60 px-1 text-center text-[10px] text-gray-700 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      />
-    );
-  }
-
-  // Determine select value: match a preset or show "custom"
-  const selectValue = FONT_SIZE_PRESETS.includes(currentNum)
-    ? String(currentNum)
-    : "custom";
-
-  return (
-    <select
-      value={selectValue}
-      onChange={(e) => {
-        if (e.target.value === "custom") {
-          setCustomValue(String(currentNum));
-          setIsCustom(true);
-        } else {
-          applySize(e.target.value);
-        }
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-      title="Font Size"
-      className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-700 focus:outline-none"
-    >
-      {FONT_SIZE_PRESETS.map((s) => (
-        <option key={s} value={String(s)}>
-          {s}px
-        </option>
-      ))}
-      {!FONT_SIZE_PRESETS.includes(currentNum) && (
-        <option value="custom">{currentNum}px</option>
-      )}
-      <option value="custom">Custom...</option>
-    </select>
   );
 }
 
@@ -816,21 +729,8 @@ function NoteToolbarIdleHorizontal() {
       aria-disabled="true"
     >
       <div className="flex flex-wrap items-center gap-1 pointer-events-none select-none">
-        <select
-          disabled
-          className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-500"
-          title="Font Family"
-          value={FONT_FAMILIES[0].value}
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <select disabled className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-500" title="Font Size" value="14">
-          <option value="14">14px</option>
-        </select>
+        <FontFamilySearch editor={null} />
+        <FontSizeSearch editor={null} />
         <div className="mx-0.5 h-4 w-px bg-black/10" />
         {[Bold, Italic, Underline, Strikethrough].map((Icon, i) => (
           <span
@@ -876,13 +776,6 @@ function NoteToolbarActive({
   editor,
   variant = "horizontal",
 }: NoteToolbarProps & { editor: Editor }) {
-  const setFontFamily = useCallback(
-    (value: string) => {
-      editor.chain().focus().setFontFamily(value).run();
-    },
-    [editor],
-  );
-
   const activeState = useEditorState({
     editor,
     selector: (ctx) => {
@@ -975,25 +868,12 @@ function NoteToolbarActive({
   if (variant === "vertical") {
     return (
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-1.5 py-1.5">
-        <select
-          value={
-            editor.getAttributes("textStyle").fontFamily ??
-            FONT_FAMILIES[0].value
-          }
-          onChange={(e) => setFontFamily(e.target.value)}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="h-6 w-full min-w-0 rounded border border-black/15 bg-white/60 px-0.5 text-[9px] text-gray-700 focus:outline-none"
-          title="Font Family"
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <FontFamilySearch editor={editor} variant="vertical" />
+        </div>
 
-        <div className="w-full [&_input]:w-full [&_select]:w-full">
-          <FontSizeInput editor={editor} />
+        <div className="w-full [&_input]:w-full" onMouseDown={(e) => e.stopPropagation()}>
+          <FontSizeSearch editor={editor} variant="vertical" defaultSize={14} />
         </div>
 
         <div className="h-px w-full shrink-0 bg-black/10" />
@@ -1044,26 +924,15 @@ function NoteToolbarActive({
     <div className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
       {/* Row 1: Text formatting */}
       <div className="flex flex-wrap items-center gap-1">
-        {/* Font family */}
-        <select
-          value={
-            editor.getAttributes("textStyle").fontFamily ??
-            FONT_FAMILIES[0].value
-          }
-          onChange={(e) => setFontFamily(e.target.value)}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-700 focus:outline-none"
-          title="Font Family"
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        {/* Font family (searchable) */}
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <FontFamilySearch editor={editor} variant="horizontal" />
+        </div>
 
-        {/* Font size input */}
-        <FontSizeInput editor={editor} />
+        {/* Font size (searchable) */}
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <FontSizeSearch editor={editor} variant="horizontal" defaultSize={14} />
+        </div>
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 

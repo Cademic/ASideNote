@@ -3,6 +3,62 @@ import { Users } from "lucide-react";
 import { getColorForUserId } from "../../lib/presenceColors";
 import type { BoardPresenceUser } from "../layout/AppLayout";
 
+/** Sidebar panel when the board hub is connected — shows who is on the board. */
+export function BoardConnectedUsersSidebar({
+  users,
+  expanded,
+}: {
+  users: BoardPresenceUser[];
+  expanded: boolean;
+}) {
+  if (users.length === 0) return null;
+
+  if (!expanded) {
+    return (
+      <div
+        className="flex flex-col items-center gap-1 border-t border-border/40 px-2 py-2"
+        title={`${users.length} connected: ${users.map((u) => u.displayName).join(", ")}`}
+        aria-label="Connected users on this board"
+      >
+        <Users className="h-5 w-5 shrink-0 text-foreground/45" aria-hidden />
+        <div className="flex max-w-full flex-wrap justify-center gap-0.5">
+          {users.slice(0, 8).map((u) => (
+            <span
+              key={u.userId}
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: getColorForUserId(u.userId) }}
+              title={u.displayName}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-border/40 px-3 py-2" aria-label="Connected users on this board">
+      <div className="mb-1.5 flex items-center gap-1.5 px-0 text-[10px] font-semibold uppercase tracking-wider text-foreground/35">
+        <Users className="h-3 w-3" aria-hidden />
+        Connected
+      </div>
+      <div className="flex max-h-36 flex-col gap-1 overflow-y-auto scrollbar-thin pr-0.5">
+        {users.map((u) => (
+          <div key={u.userId} className="flex min-w-0 items-center gap-2 text-sm text-foreground/85">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: getColorForUserId(u.userId) }}
+              aria-hidden
+            />
+            <span className="truncate" title={u.displayName}>
+              {u.displayName}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface BoardConnectedUsersProps {
   users: BoardPresenceUser[];
 }

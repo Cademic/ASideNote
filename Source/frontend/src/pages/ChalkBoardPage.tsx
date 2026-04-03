@@ -46,7 +46,8 @@ function clamp(value: number, min: number, max: number) {
 
 export function ChalkBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
-  const { setBoardName, openBoard, setBoardPresence, connectedUsers } = useOutletContext<AppLayoutContext>();
+  const { setBoardName, openBoard, setBoardPresence, connectedUsers, setBoardHubConnected } =
+    useOutletContext<AppLayoutContext>();
 
   // --- Board & loading state ---
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
@@ -717,13 +718,18 @@ export function ChalkBoardPage() {
     });
   }, []);
 
-  const { sendFocus, sendCursor } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, sendCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onPresenceUpdate: setBoardPresence,
     onUserFocusingItem: handleUserFocusingItem,
     onCursorPosition: handleCursorPosition,
   });
+
+  useEffect(() => {
+    setBoardHubConnected(isHubConnected);
+    return () => setBoardHubConnected(false);
+  }, [isHubConnected, setBoardHubConnected]);
 
   useEffect(() => {
     const primary = primaryEditingNoteIdRef.current;
@@ -1377,7 +1383,7 @@ export function ChalkBoardPage() {
           richTextToolbar={richTextToolbar}
         />
       </div>
-      <BoardConnectedUsers users={connectedUsers} />
+      {!isHubConnected && <BoardConnectedUsers users={connectedUsers} />}
     </div>
   );
 

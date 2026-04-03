@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
@@ -29,6 +29,8 @@ import {
   Code2,
 } from "lucide-react";
 import { TextColorDropdown, HighlightColorDropdown } from "./NoteToolbar";
+import { FontFamilySearch } from "./FontFamilySearch";
+import { FontSizeSearch } from "./FontSizeSearch";
 
 interface IndexCardToolbarProps {
   editor: Editor | null;
@@ -43,28 +45,6 @@ interface IndexCardToolbarProps {
 }
 
 const ROTATION_PRESETS = [-10, -5, -3, 0, 3, 5, 10];
-
-const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-  { label: "Cursive", value: "'Segoe Script', 'Comic Sans MS', cursive" },
-  { label: "Arial", value: "Arial, sans-serif" },
-  { label: "Helvetica", value: "Helvetica, Arial, sans-serif" },
-  { label: "Times", value: "Times, 'Times New Roman', serif" },
-  { label: "Courier", value: "Courier, 'Courier New', monospace" },
-  { label: "Verdana", value: "Verdana, sans-serif" },
-  { label: "Trebuchet", value: "'Trebuchet MS', sans-serif" },
-  { label: "Palatino", value: "Palatino, 'Palatino Linotype', serif" },
-  { label: "Garamond", value: "Garamond, serif" },
-  { label: "Bookman", value: "'Bookman Old Style', serif" },
-  { label: "Comic Sans", value: "'Comic Sans MS', cursive" },
-  { label: "Impact", value: "Impact, sans-serif" },
-];
-
-const MIN_FONT_SIZE = 8;
-const MAX_FONT_SIZE = 48;
-const FONT_SIZE_PRESETS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
 
 const CARD_COLOR_SWATCHES = [
   { key: "white", swatch: "bg-white border-gray-300" },
@@ -108,90 +88,6 @@ function ToolbarButton({
     >
       {children}
     </button>
-  );
-}
-
-function parseFontSize(raw: string | undefined | null): number {
-  if (!raw) return 14;
-  const n = parseInt(raw, 10);
-  return Number.isNaN(n) ? 14 : n;
-}
-
-function FontSizeInput({ editor }: { editor: Editor }) {
-  const currentRaw = editor.getAttributes("textStyle").fontSize as
-    | string
-    | undefined;
-  const currentNum = parseFontSize(currentRaw);
-  const [isCustom, setIsCustom] = useState(false);
-  const [customValue, setCustomValue] = useState(String(currentNum));
-
-  function applySize(val: string) {
-    let num = parseInt(val, 10);
-    if (Number.isNaN(num)) num = 14;
-    num = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, num));
-    setCustomValue(String(num));
-    editor.chain().focus().setFontSize(`${num}px`).run();
-  }
-
-  if (isCustom) {
-    return (
-      <input
-        autoFocus
-        type="number"
-        min={MIN_FONT_SIZE}
-        max={MAX_FONT_SIZE}
-        value={customValue}
-        onChange={(e) => setCustomValue(e.target.value)}
-        onBlur={(e) => {
-          applySize(e.target.value);
-          setIsCustom(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            applySize((e.target as HTMLInputElement).value);
-            setIsCustom(false);
-            e.preventDefault();
-          }
-          if (e.key === "Escape") {
-            setIsCustom(false);
-          }
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        title="Font size (px)"
-        className="h-6 w-14 rounded border border-black/15 bg-white/60 px-1 text-center text-[10px] text-gray-700 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      />
-    );
-  }
-
-  const selectValue = FONT_SIZE_PRESETS.includes(currentNum)
-    ? String(currentNum)
-    : "custom";
-
-  return (
-    <select
-      value={selectValue}
-      onChange={(e) => {
-        if (e.target.value === "custom") {
-          setCustomValue(String(currentNum));
-          setIsCustom(true);
-        } else {
-          applySize(e.target.value);
-        }
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-      title="Font Size"
-      className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-700 focus:outline-none"
-    >
-      {FONT_SIZE_PRESETS.map((s) => (
-        <option key={s} value={String(s)}>
-          {s}px
-        </option>
-      ))}
-      {!FONT_SIZE_PRESETS.includes(currentNum) && (
-        <option value="custom">{currentNum}px</option>
-      )}
-      <option value="custom">Custom...</option>
-    </select>
   );
 }
 
@@ -356,13 +252,6 @@ export function IndexCardToolbar({
   hideCardColor = false,
   hideTilt = false,
 }: IndexCardToolbarProps) {
-  const setFontFamily = useCallback(
-    (value: string) => {
-      editor?.chain().focus().setFontFamily(value).run();
-    },
-    [editor],
-  );
-
   const activeState = useEditorState({
     editor,
     selector: (ctx) => {
@@ -411,26 +300,15 @@ export function IndexCardToolbar({
     <div className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
       {/* Row 1: Text formatting */}
       <div className="flex flex-wrap items-center gap-1">
-        {/* Font family */}
-        <select
-          value={
-            editor.getAttributes("textStyle").fontFamily ??
-            FONT_FAMILIES[0].value
-          }
-          onChange={(e) => setFontFamily(e.target.value)}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-700 focus:outline-none"
-          title="Font Family"
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        {/* Font family (searchable) */}
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <FontFamilySearch editor={editor} variant="horizontal" />
+        </div>
 
-        {/* Font size input */}
-        <FontSizeInput editor={editor} />
+        {/* Font size (searchable) */}
+        <div onMouseDown={(e) => e.stopPropagation()}>
+          <FontSizeSearch editor={editor} variant="horizontal" defaultSize={14} />
+        </div>
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { useAuth } from "../context/AuthContext";
 
@@ -67,6 +67,8 @@ export interface UseBoardRealtimeReturn {
   sendFocus: (itemType: string, itemId: string | null) => void;
   sendCursor: (x: number, y: number) => void;
   sendTextCursor: (itemType: string, itemId: string, field: "title" | "content", position: number) => void;
+  /** True after the SignalR hub has joined the board (collaboration / presence active). */
+  isHubConnected: boolean;
 }
 
 /**
@@ -129,9 +131,13 @@ export function useBoardRealtime(
   }, []);
 
   const enabled = options.enabled !== false;
+  const [isHubConnected, setIsHubConnected] = useState(false);
 
   useEffect(() => {
-    if (!boardId || !isAuthenticated || !accessToken || !enabled) return;
+    if (!boardId || !isAuthenticated || !accessToken || !enabled) {
+      setIsHubConnected(false);
+      return;
+    }
 
     const base = `${getHubBaseUrl()}/hubs/board`;
     const hubUrl = `${base}${base.includes("?") ? "&" : "?"}access_token=${encodeURIComponent(accessToken)}`;
@@ -148,6 +154,18 @@ export function useBoardRealtime(
       .build();
 
     connectionRef.current = connection;
+
+    connection.onclose((error) => {
+      setIsHubConnected(false);
+      if (import.meta.env.DEV) {
+        console.warn("[useBoardRealtime] Closed:", error?.message);
+      }
+    });
+    connection.onreconnecting(() => setIsHubConnected(false));
+    connection.onreconnected(() => {
+      setIsHubConnected(true);
+      connection.invoke("JoinBoard", boardId).catch(() => {});
+    });
 
     let presenceList: BoardPresenceUser[] = [];
     const applyPresence = () => onPresenceUpdateRef.current?.(presenceList);
@@ -290,23 +308,18 @@ export function useBoardRealtime(
         })
         .then(() => {
           if (cancelled) return;
+          setIsHubConnected(true);
           if (import.meta.env.DEV) console.log("[useBoardRealtime] Joined board:", boardId);
         })
         .catch((err: unknown) => {
           if (cancelled) return;
+          setIsHubConnected(false);
           if (import.meta.env.DEV) {
             const e = err as Error & { message?: string };
             console.error("[useBoardRealtime] Failed:", e?.message ?? String(err));
           }
         });
     }, 0);
-
-    if (import.meta.env.DEV) {
-      connection.onclose((error) => console.warn("[useBoardRealtime] Closed:", error?.message));
-      connection.onreconnected(() => {
-        connection.invoke("JoinBoard", boardId).catch(() => {});
-      });
-    }
 
     return () => {
       cancelled = true;
@@ -336,5 +349,5 @@ export function useBoardRealtime(
     };
   }, [boardId, isAuthenticated, accessToken, enabled]);
 
-  return { sendFocus, sendCursor, sendTextCursor };
+  return { sendFocus, sendCursor, sendTextCursor, isHubConnected };
 }
