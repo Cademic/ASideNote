@@ -1,3 +1,4 @@
+import axios from "axios";
 import type {
   BoardImageSummaryDto,
   BoardSummaryDto,
@@ -51,8 +52,16 @@ export async function uploadBoardImage(boardId: string, file: File): Promise<{ u
 
 /** Get all image cards on a board. */
 export async function getBoardImageCards(boardId: string): Promise<BoardImageSummaryDto[]> {
-  const response = await apiClient.get<BoardImageSummaryDto[]>(`/boards/${boardId}/image-cards`);
-  return response.data;
+  try {
+    const response = await apiClient.get<BoardImageSummaryDto[]>(`/boards/${boardId}/image-cards`);
+    return response.data;
+  } catch (e: unknown) {
+    // 503 = DB missing BoardImages table (schema not migrated). Board still works without image cards.
+    if (axios.isAxiosError(e) && e.response?.status === 503) {
+      return [];
+    }
+    throw e;
+  }
 }
 
 /** Create an image card on a board. */

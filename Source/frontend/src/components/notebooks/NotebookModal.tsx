@@ -333,11 +333,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
           <div className="flex items-center gap-2">
             {editor && (
               <div className="hidden sm:block">
-                <NoteToolbar
-                  editor={editor}
-                  noteRotation={0}
-                  onNoteRotationChange={() => {}}
-                />
+                <NoteToolbar editor={editor} />
               </div>
             )}
             {editor && (

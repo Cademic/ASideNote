@@ -1,10 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { Save, Upload, ChevronRight, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon, Check } from "lucide-react";
+import type { Editor } from "@tiptap/react";
+import { Save, Upload, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon, Check } from "lucide-react";
+import { NoteToolbar } from "./NoteToolbar";
+import { dividerClass, HoverSubmenu, menuItemClass } from "./boardMenuShared";
+import {
+  BoardMenuMobileEditToolkit,
+  BoardMenuMobileInsertToolkit,
+  BoardMenuMobileViewToolkit,
+} from "./BoardMenuMobileToolkit";
 
 const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200];
 
 type OpenMenu = "file" | "edit" | "insert" | "view" | null;
 export type BoardBackgroundTheme = "whiteboard" | "blackboard" | "default";
+
+/** Active TipTap context for the sticky note / index card being edited (shown in the menu bar). */
+export interface BoardRichTextToolbarState {
+  sourceId: string;
+  editor: Editor | null;
+}
 
 interface BoardMenuBarProps {
   boardType: "NoteBoard" | "ChalkBoard";
@@ -23,63 +37,8 @@ interface BoardMenuBarProps {
   onBackgroundThemeChange: (theme: BoardBackgroundTheme) => void;
   autoEnlargeNotes: boolean;
   onAutoEnlargeNotesChange: (enabled: boolean) => void;
-}
-
-const menuItemClass =
-  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-amber-50 hover:text-foreground dark:hover:bg-amber-900/20 flex items-center gap-2";
-const menuItemWithSubmenuClass =
-  "w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-amber-50 hover:text-foreground dark:hover:bg-amber-900/20 flex items-center justify-between gap-2";
-const dividerClass = "my-1 border-t border-border/50";
-const submenuClass =
-  "absolute left-full top-0 -ml-1 pl-1 z-[60] min-w-[160px] rounded-lg border border-border bg-background py-1 shadow-xl";
-
-function HoverSubmenu({
-  label,
-  children,
-}: {
-  label: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-  useEffect(() => () => clearCloseTimer(), []);
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => {
-        clearCloseTimer();
-        setOpen(true);
-      }}
-      onMouseLeave={() => {
-        closeTimerRef.current = setTimeout(() => setOpen(false), 150);
-      }}
-    >
-      <div className={menuItemWithSubmenuClass}>
-        {label}
-        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-      </div>
-      {open && (
-        <div
-          className={submenuClass}
-          onMouseEnter={() => {
-            clearCloseTimer();
-            setOpen(true);
-          }}
-          onMouseLeave={() => {
-            closeTimerRef.current = setTimeout(() => setOpen(false), 150);
-          }}
-        >
-          {children}
-        </div>
-      )}
-    </div>
-  );
+  /** When a note or index card is in edit mode, formatting controls appear in this bar. */
+  richTextToolbar?: BoardRichTextToolbarState | null;
 }
 
 export function BoardMenuBar({
@@ -99,6 +58,7 @@ export function BoardMenuBar({
   onBackgroundThemeChange,
   autoEnlargeNotes,
   onAutoEnlargeNotesChange,
+  richTextToolbar = null,
 }: BoardMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const menuBarRef = useRef<HTMLDivElement>(null);
@@ -127,7 +87,12 @@ export function BoardMenuBar({
     "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[280px] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
 
   return (
-    <div ref={menuBarRef} className="flex items-center gap-1 px-2 py-1.5">
+    <div
+      ref={menuBarRef}
+      data-board-menu-bar
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1.5"
+    >
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-1">
       {/* File */}
       <div className="relative">
         <button
@@ -200,6 +165,7 @@ export function BoardMenuBar({
               Redo
               <span className="ml-auto text-xs text-foreground/50">Ctrl+Y</span>
             </button>
+            <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} closeMenu={closeMenu} />
           </div>
         )}
       </div>
@@ -252,6 +218,7 @@ export function BoardMenuBar({
                 Image
               </button>
             )}
+            <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} closeMenu={closeMenu} />
           </div>
         )}
       </div>
@@ -316,6 +283,7 @@ export function BoardMenuBar({
                 </button>
               ))}
             </HoverSubmenu>
+            <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} closeMenu={closeMenu} />
             <div className={dividerClass} />
             <button
               type="button"
@@ -336,6 +304,13 @@ export function BoardMenuBar({
             </button>
           </div>
         )}
+      </div>
+      </div>
+
+      <div className="hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center">
+        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+          <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+        </div>
       </div>
     </div>
   );

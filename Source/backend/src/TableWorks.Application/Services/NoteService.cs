@@ -116,6 +116,10 @@ public sealed class NoteService : INoteService
         if (request.BoardId.HasValue && !await _boardAccess.HasWriteAccessAsync(userId, request.BoardId.Value, cancellationToken))
             throw new UnauthorizedAccessException("You do not have permission to add notes to this board.");
 
+        const double defaultStickyNoteSize = 270.0;
+        var width = request.Width ?? request.Height ?? defaultStickyNoteSize;
+        var height = request.Height ?? request.Width ?? defaultStickyNoteSize;
+
         var now = DateTime.UtcNow;
         var note = new Note
         {
@@ -127,8 +131,8 @@ public sealed class NoteService : INoteService
             BoardId = request.BoardId,
             PositionX = request.PositionX,
             PositionY = request.PositionY,
-            Width = request.Width,
-            Height = request.Height,
+            Width = width,
+            Height = height,
             Color = request.Color,
             Rotation = request.Rotation,
             CreatedAt = now,

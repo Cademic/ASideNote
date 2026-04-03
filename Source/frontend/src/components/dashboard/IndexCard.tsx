@@ -14,12 +14,13 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
-import { X, GripVertical, MoreVertical, Copy, Trash2 } from "lucide-react";
+import { X, GripVertical, MoreVertical, Copy, Trash2, RotateCw } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { IndexCardSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
 import { INDEX_CARD_COLORS } from "./indexCardColors";
-import { NoteToolbar } from "./NoteToolbar";
+import type { BoardRichTextToolbarState } from "./BoardMenuBar";
+import { ROTATION_PRESETS } from "./noteToolbarConstants";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -61,6 +62,7 @@ interface IndexCardProps {
   zoom?: number;
   /** When true, visually scale the card when editing (for better readability) */
   enlargeWhenEditing?: boolean;
+  onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
 }
 
 const DEFAULT_WIDTH = 450;
@@ -119,6 +121,7 @@ export function IndexCard({
   onContextMenu,
   zoom = 1,
   enlargeWhenEditing = false,
+  onRichTextToolbarChange,
 }: IndexCardProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastDragEndRef = useRef<number>(0);
@@ -379,19 +382,23 @@ export function IndexCard({
     [titleEditor, contentEditor, card.id, onSave],
   );
 
-  const handleCardColorChange = useCallback(
-    (newColor: string) => {
-      onColorChange(card.id, newColor);
-    },
-    [card.id, onColorChange],
-  );
+  useEffect(() => {
+    if (!onRichTextToolbarChange) return;
+    if (!isEditing) {
+      onRichTextToolbarChange(null, card.id);
+      return;
+    }
+    onRichTextToolbarChange({
+      sourceId: card.id,
+      editor: activeEditor,
+    });
+  }, [isEditing, activeEditor, activeField, titleEditor, contentEditor, card.id, onRichTextToolbarChange]);
 
-  const handleCardRotationChange = useCallback(
-    (newRotation: number) => {
-      onRotationChange(card.id, newRotation);
-    },
-    [card.id, onRotationChange],
-  );
+  useEffect(() => {
+    return () => {
+      onRichTextToolbarChange?.(null, card.id);
+    };
+  }, [onRichTextToolbarChange, card.id]);
 
   // --- Resize logic ---
   const resizeRef = useRef<{
@@ -582,7 +589,7 @@ export function IndexCard({
       >
         <div
           className={[
-            "index-card relative overflow-visible rounded-md shadow-lg transition-shadow hover:shadow-xl",
+            "index-card relative flex min-h-0 flex-col overflow-visible rounded-md shadow-lg transition-shadow hover:shadow-xl",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
             focusedBy?.length ? "ring-[3px]" : "",
             color.bg,
@@ -628,7 +635,7 @@ export function IndexCard({
               onStartEdit(card.id);
             }
           }}
-        >
+          >
           {/* Pin */}
           <div
             data-pin-note-id={card.id}
@@ -699,6 +706,31 @@ export function IndexCard({
                           title={key}
                           aria-label={`Color ${key}`}
                         />
+                      ))}
+                    </div>
+                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <RotateCw className="h-3 w-3" />
+                      Tilt
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                      {ROTATION_PRESETS.map((deg) => (
+                        <button
+                          key={deg}
+                          type="button"
+                          onClick={() => {
+                            onRotationChange(card.id, deg);
+                            setMenuOpen(false);
+                          }}
+                          className={[
+                            "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
+                            (card.rotation ?? 0) === deg
+                              ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
+                              : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                          ].join(" ")}
+                          title={`${deg}°`}
+                        >
+                          {deg === 0 ? "0°" : `${deg > 0 ? "+" : ""}${deg}°`}
+                        </button>
                       ))}
                     </div>
                     <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
@@ -795,22 +827,8 @@ export function IndexCard({
             <div className="index-card-header-rule" />
           </div>
 
-          {/* Slide-out toolbar (visible in edit mode) */}
-          <div
-            className={[
-              "overflow-hidden transition-all duration-200",
-              isEditing ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0",
-            ].join(" ")}
-          >
-            <NoteToolbar
-              editor={activeEditor}
-              noteRotation={card.rotation ?? 0}
-              onNoteRotationChange={handleCardRotationChange}
-            />
-          </div>
-
-          {/* Content area with ruled lines */}
-          <div className="overflow-hidden index-card-ruled">
+          {/* Content area with ruled lines (toolbar is absolutely positioned to the left) */}
+          <div className="index-card-ruled min-w-0 flex-1 overflow-hidden">
             {isEditing ? (
               <div className="px-3 pb-4 pt-2 space-y-1.5" onBlur={handleBlur} onKeyDown={handleKeyDown}>
                 <div

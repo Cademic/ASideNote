@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getPinnedBoards, toggleBoardPin } from "../../api/boards";
 import { getPinnedProjects, toggleProjectPin } from "../../api/projects";
@@ -10,6 +11,9 @@ import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../
 
 /** Tailwind `lg` breakpoint — below this: sidebar becomes hamburger drawer */
 const SIDEBAR_BREAKPOINT = 1024;
+
+/** Must match mobile drawer `duration-300` so the open-arrow waits for slide-out to finish */
+const MOBILE_DRAWER_TRANSITION_MS = 300;
 
 export interface OpenedBoard {
   id: string;
@@ -55,6 +59,9 @@ export function AppLayout() {
    *  automatic resize change. When the breakpoint triggers we reset this flag
    *  so the auto-behaviour takes over again on the next cross. */
   const userToggledRef = useRef(false);
+  /** For board-page open-arrow: delay showing until drawer close animation ends */
+  const prevSidebarOpenForArrowRef = useRef(isSidebarOpen);
+  const [boardOpenArrowVisible, setBoardOpenArrowVisible] = useState(true);
 
   /* ── Mobile vs desktop: hamburger drawer vs inline sidebar ──────────── */
   useEffect(() => {
@@ -76,6 +83,36 @@ export function AppLayout() {
   useEffect(() => {
     if (isMobile) setIsSidebarOpen(false);
   }, [isMobile, location.pathname]);
+
+  /* ── Board page: show chevron only after drawer finishes sliding closed ─ */
+  useEffect(() => {
+    const isNoteBoardRoute = /^\/boards\/[^/]+$/.test(location.pathname);
+    const isChalkBoardRoute = /^\/chalkboards\/[^/]+$/.test(location.pathname);
+    const onBoardDetail = isNoteBoardRoute || isChalkBoardRoute;
+
+    if (!onBoardDetail || !isMobile) {
+      setBoardOpenArrowVisible(true);
+      prevSidebarOpenForArrowRef.current = isSidebarOpen;
+      return;
+    }
+
+    if (isSidebarOpen) {
+      setBoardOpenArrowVisible(false);
+      prevSidebarOpenForArrowRef.current = true;
+      return;
+    }
+
+    if (prevSidebarOpenForArrowRef.current === true) {
+      prevSidebarOpenForArrowRef.current = false;
+      const id = window.setTimeout(() => {
+        setBoardOpenArrowVisible(true);
+      }, MOBILE_DRAWER_TRANSITION_MS);
+      return () => clearTimeout(id);
+    }
+
+    prevSidebarOpenForArrowRef.current = false;
+    setBoardOpenArrowVisible(true);
+  }, [isMobile, isSidebarOpen, location.pathname]);
 
   function handleToggleSidebar() {
     userToggledRef.current = true;
@@ -187,6 +224,11 @@ export function AppLayout() {
     isSidebarOpen,
   };
 
+  /** Note or chalk board detail — hide global navbar for maximum canvas space */
+  const isNoteBoardRoute = /^\/boards\/[^/]+$/.test(location.pathname);
+  const isChalkBoardRoute = /^\/chalkboards\/[^/]+$/.test(location.pathname);
+  const isBoardDetailRoute = isNoteBoardRoute || isChalkBoardRoute;
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
@@ -206,17 +248,27 @@ export function AppLayout() {
           onUnpinNotebook={handleUnpinNotebook}
         />
       )}
-      {isMobile && isSidebarOpen && (
+      {isMobile && (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-black/50"
+            tabIndex={-1}
+            className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+              isSidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            }`}
             onClick={handleToggleSidebar}
             aria-label="Close menu"
           />
-          <div className="fixed left-0 top-0 bottom-0 z-50 w-60 shadow-xl">
+          <div
+            className={`fixed left-0 top-0 bottom-0 z-50 w-60 shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              isSidebarOpen
+                ? "translate-x-0 pointer-events-auto"
+                : "-translate-x-full pointer-events-none"
+            }`}
+            aria-hidden={!isSidebarOpen}
+          >
             <Sidebar
-              isOpen
+              isOpen={isSidebarOpen}
               onToggle={handleToggleSidebar}
               isDrawer
               openedBoards={openedBoards}
@@ -233,15 +285,35 @@ export function AppLayout() {
         </>
       )}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        <Navbar
-          boardName={boardName}
-          connectedUsers={connectedUsers}
-          onToggleSidebar={isMobile ? handleToggleSidebar : undefined}
-          showMenuButton={isMobile}
-        />
-        <main className="flex-1 overflow-auto p-4">
+        {!isBoardDetailRoute && (
+          <Navbar
+            boardName={boardName}
+            connectedUsers={connectedUsers}
+            onToggleSidebar={isMobile ? handleToggleSidebar : undefined}
+            showMenuButton={isMobile}
+          />
+        )}
+        <main
+          className={
+            isBoardDetailRoute
+              ? isNoteBoardRoute
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4"
+                : "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+              : "flex-1 overflow-auto p-4"
+          }
+        >
           <Outlet context={outletContext} />
         </main>
+        {isBoardDetailRoute && isMobile && boardOpenArrowVisible && (
+          <button
+            type="button"
+            onClick={handleToggleSidebar}
+            className="fixed left-0 top-1/2 z-[100] flex -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-foreground/15 bg-background/95 py-3 pl-px pr-1 text-foreground/80 shadow-sm backdrop-blur-sm transition-opacity duration-200 hover:bg-foreground/5"
+            aria-label="Open sidebar"
+          >
+            <ChevronRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+          </button>
+        )}
       </div>
     </div>
   );

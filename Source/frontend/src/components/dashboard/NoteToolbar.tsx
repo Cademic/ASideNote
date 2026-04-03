@@ -8,7 +8,6 @@ import {
   Underline,
   Strikethrough,
   Type,
-  RotateCw,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -17,34 +16,19 @@ import {
   ChevronDown,
   ListOrdered,
 } from "lucide-react";
+import {
+  FONT_FAMILIES,
+  FONT_SIZE_PRESETS,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
+  TEXT_COLORS,
+} from "./noteToolbarConstants";
 
 interface NoteToolbarProps {
   editor: Editor | null;
-  noteRotation: number;
-  onNoteRotationChange: (rotation: number) => void;
+  /** Horizontal bar (default) or narrow vertical strip for left-docked toolbars */
+  variant?: "horizontal" | "vertical";
 }
-
-const ROTATION_PRESETS = [-10, -5, -3, 0, 3, 5, 10];
-
-const FONT_FAMILIES = [
-  { label: "Sans", value: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  { label: "Serif", value: "Georgia, Cambria, 'Times New Roman', serif" },
-  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
-  { label: "Cursive", value: "'Segoe Script', 'Comic Sans MS', cursive" },
-];
-
-const MIN_FONT_SIZE = 8;
-const MAX_FONT_SIZE = 48;
-const FONT_SIZE_PRESETS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
-
-const TEXT_COLORS = [
-  { label: "Black", value: "#1f2937" },
-  { label: "Red", value: "#dc2626" },
-  { label: "Blue", value: "#2563eb" },
-  { label: "Green", value: "#16a34a" },
-  { label: "Orange", value: "#ea580c" },
-  { label: "Purple", value: "#9333ea" },
-];
 
 function ToolbarButton({
   isActive,
@@ -77,7 +61,13 @@ function ToolbarButton({
   );
 }
 
-function ListDropdownButton({ editor }: { editor: Editor }) {
+function ListDropdownButton({
+  editor,
+  dropdownPlacement = "below",
+}: {
+  editor: Editor;
+  dropdownPlacement?: "below" | "right";
+}) {
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -90,9 +80,13 @@ function ListDropdownButton({ editor }: { editor: Editor }) {
     }
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+      if (dropdownPlacement === "right") {
+        setDropdownStyle({ left: rect.right + 4, top: rect.top });
+      } else {
+        setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+      }
     }
-  }, [open]);
+  }, [open, dropdownPlacement]);
 
   useEffect(() => {
     if (!open) return;
@@ -163,7 +157,11 @@ function ListDropdownButton({ editor }: { editor: Editor }) {
           } else {
             const rect = buttonRef.current?.getBoundingClientRect();
             if (rect) {
-              setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+              if (dropdownPlacement === "right") {
+                setDropdownStyle({ left: rect.right + 4, top: rect.top });
+              } else {
+                setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+              }
             }
             setOpen(true);
           }
@@ -410,14 +408,78 @@ function FontSizeInput({ editor }: { editor: Editor }) {
   );
 }
 
-export function NoteToolbar({
+/** Visible but non-interactive toolbar (no editor — e.g. no note in edit mode). */
+function NoteToolbarIdleHorizontal() {
+  return (
+    <div
+      className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1 opacity-[0.55]"
+      role="toolbar"
+      aria-label="Text formatting. Open a note or card to edit."
+      aria-disabled="true"
+    >
+      <div className="flex flex-wrap items-center gap-1 pointer-events-none select-none">
+        <select
+          disabled
+          className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-500"
+          title="Font Family"
+          value={FONT_FAMILIES[0].value}
+        >
+          {FONT_FAMILIES.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+        <select disabled className="h-6 rounded border border-black/15 bg-white/60 px-1 text-[10px] text-gray-500" title="Font Size" value="14">
+          <option value="14">14px</option>
+        </select>
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {[Bold, Italic, Underline, Strikethrough].map((Icon, i) => (
+          <span
+            key={i}
+            className="flex h-6 w-6 items-center justify-center rounded text-gray-400"
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        ))}
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {[AlignLeft, AlignCenter, AlignRight].map((Icon, i) => (
+          <span key={i} className="flex h-6 w-6 items-center justify-center rounded text-gray-400">
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        ))}
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        <span className="flex h-6 items-center gap-0.5 rounded px-1.5 text-gray-400">
+          <List className="h-3.5 w-3.5" />
+          <ChevronDown className="h-3 w-3" />
+        </span>
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        <span className="flex h-6 w-6 items-center justify-center text-gray-400">
+          <LinkIcon className="h-3.5 w-3.5" />
+        </span>
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        <div className="flex items-center gap-0.5">
+          <Type className="mr-0.5 h-3 w-3 text-gray-400" />
+          {TEXT_COLORS.map((c) => (
+            <span
+              key={c.value}
+              className="h-4 w-4 rounded-full border border-black/20"
+              style={{ backgroundColor: c.value }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteToolbarActive({
   editor,
-  noteRotation,
-  onNoteRotationChange,
-}: NoteToolbarProps) {
+  variant = "horizontal",
+}: NoteToolbarProps & { editor: Editor }) {
   const setFontFamily = useCallback(
     (value: string) => {
-      editor?.chain().focus().setFontFamily(value).run();
+      editor.chain().focus().setFontFamily(value).run();
     },
     [editor],
   );
@@ -441,13 +503,149 @@ export function NoteToolbar({
     },
   });
 
-  if (!editor) return null;
-
   const state = activeState ?? {
     isBold: false, isItalic: false, isUnderline: false, isStrike: false, isLink: false,
     textAlignLeft: false, textAlignCenter: false, textAlignRight: false, color: undefined,
   };
   const currentColor = state.color ?? "#1f2937";
+
+  const listPlacement = variant === "vertical" ? "right" : "below";
+
+  const formattingRow = (
+    <>
+      <ToolbarButton
+        isActive={state.isBold}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        title="Bold"
+      >
+        <Bold className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        isActive={state.isItalic}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        title="Italic"
+      >
+        <Italic className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        isActive={state.isUnderline}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        title="Underline"
+      >
+        <Underline className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        isActive={state.isStrike}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        title="Strikethrough"
+      >
+        <Strikethrough className="h-3.5 w-3.5" />
+      </ToolbarButton>
+    </>
+  );
+
+  const alignRow = (
+    <>
+      <ToolbarButton
+        isActive={state.textAlignLeft}
+        onClick={() => editor.chain().focus().setTextAlign("left").run()}
+        title="Align Left"
+      >
+        <AlignLeft className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        isActive={state.textAlignCenter}
+        onClick={() => editor.chain().focus().setTextAlign("center").run()}
+        title="Align Center"
+      >
+        <AlignCenter className="h-3.5 w-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        isActive={state.textAlignRight}
+        onClick={() => editor.chain().focus().setTextAlign("right").run()}
+        title="Align Right"
+      >
+        <AlignRight className="h-3.5 w-3.5" />
+      </ToolbarButton>
+    </>
+  );
+
+  const colorSwatches = (
+    <div className={variant === "vertical" ? "flex flex-col items-center gap-0.5" : "flex items-center gap-0.5"}>
+      <Type className={variant === "vertical" ? "h-3 w-3 text-gray-500" : "mr-0.5 h-3 w-3 text-gray-500"} />
+      <div className={variant === "vertical" ? "flex flex-col gap-0.5" : "flex items-center gap-0.5"}>
+        {TEXT_COLORS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              editor.chain().focus().setColor(c.value).run();
+            }}
+            title={c.label}
+            className={[
+              "h-4 w-4 rounded-full border transition-transform",
+              currentColor === c.value
+                ? "scale-110 border-gray-800 ring-1 ring-gray-400"
+                : "border-black/20 hover:scale-110",
+            ].join(" ")}
+            style={{ backgroundColor: c.value }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  if (variant === "vertical") {
+    return (
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-1.5 py-1.5">
+        <select
+          value={
+            editor.getAttributes("textStyle").fontFamily ??
+            FONT_FAMILIES[0].value
+          }
+          onChange={(e) => setFontFamily(e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="h-6 w-full min-w-0 rounded border border-black/15 bg-white/60 px-0.5 text-[9px] text-gray-700 focus:outline-none"
+          title="Font Family"
+        >
+          {FONT_FAMILIES.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="w-full [&_input]:w-full [&_select]:w-full">
+          <FontSizeInput editor={editor} />
+        </div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        <div className="flex flex-col items-center gap-0.5">{formattingRow}</div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        <div className="flex flex-col items-center gap-0.5">{alignRow}</div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        <div className="flex justify-center">
+          <ListDropdownButton editor={editor} dropdownPlacement={listPlacement} />
+        </div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        <div className="flex justify-center">
+          <LinkButton editor={editor} isLinkActive={state.isLink} />
+        </div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        {colorSwatches}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
@@ -477,64 +675,17 @@ export function NoteToolbar({
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
         {/* Bold / Italic / Underline / Strikethrough */}
-        <ToolbarButton
-          isActive={state.isBold}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          title="Bold"
-        >
-          <Bold className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          isActive={state.isItalic}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          title="Italic"
-        >
-          <Italic className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          isActive={state.isUnderline}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          title="Underline"
-        >
-          <Underline className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          isActive={state.isStrike}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-          title="Strikethrough"
-        >
-          <Strikethrough className="h-3.5 w-3.5" />
-        </ToolbarButton>
+        <div className="flex flex-wrap items-center gap-1">{formattingRow}</div>
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
         {/* Text alignment */}
-        <ToolbarButton
-          isActive={state.textAlignLeft}
-          onClick={() => editor.chain().focus().setTextAlign("left").run()}
-          title="Align Left"
-        >
-          <AlignLeft className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          isActive={state.textAlignCenter}
-          onClick={() => editor.chain().focus().setTextAlign("center").run()}
-          title="Align Center"
-        >
-          <AlignCenter className="h-3.5 w-3.5" />
-        </ToolbarButton>
-        <ToolbarButton
-          isActive={state.textAlignRight}
-          onClick={() => editor.chain().focus().setTextAlign("right").run()}
-          title="Align Right"
-        >
-          <AlignRight className="h-3.5 w-3.5" />
-        </ToolbarButton>
+        <div className="flex flex-wrap items-center gap-1">{alignRow}</div>
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
         {/* List dropdown */}
-        <ListDropdownButton editor={editor} />
+        <ListDropdownButton editor={editor} dropdownPlacement={listPlacement} />
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
@@ -544,54 +695,16 @@ export function NoteToolbar({
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
         {/* Text color swatches */}
-        <div className="flex items-center gap-0.5">
-          <Type className="mr-0.5 h-3 w-3 text-gray-500" />
-          {TEXT_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                editor.chain().focus().setColor(c.value).run();
-              }}
-              title={c.label}
-              className={[
-                "h-4 w-4 rounded-full border transition-transform",
-                currentColor === c.value
-                  ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                  : "border-black/20 hover:scale-110",
-              ].join(" ")}
-              style={{ backgroundColor: c.value }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Row 2: Rotation presets */}
-      <div className="flex items-center gap-1">
-        <RotateCw className="mr-0.5 h-3 w-3 text-gray-500" />
-        <span className="text-[10px] text-gray-500">Tilt:</span>
-        {ROTATION_PRESETS.map((deg) => (
-          <button
-            key={deg}
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onNoteRotationChange(deg);
-            }}
-            title={`${deg}°`}
-            className={[
-              "flex h-5 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
-              noteRotation === deg
-                ? "border-gray-800 bg-black/15 text-gray-900"
-                : "border-black/10 bg-white/50 text-gray-600 hover:bg-black/10",
-            ].join(" ")}
-          >
-            {deg === 0 ? "0°" : `${deg > 0 ? "+" : ""}${deg}°`}
-          </button>
-        ))}
+        {colorSwatches}
       </div>
     </div>
   );
+}
+
+export function NoteToolbar(props: NoteToolbarProps) {
+  if (!props.editor) {
+    if (props.variant === "vertical") return null;
+    return <NoteToolbarIdleHorizontal />;
+  }
+  return <NoteToolbarActive {...props} editor={props.editor} />;
 }

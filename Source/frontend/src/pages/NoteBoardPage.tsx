@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
-import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
+import {
+  BoardMenuBar,
+  type BoardBackgroundTheme,
+  type BoardRichTextToolbarState,
+} from "../components/dashboard/BoardMenuBar";
 import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
 import { CorkBoard } from "../components/dashboard/CorkBoard";
-import { StickyNote } from "../components/dashboard/StickyNote";
+import { StickyNote, STICKY_NOTE_DEFAULT_SIZE } from "../components/dashboard/StickyNote";
 import { IndexCard } from "../components/dashboard/IndexCard";
 import { ImageCard } from "../components/dashboard/ImageCard";
 import { RedStringLayer } from "../components/dashboard/RedStringLayer";
@@ -64,6 +68,7 @@ export function NoteBoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
   const [editingCardIds, setEditingCardIds] = useState<Set<string>>(new Set());
+  const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const primaryEditingCardIdRef = useRef<string | null>(null);
   const loadFileInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +140,26 @@ export function NoteBoardPage() {
     setZIndexMap((prev) => ({ ...prev, [id]: next }));
   }
 
+  const handleRichTextToolbarChange = useCallback(
+    (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => {
+      if (state === null && clearedSourceId !== undefined) {
+        setRichTextToolbar((prev) => (prev?.sourceId === clearedSourceId ? null : prev));
+        return;
+      }
+      if (state === null) {
+        setRichTextToolbar(null);
+        return;
+      }
+      setRichTextToolbar((prev) => {
+        if (prev && prev.sourceId === state.sourceId && prev.editor === state.editor) {
+          return prev;
+        }
+        return state;
+      });
+    },
+    [],
+  );
+
   // --- Red-string linking state ---
   const [connections, setConnections] = useState<BoardConnectionDto[]>([]);
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
@@ -145,7 +170,6 @@ export function NoteBoardPage() {
   // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
   const CANVAS_PADDING = 300;
   const DEFAULT_CANVAS_SIZE = 2000;
-  const NOTE_DEFAULT_SIZE = 270;
   const INDEX_CARD_DEFAULT_W = 450;
   const INDEX_CARD_DEFAULT_H = 300;
   const IMAGE_CARD_DEFAULT_W = 200;
@@ -166,8 +190,8 @@ export function NoteBoardPage() {
     for (const n of notes) {
       const x = n.positionX ?? POSITION_DEFAULT;
       const y = n.positionY ?? POSITION_DEFAULT;
-      const w = n.width ?? NOTE_DEFAULT_SIZE;
-      const h = n.height ?? NOTE_DEFAULT_SIZE;
+      const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
+      const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
       update(x, y, w, h);
     }
     for (const c of indexCards) {
@@ -331,6 +355,7 @@ export function NoteBoardPage() {
 
       const target = e.target as Element;
       if (target.closest("[data-board-toolbar-portal]")) return;
+      if (target.closest("[data-board-menu-bar]")) return;
 
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       const cardEl = target.closest("[data-board-item='card'][data-card-id]");
@@ -342,6 +367,7 @@ export function NoteBoardPage() {
       setEditingCardIds(new Set());
       primaryEditingNoteIdRef.current = null;
       primaryEditingCardIdRef.current = null;
+      setRichTextToolbar(null);
     }
     document.addEventListener("mousedown", handleDocumentMouseDown, true);
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown, true);
@@ -1156,14 +1182,16 @@ export function NoteBoardPage() {
     if (!boardId) return;
     try {
       const center = getViewportCenterInBoardCoords();
-      const positionX = center.x - NOTE_DEFAULT_SIZE / 2;
-      const positionY = center.y - NOTE_DEFAULT_SIZE / 2;
+      const positionX = center.x - STICKY_NOTE_DEFAULT_SIZE / 2;
+      const positionY = center.y - STICKY_NOTE_DEFAULT_SIZE / 2;
 
       const created = await createNote({
         content: "",
         boardId,
         positionX,
         positionY,
+        width: STICKY_NOTE_DEFAULT_SIZE,
+        height: STICKY_NOTE_DEFAULT_SIZE,
       });
 
       setNotes((prev) => [created, ...prev]);
@@ -1336,7 +1364,7 @@ export function NoteBoardPage() {
     }
   }
 
-  async function handleRotationChange(id: string, rotation: number) {
+  const handleRotationChange = useCallback(async (id: string, rotation: number) => {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, rotation } : n)),
     );
@@ -1346,7 +1374,7 @@ export function NoteBoardPage() {
     } catch {
       // Silently fail
     }
-  }
+  }, []);
 
   async function handleDelete(id: string) {
     deletedNoteIdsRef.current.add(id);
@@ -1565,7 +1593,7 @@ export function NoteBoardPage() {
     }
   }
 
-  async function handleCardRotationChange(id: string, rotation: number) {
+  const handleCardRotationChange = useCallback(async (id: string, rotation: number) => {
     setIndexCards((prev) =>
       prev.map((c) => (c.id === id ? { ...c, rotation } : c)),
     );
@@ -1575,7 +1603,7 @@ export function NoteBoardPage() {
     } catch {
       // Silently fail
     }
-  }
+  }, []);
 
   async function handleQuickAddImage() {
     if (!boardId) return;
@@ -1859,6 +1887,7 @@ export function NoteBoardPage() {
       setEditingCardIds(new Set());
       primaryEditingNoteIdRef.current = null;
       primaryEditingCardIdRef.current = null;
+      setRichTextToolbar(null);
       const idMap = new Map<string, string>();
 
       // Delete existing items
@@ -1998,6 +2027,8 @@ export function NoteBoardPage() {
           boardId,
           positionX: x,
           positionY: y,
+          width: STICKY_NOTE_DEFAULT_SIZE,
+          height: STICKY_NOTE_DEFAULT_SIZE,
         });
         setNotes((prev) => [...prev, created]);
         setEditingNoteIds((prev) => new Set(prev).add(created.id));
@@ -2176,14 +2207,10 @@ export function NoteBoardPage() {
 
   const isEmpty = notes.length === 0 && indexCards.length === 0 && imageCards.length === 0;
 
-  return (
-    <div className="relative flex h-full flex-col">
-      {/* Menu bar - paper style with online users on left */}
-      <div className="notepad-card flex-shrink-0 !overflow-visible border-b border-border/50 z-10">
-        <div className="notepad-spiral-strip" />
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <BoardMenuBar
+  const boardTopBar = (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className="min-w-0 flex-1">
+        <BoardMenuBar
           boardType="NoteBoard"
           zoom={zoom}
           onZoomChange={(z) => handleViewportChange(z, panX, panY)}
@@ -2200,11 +2227,15 @@ export function NoteBoardPage() {
           onBackgroundThemeChange={setBackgroundTheme}
           autoEnlargeNotes={autoEnlargeNotes}
           onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+          richTextToolbar={richTextToolbar}
         />
-          </div>
-          <BoardConnectedUsers users={connectedUsers} />
-        </div>
       </div>
+      <BoardConnectedUsers users={connectedUsers} />
+    </div>
+  );
+
+  return (
+    <div className="relative flex h-full flex-col">
       <input
         ref={loadFileInputRef}
         type="file"
@@ -2213,7 +2244,7 @@ export function NoteBoardPage() {
         aria-hidden
         onChange={handleLoadFileSelect}
       />
-      {/* Board content */}
+      {/* Board: menu sits inside the cork frame, just below the top wood edge */}
       <div
         ref={boardViewportRef}
         className="relative flex-1 min-h-0"
@@ -2221,6 +2252,7 @@ export function NoteBoardPage() {
         onMouseLeave={() => setIsBoardHovered(false)}
       >
         <CorkBoard
+              topBar={boardTopBar}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
               onBoardMouseMove={handleBoardMouseMove}
@@ -2231,6 +2263,7 @@ export function NoteBoardPage() {
                   setEditingCardIds(new Set());
                   primaryEditingNoteIdRef.current = null;
                   primaryEditingCardIdRef.current = null;
+                  setRichTextToolbar(null);
                 }
               }}
               zoom={zoom}
@@ -2307,6 +2340,7 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "note", note })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              onRichTextToolbarChange={handleRichTextToolbarChange}
             />
           ))}
 
@@ -2355,6 +2389,7 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "card", card })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              onRichTextToolbarChange={handleRichTextToolbarChange}
             />
           ))}
 

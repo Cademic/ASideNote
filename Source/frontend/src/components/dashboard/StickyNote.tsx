@@ -9,11 +9,12 @@ import FontFamily from "@tiptap/extension-font-family";
 import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
-import { X, GripVertical, MoreVertical, Copy, Trash2 } from "lucide-react";
+import { X, GripVertical, MoreVertical, Copy, Trash2, RotateCw } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { NoteSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
-import { NoteToolbar } from "./NoteToolbar";
+import type { BoardRichTextToolbarState } from "./BoardMenuBar";
+import { ROTATION_PRESETS } from "./noteToolbarConstants";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -51,9 +52,13 @@ interface StickyNoteProps {
   zoom?: number;
   /** When true, visually scale the note when editing (for better readability) */
   enlargeWhenEditing?: boolean;
+  /** Registers the active TipTap editor with the board menu bar while editing */
+  onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
 }
 
-const DEFAULT_SIZE = 270;
+/** Default width and height for sticky notes on boards (square). */
+export const STICKY_NOTE_DEFAULT_SIZE = 270;
+const DEFAULT_SIZE = STICKY_NOTE_DEFAULT_SIZE;
 const MIN_SIZE = 120;
 const MAX_WIDTH = 600;
 const MAX_HEIGHT = 600;
@@ -170,6 +175,7 @@ export function StickyNote({
   onContextMenu,
   zoom = 1,
   enlargeWhenEditing = false,
+  onRichTextToolbarChange,
 }: StickyNoteProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const ignoreBlurUntilRef = useRef<number>(0);
@@ -500,19 +506,23 @@ export function StickyNote({
     [titleEditor, contentEditor, note.id, onSave],
   );
 
-  const handleNoteColorChange = useCallback(
-    (newColor: string) => {
-      onColorChange(note.id, newColor);
-    },
-    [note.id, onColorChange],
-  );
+  useEffect(() => {
+    if (!onRichTextToolbarChange) return;
+    if (!isEditing) {
+      onRichTextToolbarChange(null, note.id);
+      return;
+    }
+    onRichTextToolbarChange({
+      sourceId: note.id,
+      editor: activeEditor,
+    });
+  }, [isEditing, activeEditor, activeField, titleEditor, contentEditor, note.id, onRichTextToolbarChange]);
 
-  const handleNoteRotationChange = useCallback(
-    (newRotation: number) => {
-      onRotationChange(note.id, newRotation);
-    },
-    [note.id, onRotationChange],
-  );
+  useEffect(() => {
+    return () => {
+      onRichTextToolbarChange?.(null, note.id);
+    };
+  }, [onRichTextToolbarChange, note.id]);
 
   // --- Resize logic using a single stable ref for all mutable state ---
   const resizeRef = useRef<{
@@ -704,7 +714,7 @@ export function StickyNote({
       >
         <div
           className={[
-            "relative overflow-visible rounded shadow-lg transition-shadow hover:shadow-xl",
+            "relative flex min-h-0 flex-col overflow-visible rounded shadow-lg transition-shadow hover:shadow-xl",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
             focusedBy?.length ? "ring-[3px]" : "",
             color.bg,
@@ -824,6 +834,31 @@ export function StickyNote({
                     />
                   ))}
                 </div>
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <RotateCw className="h-3 w-3" />
+                  Tilt
+                </div>
+                <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+                  {ROTATION_PRESETS.map((deg) => (
+                    <button
+                      key={deg}
+                      type="button"
+                      onClick={() => {
+                        onRotationChange(note.id, deg);
+                        setMenuOpen(false);
+                      }}
+                      className={[
+                        "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
+                        (note.rotation ?? 0) === deg
+                          ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
+                          : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                      ].join(" ")}
+                      title={`${deg}°`}
+                    >
+                      {deg === 0 ? "0°" : `${deg > 0 ? "+" : ""}${deg}°`}
+                    </button>
+                  ))}
+                </div>
                 <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
                 {onDuplicate && (
                   <button
@@ -882,22 +917,8 @@ export function StickyNote({
           </div>
         </div>
 
-        {/* Slide-out toolbar (visible in edit mode) */}
-        <div
-          className={[
-            "overflow-hidden transition-all duration-200",
-            isEditing ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0",
-          ].join(" ")}
-        >
-        <NoteToolbar
-          editor={activeEditor}
-          noteRotation={note.rotation ?? 0}
-          onNoteRotationChange={handleNoteRotationChange}
-        />
-        </div>
-
-        {/* Content area */}
-        <div className="overflow-hidden">
+        {/* Body: full-width editors (toolbar is absolutely positioned to the left) */}
+        <div className="min-w-0 flex-1 overflow-hidden">
           {isEditing || (focusedBy && focusedBy.length > 0) ? (
             <div className="px-3 pb-4 space-y-1.5" onBlur={handleBlur} onKeyDown={handleKeyDown}>
               {/* Title rich text editor */}

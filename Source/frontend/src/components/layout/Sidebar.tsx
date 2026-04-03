@@ -254,7 +254,7 @@ export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCl
               Pinned
             </span>
           )}
-          {!isOpen && (
+          {!isOpen && !isDrawer && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               <Pin className="mx-auto h-3 w-3" />
             </span>
@@ -399,7 +399,7 @@ export function Sidebar({ isOpen, onToggle, isDrawer = false, openedBoards, onCl
               Opened
             </span>
           )}
-          {!isOpen && (
+          {!isOpen && !isDrawer && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               Open
             </span>

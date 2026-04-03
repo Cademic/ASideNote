@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { isWheelOverEditableText, wheelEventDeltaPixels } from "../../lib/boardWheelPan";
 import { ZoomControls } from "./ZoomControls";
 import { useTouchViewport } from "../../hooks/useTouchViewport";
 
@@ -6,6 +7,8 @@ export type CorkBoardBackgroundTheme = "whiteboard" | "blackboard" | "default";
 
 interface CorkBoardProps {
   children: ReactNode;
+  /** Renders inside the board frame, directly under the top wood edge (e.g. menu bar). */
+  topBar?: ReactNode;
   boardRef?: React.RefObject<HTMLDivElement | null>;
   onDropItem?: (type: string, x: number, y: number) => void;
   /** Board-space (canvas) coords when mouse moves over the viewport */
@@ -32,8 +35,10 @@ interface CorkBoardProps {
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 /** Zoom factor per "unit" of scroll; scaled by deltaY so zoom is proportional to scroll amount */
-const ZOOM_STEP_PER_UNIT = 1.028;
+const ZOOM_STEP_PER_UNIT = 1.032;
+/** Divisor for wheel exponent; smaller = faster zoom. Trackpads use pixel deltas. */
 const ZOOM_DELTA_SCALE = 55;
+const ZOOM_DELTA_SCALE_PIXEL = 30;
 const ZOOM_EXPONENT_CAP = 2.5;
 
 function clamp(value: number, min: number, max: number) {
@@ -42,13 +47,27 @@ function clamp(value: number, min: number, max: number) {
 
 const DEFAULT_CANVAS_SIZE = 10000;
 
-export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0 }: CorkBoardProps) {
+export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0 }: CorkBoardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  const zoomRef = useRef(zoom);
+  const contentMinXRef = useRef(contentMinX);
+  const contentMinYRef = useRef(contentMinY);
+  panXRef.current = panX;
+  panYRef.current = panY;
+  zoomRef.current = zoom;
+  contentMinXRef.current = contentMinX;
+  contentMinYRef.current = contentMinY;
+
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
 
   // Bridge boardRef to point at the canvas div
   const setCanvasRef = useCallback(
@@ -107,47 +126,90 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
     [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
   );
 
-  // ---- Wheel zoom (Ctrl + scroll only) ----
+  // ---- Wheel: Ctrl/Cmd + scroll = zoom; two-finger / trackpad scroll (or mouse wheel) = pan ----
+  // Pan deltas are coalesced per animation frame so diagonal trackpad motion stays smooth (fewer React updates).
 
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
+    const wheelPanAccum = { dx: 0, dy: 0 };
+    let wheelPanRaf: number | null = null;
+
+    function flushWheelPan() {
+      wheelPanRaf = null;
+      const dx = wheelPanAccum.dx;
+      const dy = wheelPanAccum.dy;
+      wheelPanAccum.dx = 0;
+      wheelPanAccum.dy = 0;
+      if (dx === 0 && dy === 0) return;
+      const z = zoomRef.current;
+      const nx = panXRef.current - dx / z;
+      const ny = panYRef.current - dy / z;
+      panXRef.current = nx;
+      panYRef.current = ny;
+      onViewportChangeRef.current(z, nx, ny);
+    }
+
+    function scheduleWheelPan() {
+      if (wheelPanRaf !== null) return;
+      wheelPanRaf = requestAnimationFrame(flushWheelPan);
+    }
+
     function onWheel(e: WheelEvent) {
-      // Only zoom when Ctrl (or Cmd on Mac) is held
-      if (!e.ctrlKey && !e.metaKey) return;
+      // Zoom when Ctrl (or Cmd on Mac) is held — including pinch-zoom on trackpads
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const z = zoomRef.current;
+        const px = panXRef.current;
+        const py = panYRef.current;
+        const cmx = contentMinXRef.current;
+        const cmy = contentMinYRef.current;
+
+        const rect = viewport!.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const deltaScale =
+          e.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? ZOOM_DELTA_SCALE_PIXEL : ZOOM_DELTA_SCALE;
+        const exponent = Math.max(
+          -ZOOM_EXPONENT_CAP,
+          Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / deltaScale),
+        );
+        const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
+        const newZoom = clamp(z * factor, MIN_ZOOM, MAX_ZOOM);
+
+        const newPanX =
+          px +
+          (mouseX + cmx * (newZoom + 1)) / newZoom -
+          (mouseX + cmx * (z + 1)) / z;
+        const newPanY =
+          py +
+          (mouseY + cmy * (newZoom + 1)) / newZoom -
+          (mouseY + cmy * (z + 1)) / z;
+
+        onViewportChangeRef.current(newZoom, newPanX, newPanY);
+        return;
+      }
+
+      if (isWheelOverEditableText(e.target)) return;
+
+      const { dx, dy } = wheelEventDeltaPixels(e, viewport);
+      if (dx === 0 && dy === 0) return;
+
       e.preventDefault();
-
-      const rect = viewport!.getBoundingClientRect();
-      // Zoom centered on the cursor position
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      // Scale zoom change by deltaY so one wheel tick is gentle; cap exponent to avoid huge jumps
-      const exponent = Math.max(
-        -ZOOM_EXPONENT_CAP,
-        Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
-      );
-      const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
-      const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
-
-      // Keep the point under the cursor fixed: world = (mouse + contentMin*(zoom+1))/zoom - pan
-      // So newPan = (mouse + contentMin*(newZoom+1))/newZoom - world = pan + (mouse + contentMin*(newZoom+1))/newZoom - (mouse + contentMin*(zoom+1))/zoom
-      const newPanX =
-        panX +
-        (mouseX + contentMinX * (newZoom + 1)) / newZoom -
-        (mouseX + contentMinX * (zoom + 1)) / zoom;
-      const newPanY =
-        panY +
-        (mouseY + contentMinY * (newZoom + 1)) / newZoom -
-        (mouseY + contentMinY * (zoom + 1)) / zoom;
-
-      onViewportChange(newZoom, newPanX, newPanY);
+      wheelPanAccum.dx += dx;
+      wheelPanAccum.dy += dy;
+      scheduleWheelPan();
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
-    return () => viewport.removeEventListener("wheel", onWheel);
-  }, [zoom, panX, panY, contentMinX, contentMinY, onViewportChange]);
+    return () => {
+      viewport.removeEventListener("wheel", onWheel);
+      if (wheelPanRaf !== null) cancelAnimationFrame(wheelPanRaf);
+    };
+  }, []);
 
   // ---- Pan (right-click drag, middle-click drag, or space + left-click drag) ----
 
@@ -277,12 +339,18 @@ export function CorkBoard({ children, boardRef, onDropItem, onBoardMouseMove, on
   const cursorClass = isPanning ? "cursor-grabbing" : isSpaceHeld ? "cursor-grab" : "";
 
   return (
-    <div className="relative h-full w-full corkboard-frame">
+    <div className="relative flex h-full w-full flex-col corkboard-frame">
+      {topBar ? (
+        <div className="notepad-card relative z-30 shrink-0 !overflow-visible rounded-t-md rounded-b-none border-b-0 shadow-none">
+          <div className="notepad-spiral-strip !border-b-0" />
+          <div className="px-2 py-1.5 sm:px-3 sm:py-2">{topBar}</div>
+        </div>
+      ) : null}
       {/* Viewport (clips and captures events) */}
       <div
         ref={viewportRef}
         className={[
-          "corkboard-surface relative h-full w-full overflow-hidden transition-shadow duration-150",
+          "corkboard-surface relative min-h-0 w-full flex-1 overflow-hidden transition-shadow duration-150",
           backgroundTheme === "whiteboard" ? "corkboard-surface--whiteboard" : "",
           backgroundTheme === "blackboard" ? "corkboard-surface--blackboard" : "",
           isDragOver ? "ring-2 ring-inset ring-primary/40" : "",

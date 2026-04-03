@@ -3,9 +3,13 @@ import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { ChalkCanvas, CHALKBOARD_BG, RESOLUTION_FACTOR, type ChalkCanvasHandle } from "../components/chalkboard/ChalkCanvas";
 import { ChalkToolbar, type ChalkMode, type ChalkTool } from "../components/chalkboard/ChalkToolbar";
-import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
+import {
+  BoardMenuBar,
+  type BoardBackgroundTheme,
+  type BoardRichTextToolbarState,
+} from "../components/dashboard/BoardMenuBar";
 import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
-import { StickyNote } from "../components/dashboard/StickyNote";
+import { StickyNote, STICKY_NOTE_DEFAULT_SIZE } from "../components/dashboard/StickyNote";
 import { ZoomControls } from "../components/dashboard/ZoomControls";
 import { getBoardById } from "../api/boards";
 import { getDrawing, saveDrawing } from "../api/drawings";
@@ -19,6 +23,7 @@ import {
   buildBoardExportFilename,
   parseBoardExportFile,
 } from "../lib/boardExport";
+import { isWheelOverEditableText, wheelEventDeltaPixels } from "../lib/boardWheelPan";
 import type { BoardSummaryDto, NoteSummaryDto } from "../types";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon } from "lucide-react";
@@ -27,8 +32,10 @@ const MIN_ZOOM = 0.25;
 const AUTO_SAVE_DELAY_MS = 300; // 300ms after last change for faster server sync
 const MAX_ZOOM = 2.0;
 /** Zoom factor per "unit" of scroll; scaled by deltaY so zoom is proportional to scroll amount */
-const ZOOM_STEP_PER_UNIT = 1.028;
+const ZOOM_STEP_PER_UNIT = 1.032;
+/** Divisor for wheel exponent; smaller = faster zoom. Trackpads use pixel deltas. */
 const ZOOM_DELTA_SCALE = 55;
+const ZOOM_DELTA_SCALE_PIXEL = 30;
 const ZOOM_EXPONENT_CAP = 2.5;
 const CHALK_WHITEBOARD_BG = "#faf9f6";
 const CHALK_BLACKBOARD_BG = "#1a1a1a";
@@ -53,6 +60,7 @@ export function ChalkBoardPage() {
   // --- Notes state ---
   const [notes, setNotes] = useState<NoteSummaryDto[]>([]);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
+  const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
   const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
@@ -83,6 +91,17 @@ export function ChalkBoardPage() {
     setZIndexMap((prev) => ({ ...prev, [id]: next }));
   }
 
+  const handleRichTextToolbarChange = useCallback(
+    (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => {
+      if (state === null && clearedSourceId !== undefined) {
+        setRichTextToolbar((prev) => (prev?.sourceId === clearedSourceId ? null : prev));
+        return;
+      }
+      setRichTextToolbar(state);
+    },
+    [],
+  );
+
   // --- Mode & tool state ---
   const [mode, setMode] = useState<ChalkMode>("draw");
   const [tool, setTool] = useState<ChalkTool>("pen");
@@ -98,13 +117,14 @@ export function ChalkBoardPage() {
   const scrollSliderYRef = useRef(0);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
+  const zoomRef = useRef(zoom);
   panXRef.current = panX;
   panYRef.current = panY;
+  zoomRef.current = zoom;
 
   // Fixed-size notes layer that expands when notes are placed or dragged outside current bounds.
   const CANVAS_PADDING = 300;
   const DEFAULT_CANVAS_SIZE = 2000;
-  const NOTE_DEFAULT_SIZE = 270;
   const POSITION_DEFAULT = 20;
   const chalkNotesBounds = useMemo(() => {
     let minX = 0;
@@ -114,8 +134,8 @@ export function ChalkBoardPage() {
     for (const n of notes) {
       const x = n.positionX ?? POSITION_DEFAULT;
       const y = n.positionY ?? POSITION_DEFAULT;
-      const w = n.width ?? NOTE_DEFAULT_SIZE;
-      const h = n.height ?? NOTE_DEFAULT_SIZE;
+      const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
+      const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
@@ -219,44 +239,89 @@ export function ChalkBoardPage() {
     }
   }, [boardId, autoEnlargeNotes]);
 
-  function handleViewportChange(newZoom: number, newPanX: number, newPanY: number) {
+  const handleViewportChange = useCallback((newZoom: number, newPanX: number, newPanY: number) => {
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
-  }
+  }, []);
 
-  // --- Wheel zoom (Ctrl/Cmd + scroll) ---
+  // --- Wheel: Ctrl/Cmd + scroll = zoom; two-finger / trackpad scroll (or mouse wheel) = pan ---
+  // Pan deltas are coalesced per animation frame for smooth diagonal motion.
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
+    const wheelPanAccum = { dx: 0, dy: 0 };
+    let wheelPanRaf: number | null = null;
+
+    function flushWheelPan() {
+      wheelPanRaf = null;
+      const dx = wheelPanAccum.dx;
+      const dy = wheelPanAccum.dy;
+      wheelPanAccum.dx = 0;
+      wheelPanAccum.dy = 0;
+      if (dx === 0 && dy === 0) return;
+      const z = zoomRef.current;
+      const rf = RESOLUTION_FACTOR;
+      const nx = panXRef.current - (rf * dx) / z;
+      const ny = panYRef.current - (rf * dy) / z;
+      panXRef.current = nx;
+      panYRef.current = ny;
+      handleViewportChange(z, nx, ny);
+    }
+
+    function scheduleWheelPan() {
+      if (wheelPanRaf !== null) return;
+      wheelPanRaf = requestAnimationFrame(flushWheelPan);
+    }
+
     function onWheel(e: WheelEvent) {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+
+        const z = zoomRef.current;
+        const px = panXRef.current;
+        const py = panYRef.current;
+
+        const rect = viewport!.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const deltaScale =
+          e.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? ZOOM_DELTA_SCALE_PIXEL : ZOOM_DELTA_SCALE;
+        const exponent = Math.max(
+          -ZOOM_EXPONENT_CAP,
+          Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / deltaScale),
+        );
+        const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
+        const newZoom = clamp(z * factor, MIN_ZOOM, MAX_ZOOM);
+        const vpScale = z / RESOLUTION_FACTOR;
+        const newVpScale = newZoom / RESOLUTION_FACTOR;
+
+        const newPanX = px + mouseX * (1 / newVpScale - 1 / vpScale);
+        const newPanY = py + mouseY * (1 / newVpScale - 1 / vpScale);
+
+        handleViewportChange(newZoom, newPanX, newPanY);
+        return;
+      }
+
+      if (isWheelOverEditableText(e.target)) return;
+
+      const { dx, dy } = wheelEventDeltaPixels(e, viewport);
+      if (dx === 0 && dy === 0) return;
+
       e.preventDefault();
-
-      const rect = viewport!.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      const exponent = Math.max(
-        -ZOOM_EXPONENT_CAP,
-        Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
-      );
-      const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
-      const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
-      const vpScale = zoom / RESOLUTION_FACTOR;
-      const newVpScale = newZoom / RESOLUTION_FACTOR;
-
-      // Keep point under cursor fixed (same formula as Note Board CorkBoard)
-      const newPanX = panX + mouseX * (1 / newVpScale - 1 / vpScale);
-      const newPanY = panY + mouseY * (1 / newVpScale - 1 / vpScale);
-
-      handleViewportChange(newZoom, newPanX, newPanY);
+      wheelPanAccum.dx += dx;
+      wheelPanAccum.dy += dy;
+      scheduleWheelPan();
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
-    return () => viewport.removeEventListener("wheel", onWheel);
-  }, [zoom, panX, panY]);
+    return () => {
+      viewport.removeEventListener("wheel", onWheel);
+      if (wheelPanRaf !== null) cancelAnimationFrame(wheelPanRaf);
+    };
+  }, [handleViewportChange]);
 
   // --- Pan (right-click, middle-click, space+left drag) ---
   function handleViewportMouseDown(e: React.MouseEvent) {
@@ -337,11 +402,13 @@ export function ChalkBoardPage() {
 
       const target = e.target as Element;
       if (target.closest("[data-board-toolbar-portal]")) return;
+      if (target.closest("[data-board-menu-bar]")) return;
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       if (noteEl?.getAttribute("data-note-id") === primaryNote) return;
 
       setEditingNoteIds(new Set());
       primaryEditingNoteIdRef.current = null;
+      setRichTextToolbar(null);
     }
     document.addEventListener("mousedown", handleDocumentMouseDown, true);
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown, true);
@@ -789,12 +856,12 @@ export function ChalkBoardPage() {
             noteRedoStackRef.current.push({
               type: "size",
               noteId: entry.noteId,
-              width: current.width ?? 270,
-              height: current.height ?? 270,
+              width: current.width ?? STICKY_NOTE_DEFAULT_SIZE,
+              height: current.height ?? STICKY_NOTE_DEFAULT_SIZE,
             });
           }
-          const w = entry.prevWidth ?? 270;
-          const h = entry.prevHeight ?? 270;
+          const w = entry.prevWidth ?? STICKY_NOTE_DEFAULT_SIZE;
+          const h = entry.prevHeight ?? STICKY_NOTE_DEFAULT_SIZE;
           setNotes((prev) =>
             prev.map((n) =>
               n.id === entry.noteId ? { ...n, width: w, height: h } : n,
@@ -1004,6 +1071,8 @@ export function ChalkBoardPage() {
         boardId,
         positionX,
         positionY,
+        width: STICKY_NOTE_DEFAULT_SIZE,
+        height: STICKY_NOTE_DEFAULT_SIZE,
       });
 
       setNotes((prev) => [created, ...prev]);
@@ -1261,41 +1330,41 @@ export function ChalkBoardPage() {
         ? CHALK_BLACKBOARD_BG
         : CHALKBOARD_BG;
 
+  const chalkBoardTopBar = (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <div className="min-w-0 flex-1">
+        <BoardMenuBar
+          boardType="ChalkBoard"
+          zoom={zoom}
+          onZoomChange={(z) => handleViewportChange(z, panX, panY)}
+          onSaveToFile={handleSaveToFile}
+          onLoadFromFile={handleLoadFromFile}
+          onUndo={triggerMenuUndo}
+          onRedo={triggerMenuRedo}
+          canUndo={
+            mode === "draw" ? true : noteUndoStackRef.current.length > 0
+          }
+          canRedo={
+            mode === "draw" ? true : noteRedoStackRef.current.length > 0
+          }
+          onInsertStickyNote={handleAddStickyNote}
+          backgroundTheme={backgroundTheme}
+          onBackgroundThemeChange={setBackgroundTheme}
+          autoEnlargeNotes={autoEnlargeNotes}
+          onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+          richTextToolbar={richTextToolbar}
+        />
+      </div>
+      <BoardConnectedUsers users={connectedUsers} />
+    </div>
+  );
+
   return (
     <div className="relative flex h-full w-full flex-col">
-      {/* Menu bar - above the chalkboard frame */}
-      <div className="notepad-card flex-shrink-0 !overflow-visible border-b-0 rounded-b-none z-10">
-        <div className="notepad-spiral-strip" />
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <BoardMenuBar
-              boardType="ChalkBoard"
-              zoom={zoom}
-              onZoomChange={(z) => handleViewportChange(z, panX, panY)}
-              onSaveToFile={handleSaveToFile}
-              onLoadFromFile={handleLoadFromFile}
-              onUndo={triggerMenuUndo}
-              onRedo={triggerMenuRedo}
-              canUndo={
-                mode === "draw" ? true : noteUndoStackRef.current.length > 0
-              }
-              canRedo={
-                mode === "draw" ? true : noteRedoStackRef.current.length > 0
-              }
-              onInsertStickyNote={handleAddStickyNote}
-              backgroundTheme={backgroundTheme}
-              onBackgroundThemeChange={setBackgroundTheme}
-              autoEnlargeNotes={autoEnlargeNotes}
-              onAutoEnlargeNotesChange={setAutoEnlargeNotes}
-            />
-          </div>
-          <BoardConnectedUsers users={connectedUsers} />
-        </div>
-      </div>
-      {/* Chalkboard frame - border color matches background theme */}
+      {/* Chalkboard frame — menu sits inside the frame (notepad strip + spiral), like the note board */}
       <div
         className={[
-          "chalkboard-frame relative flex-1 min-h-0 flex flex-col overflow-auto rounded-t-none",
+          "chalkboard-frame relative flex min-h-0 flex-1 flex-col overflow-auto",
           backgroundTheme === "whiteboard" && "chalkboard-frame--whiteboard",
           backgroundTheme === "blackboard" && "chalkboard-frame--blackboard",
         ]
@@ -1310,6 +1379,10 @@ export function ChalkBoardPage() {
           aria-hidden
           onChange={handleLoadFileSelect}
         />
+        <div className="notepad-card relative z-30 shrink-0 !overflow-visible rounded-t-md rounded-b-none border-b-0 shadow-none">
+          <div className="notepad-spiral-strip !border-b-0" />
+          <div className="px-2 py-1.5 sm:px-3 sm:py-2">{chalkBoardTopBar}</div>
+        </div>
         {/* Viewport (clips and captures pan/zoom events) */}
         <div
           ref={viewportRef}
@@ -1356,6 +1429,7 @@ export function ChalkBoardPage() {
             if (!(e.target as Element).closest("[data-board-item]")) {
               setEditingNoteIds(new Set());
               primaryEditingNoteIdRef.current = null;
+              setRichTextToolbar(null);
             }
           }}
         >
@@ -1409,6 +1483,7 @@ export function ChalkBoardPage() {
                 onExitEdit={handleExitEditNote}
                 onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
                 zoom={zoom / RESOLUTION_FACTOR}
+                onRichTextToolbarChange={handleRichTextToolbarChange}
               />
             ))}
           </div>
