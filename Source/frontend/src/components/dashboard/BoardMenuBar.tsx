@@ -133,17 +133,9 @@ export function BoardMenuBar({
       data-board-menu-bar
       className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1.5"
     >
-      <div
-        className={[
-          "w-full overflow-hidden transform-gpu transition-[max-height,opacity,transform] duration-200 ease-out",
-          isCollapsed
-            ? "max-h-0 -translate-y-2 opacity-0 pointer-events-none"
-            : "max-h-[420px] translate-y-0 opacity-100 pointer-events-auto",
-        ].join(" ")}
-      >
-        <div className="flex flex-shrink-0 items-center gap-1">
-          {/* File */}
-          <div className="relative">
+      <div className={isCollapsed ? "hidden" : "flex flex-shrink-0 items-center gap-1"}>
+      {/* File */}
+      <div className="relative">
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
@@ -177,10 +169,10 @@ export function BoardMenuBar({
             </button>
           </div>
         )}
-          </div>
+      </div>
 
-          {/* Edit */}
-          <div className="relative">
+      {/* Edit */}
+      <div className="relative">
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "edit" ? null : "edit")}
@@ -217,10 +209,10 @@ export function BoardMenuBar({
             <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
-          </div>
+      </div>
 
-          {/* Insert */}
-          <div className="relative">
+      {/* Insert */}
+      <div className="relative">
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "insert" ? null : "insert")}
@@ -270,10 +262,10 @@ export function BoardMenuBar({
             <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
-          </div>
+      </div>
 
-          {/* View */}
-          <div className="relative">
+      {/* View */}
+      <div className="relative">
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "view" ? null : "view")}
@@ -385,21 +377,15 @@ export function BoardMenuBar({
             </button>
           </div>
         )}
-          </div>
-        </div>
+      </div>
+      </div>
 
       <div
-        className={[
-          "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center overflow-hidden transition-[max-height,opacity,transform] duration-200 ease-out",
-          isCollapsed
-            ? "max-h-0 opacity-0 -translate-y-2 pointer-events-none"
-            : "max-h-[120px] opacity-100 translate-y-0 pointer-events-auto",
-        ].join(" ")}
+        className={isCollapsed ? "hidden" : "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center"}
       >
         <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
           <NoteToolbar editor={richTextToolbar?.editor ?? null} />
         </div>
-      </div>
       </div>
 
       <button
