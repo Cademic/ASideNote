@@ -19,3 +19,26 @@ export const TEXT_COLORS = [
   { label: "Orange", value: "#ea580c" },
   { label: "Purple", value: "#9333ea" },
 ];
+
+/** Normalize to #rrggbb for `<input type="color">` (falls back if parsing fails). */
+export function hexForColorInput(color: string): string {
+  const t = color?.trim() ?? "";
+  if (/^#[0-9A-Fa-f]{6}$/.test(t)) return t;
+  if (/^#[0-9A-Fa-f]{3}$/.test(t)) {
+    const r = t[1];
+    const g = t[2];
+    const b = t[3];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return "#1f2937";
+}
+
+/** Preset highlight background colors (TipTap multicolor highlight) */
+export const HIGHLIGHT_COLORS = [
+  { label: "Yellow", value: "#fef08a" },
+  { label: "Green", value: "#86efac" },
+  { label: "Blue", value: "#93c5fd" },
+  { label: "Pink", value: "#f9a8d4" },
+  { label: "Orange", value: "#fdba74" },
+  { label: "Purple", value: "#c4b5fd" },
+];

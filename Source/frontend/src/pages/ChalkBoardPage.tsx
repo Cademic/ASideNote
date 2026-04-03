@@ -50,6 +50,8 @@ export function ChalkBoardPage() {
 
   // --- Board & loading state ---
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
+  const boardNameRef = useRef<string>(board?.name ?? "");
+  boardNameRef.current = board?.name ?? "";
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +62,8 @@ export function ChalkBoardPage() {
   // --- Notes state ---
   const [notes, setNotes] = useState<NoteSummaryDto[]>([]);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
+  const editingNoteIdsRef = useRef<Set<string>>(editingNoteIds);
+  editingNoteIdsRef.current = editingNoteIds;
   const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
@@ -666,14 +670,16 @@ export function ChalkBoardPage() {
     const skipSize =
       lastResizedNoteRef.current?.id === id &&
       Date.now() - lastResizedNoteRef.current.at < RESIZE_ECHO_IGNORE_MS;
+    const skipTextWhileEditing = editingNoteIdsRef.current.has(id);
     setNotes((prev) =>
       prev.map((n) => {
         if (n.id !== id) return n;
         const next = { ...n };
         if (!skipPosition && payload.positionX !== undefined) next.positionX = payload.positionX;
         if (!skipPosition && payload.positionY !== undefined) next.positionY = payload.positionY;
-        if (payload.title !== undefined) next.title = payload.title;
-        if (payload.content !== undefined && payload.content !== null) next.content = payload.content;
+        if (!skipTextWhileEditing && payload.title !== undefined) next.title = payload.title;
+        if (!skipTextWhileEditing && payload.content !== undefined && payload.content !== null)
+          next.content = payload.content;
         if (!skipSize && payload.width !== undefined) next.width = payload.width;
         if (!skipSize && payload.height !== undefined) next.height = payload.height;
         if (payload.color !== undefined) next.color = payload.color;
@@ -931,16 +937,32 @@ export function ChalkBoardPage() {
   // --- File save/load and menu actions ---
   function handleSaveToFile() {
     const canvasJson = canvasRef.current?.toJSON() ?? "{}";
-    const payload = createBoardExportPayload("ChalkBoard", board?.name ?? "Chalk Board", {
-      notes,
+    const boardName = boardNameRef.current || "Chalk Board";
+    const payload = createBoardExportPayload("ChalkBoard", boardName, {
+      notes: notesRef.current,
       drawing: { canvasJson },
-      viewport: { zoom, panX, panY },
+      viewport: { zoom: zoomRef.current, panX: panXRef.current, panY: panYRef.current },
     });
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
-    triggerBoardDownload(blob, buildBoardExportFilename(board?.name ?? "chalk-board"));
+    triggerBoardDownload(blob, buildBoardExportFilename(boardName));
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.defaultPrevented) return;
+      if (e.key.toLowerCase() !== "s") return;
+
+      e.preventDefault();
+      handleSaveToFile();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [boardId]);
 
   function handleLoadFromFile() {
     loadFileInputRef.current?.click();

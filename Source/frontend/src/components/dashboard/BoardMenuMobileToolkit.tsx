@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
@@ -5,6 +6,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Highlighter,
   Italic,
   Link as LinkIcon,
   List,
@@ -16,6 +18,8 @@ import {
 import {
   FONT_FAMILIES,
   FONT_SIZE_PRESETS,
+  HIGHLIGHT_COLORS,
+  hexForColorInput,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   TEXT_COLORS,
@@ -30,6 +34,44 @@ function parseFontSize(raw: string | undefined | null): number {
 
 function itemActiveClass(active: boolean) {
   return active ? " bg-sky-50 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100" : "";
+}
+
+function MenuCustomColorButton({
+  value,
+  onPick,
+}: {
+  value: string;
+  onPick: (hex: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pickerValue, setPickerValue] = useState(() => hexForColorInput(value));
+  useEffect(() => {
+    setPickerValue(hexForColorInput(value));
+  }, [value]);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="color"
+        value={pickerValue}
+        onChange={(e) => {
+          const v = e.target.value;
+          setPickerValue(v);
+          onPick(v);
+        }}
+        className="pointer-events-none fixed h-0 w-0 opacity-0"
+        tabIndex={-1}
+        aria-hidden
+      />
+      <button
+        type="button"
+        className={menuItemClass}
+        onClick={() => inputRef.current?.click()}
+      >
+        Custom color…
+      </button>
+    </>
+  );
 }
 
 const toolkitHintClass = "px-3 py-2 text-xs leading-snug text-foreground/60";
@@ -68,10 +110,8 @@ function ViewToolkitIdleHint() {
 
 export function BoardMenuMobileEditToolkit({
   editor,
-  closeMenu,
 }: {
   editor: Editor | null;
-  closeMenu: () => void;
 }) {
   if (!editor) {
     return (
@@ -80,15 +120,13 @@ export function BoardMenuMobileEditToolkit({
       </div>
     );
   }
-  return <BoardMenuMobileEditToolkitActive editor={editor} closeMenu={closeMenu} />;
+  return <BoardMenuMobileEditToolkitActive editor={editor} />;
 }
 
 function BoardMenuMobileEditToolkitActive({
   editor,
-  closeMenu,
 }: {
   editor: Editor;
-  closeMenu: () => void;
 }) {
   const state = useEditorState({
     editor,
@@ -101,6 +139,8 @@ function BoardMenuMobileEditToolkitActive({
         isUnderline: ed.isActive("underline"),
         isStrike: ed.isActive("strike"),
         color: ed.getAttributes("textStyle").color as string | undefined,
+        isHighlight: ed.isActive("highlight"),
+        highlightColor: (ed.getAttributes("highlight").color as string | undefined) ?? "#fef08a",
       };
     },
   });
@@ -110,6 +150,8 @@ function BoardMenuMobileEditToolkitActive({
     isUnderline: false,
     isStrike: false,
     color: undefined,
+    isHighlight: false,
+    highlightColor: "#fef08a",
   };
   const currentColor = s.color ?? "#1f2937";
   const currentSize = parseFontSize(editor.getAttributes("textStyle").fontSize as string | undefined);
@@ -126,7 +168,6 @@ function BoardMenuMobileEditToolkitActive({
             className={menuItemClass}
             onClick={() => {
               editor.chain().focus().setFontFamily(f.value).run();
-              closeMenu();
             }}
           >
             {f.label}
@@ -141,7 +182,6 @@ function BoardMenuMobileEditToolkitActive({
             className={`${menuItemClass}${currentSize === size ? " bg-sky-50 dark:bg-sky-900/30" : ""}`}
             onClick={() => {
               editor.chain().focus().setFontSize(`${size}px`).run();
-              closeMenu();
             }}
           >
             {size}px
@@ -157,7 +197,6 @@ function BoardMenuMobileEditToolkitActive({
             if (Number.isNaN(n)) n = 14;
             n = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, n));
             editor.chain().focus().setFontSize(`${n}px`).run();
-            closeMenu();
           }}
         >
           Custom…
@@ -206,6 +245,43 @@ function BoardMenuMobileEditToolkitActive({
       <HoverSubmenu
         label={
           <span className="flex items-center gap-2">
+            <Highlighter className="h-3.5 w-3.5" />
+            Highlight
+          </span>
+        }
+      >
+        {s.isHighlight && (
+          <button
+            type="button"
+            className={menuItemClass}
+            onClick={() => {
+              editor.chain().focus().unsetHighlight().run();
+            }}
+          >
+            Remove highlight
+          </button>
+        )}
+        {HIGHLIGHT_COLORS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            className={`${menuItemClass}${s.highlightColor === c.value && s.isHighlight ? " bg-sky-50 dark:bg-sky-900/30" : ""}`}
+            onClick={() => {
+              editor.chain().focus().toggleHighlight({ color: c.value }).run();
+            }}
+          >
+            <span className="h-4 w-4 rounded border border-black/20" style={{ backgroundColor: c.value }} />
+            {c.label}
+          </button>
+        ))}
+        <MenuCustomColorButton
+          value={s.highlightColor}
+          onPick={(hex) => editor.chain().focus().toggleHighlight({ color: hex }).run()}
+        />
+      </HoverSubmenu>
+      <HoverSubmenu
+        label={
+          <span className="flex items-center gap-2">
             <Type className="h-3.5 w-3.5" />
             Text color
           </span>
@@ -218,13 +294,16 @@ function BoardMenuMobileEditToolkitActive({
             className={`${menuItemClass}${currentColor === c.value ? " bg-sky-50 dark:bg-sky-900/30" : ""}`}
             onClick={() => {
               editor.chain().focus().setColor(c.value).run();
-              closeMenu();
             }}
           >
             <span className="h-4 w-4 rounded-full border border-black/20" style={{ backgroundColor: c.value }} />
             {c.label}
           </button>
         ))}
+        <MenuCustomColorButton
+          value={currentColor}
+          onPick={(hex) => editor.chain().focus().setColor(hex).run()}
+        />
       </HoverSubmenu>
     </div>
   );
@@ -232,10 +311,8 @@ function BoardMenuMobileEditToolkitActive({
 
 export function BoardMenuMobileInsertToolkit({
   editor,
-  closeMenu,
 }: {
   editor: Editor | null;
-  closeMenu: () => void;
 }) {
   if (!editor) {
     return (
@@ -244,15 +321,13 @@ export function BoardMenuMobileInsertToolkit({
       </div>
     );
   }
-  return <BoardMenuMobileInsertToolkitActive editor={editor} closeMenu={closeMenu} />;
+  return <BoardMenuMobileInsertToolkitActive editor={editor} />;
 }
 
 function BoardMenuMobileInsertToolkitActive({
   editor,
-  closeMenu,
 }: {
   editor: Editor;
-  closeMenu: () => void;
 }) {
   const state = useEditorState({
     editor,
@@ -285,7 +360,6 @@ function BoardMenuMobileInsertToolkitActive({
           } else {
             editor.chain().focus().unsetLink().run();
           }
-          closeMenu();
         }}
       >
         <LinkIcon className="h-3.5 w-3.5" />
@@ -296,7 +370,6 @@ function BoardMenuMobileInsertToolkitActive({
         className={`${menuItemClass}${itemActiveClass(st.isBullet)}`}
         onClick={() => {
           editor.chain().focus().toggleBulletList().run();
-          closeMenu();
         }}
       >
         <List className="h-3.5 w-3.5" />
@@ -311,7 +384,6 @@ function BoardMenuMobileInsertToolkitActive({
           } else {
             editor.chain().focus().toggleOrderedList().run();
           }
-          closeMenu();
         }}
       >
         <ListOrdered className="h-3.5 w-3.5" />
@@ -326,7 +398,6 @@ function BoardMenuMobileInsertToolkitActive({
           } else {
             editor.chain().focus().toggleOrderedList().updateAttributes("orderedList", { type: "A" }).run();
           }
-          closeMenu();
         }}
       >
         <ListOrdered className="h-3.5 w-3.5" />
@@ -338,10 +409,8 @@ function BoardMenuMobileInsertToolkitActive({
 
 export function BoardMenuMobileViewToolkit({
   editor,
-  closeMenu,
 }: {
   editor: Editor | null;
-  closeMenu: () => void;
 }) {
   if (!editor) {
     return (
@@ -350,15 +419,13 @@ export function BoardMenuMobileViewToolkit({
       </div>
     );
   }
-  return <BoardMenuMobileViewToolkitActive editor={editor} closeMenu={closeMenu} />;
+  return <BoardMenuMobileViewToolkitActive editor={editor} />;
 }
 
 function BoardMenuMobileViewToolkitActive({
   editor,
-  closeMenu,
 }: {
   editor: Editor;
-  closeMenu: () => void;
 }) {
   const state = useEditorState({
     editor,

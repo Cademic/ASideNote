@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -9,12 +9,14 @@ import FontFamily from "@tiptap/extension-font-family";
 import CharacterCount from "@tiptap/extension-character-count";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
+import Highlight from "@tiptap/extension-highlight";
 import { X, GripVertical, MoreVertical, Copy, Trash2, RotateCw } from "lucide-react";
 import { handleTabKey } from "../../lib/tiptap-tab-indent";
 import type { NoteSummaryDto } from "../../types";
 import { FontSize } from "../../lib/tiptap-font-size";
 import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
+import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -58,12 +60,23 @@ interface StickyNoteProps {
 
 /** Default width and height for sticky notes on boards (square). */
 export const STICKY_NOTE_DEFAULT_SIZE = 270;
+/** Hard cap on note height when resizing (px). */
+export const STICKY_NOTE_MAX_HEIGHT = 600;
 const DEFAULT_SIZE = STICKY_NOTE_DEFAULT_SIZE;
 const MIN_SIZE = 120;
 const MAX_WIDTH = 600;
-const MAX_HEIGHT = 600;
-const MAX_CONTENT_LENGTH = 1000;
-const MAX_TITLE_LENGTH = 100;
+/** Plain-text character budget for note body (TipTap CharacterCount). */
+const MAX_CONTENT_TEXT_LENGTH = 1000;
+/** Max paragraph blocks (Enter). Existing notes above this can still be edited down. */
+const MAX_CONTENT_PARAGRAPHS = 40;
+/** Max soft line breaks (Shift+Enter). */
+const MAX_CONTENT_HARD_BREAKS = 60;
+/** Title plain-text length; matches API validators (`MaximumLength(500)` on note title). */
+const MAX_TITLE_TEXT_LENGTH = 500;
+/** Title is a single paragraph block (Enter cannot add another). */
+const MAX_TITLE_PARAGRAPHS = 1;
+/** Soft line breaks allowed in title (Shift+Enter). */
+const MAX_TITLE_HARD_BREAKS = 20;
 
 type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
@@ -207,6 +220,7 @@ export function StickyNote({
     FontSize,
     TextAlign.configure({ types: ["paragraph"] }),
     Link.configure({ openOnClick: false }),
+    Highlight.configure({ multicolor: true }),
   ];
 
   const sendTextCursorIfNeeded = useCallback(
@@ -221,7 +235,11 @@ export function StickyNote({
   const titleEditor = useEditor({
     extensions: [
       ...sharedExtensions,
-      CharacterCount.configure({ limit: MAX_TITLE_LENGTH }),
+      CharacterCount.configure({ limit: MAX_TITLE_TEXT_LENGTH }),
+      NoteBodyLimits.configure({
+        maxParagraphs: MAX_TITLE_PARAGRAPHS,
+        maxHardBreaks: MAX_TITLE_HARD_BREAKS,
+      }),
     ],
     content: note.title || "",
     editable: isEditing,
@@ -241,7 +259,11 @@ export function StickyNote({
   const contentEditor = useEditor({
     extensions: [
       ...sharedExtensions,
-      CharacterCount.configure({ limit: MAX_CONTENT_LENGTH }),
+      CharacterCount.configure({ limit: MAX_CONTENT_TEXT_LENGTH }),
+      NoteBodyLimits.configure({
+        maxParagraphs: MAX_CONTENT_PARAGRAPHS,
+        maxHardBreaks: MAX_CONTENT_HARD_BREAKS,
+      }),
     ],
     content: note.content || "",
     editable: isEditing,
@@ -256,6 +278,16 @@ export function StickyNote({
       setActiveField("content");
       sendTextCursorIfNeeded(editor, "content");
     },
+  });
+
+  const titleCharCount = useEditorState({
+    editor: titleEditor,
+    selector: ({ editor }) => editor?.storage.characterCount?.characters() ?? 0,
+  });
+
+  const contentCharCount = useEditorState({
+    editor: contentEditor,
+    selector: ({ editor }) => editor?.storage.characterCount?.characters() ?? 0,
   });
 
   const activeEditor =
@@ -313,17 +345,15 @@ export function StickyNote({
   // Sync title editor from props
   useEffect(() => {
     if (!titleEditor) return;
+    if (isEditing && titleEditor.isFocused) return;
     const currentHtml = titleEditor.getHTML();
     const propHtml = note.title ?? "";
     if (currentHtml !== propHtml && propHtml !== undefined) {
-      // When not editing, only sync if editor is not focused
-      // When editing, always sync to show remote changes (collaborative editing)
       if (!isEditing) {
         if (!titleEditor.isFocused) {
           titleEditor.commands.setContent(propHtml || "", { emitUpdate: false });
         }
       } else {
-        // When editing, sync remote changes even if focused
         titleEditor.commands.setContent(propHtml || "", { emitUpdate: false });
       }
     }
@@ -332,17 +362,15 @@ export function StickyNote({
   // Sync content editor from props
   useEffect(() => {
     if (!contentEditor) return;
+    if (isEditing && contentEditor.isFocused) return;
     const currentHtml = contentEditor.getHTML();
     const propHtml = note.content ?? "";
     if (currentHtml !== propHtml && propHtml !== undefined) {
-      // When not editing, only sync if editor is not focused
-      // When editing, always sync to show remote changes (collaborative editing)
       if (!isEditing) {
         if (!contentEditor.isFocused) {
           contentEditor.commands.setContent(propHtml || "", { emitUpdate: false });
         }
       } else {
-        // When editing, sync remote changes even if focused
         contentEditor.commands.setContent(propHtml || "", { emitUpdate: false });
       }
     }
@@ -599,19 +627,19 @@ export function StickyNote({
           }
         }
         if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
+          newH = Math.min(STICKY_NOTE_MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
         }
         if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
           const proposed = rs.startH - dy;
-          if (proposed >= MIN_SIZE && proposed <= MAX_HEIGHT) {
+          if (proposed >= MIN_SIZE && proposed <= STICKY_NOTE_MAX_HEIGHT) {
             newH = proposed;
             newY = rs.startPosY + dy;
           } else if (proposed < MIN_SIZE) {
             newH = MIN_SIZE;
             newY = rs.startPosY + (rs.startH - MIN_SIZE);
           } else {
-            newH = MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MAX_HEIGHT);
+            newH = STICKY_NOTE_MAX_HEIGHT;
+            newY = rs.startPosY + (rs.startH - STICKY_NOTE_MAX_HEIGHT);
           }
         }
 
@@ -939,13 +967,12 @@ export function StickyNote({
               <div className="flex justify-end -mt-0.5 mb-0.5">
                 <span
                   className={`text-[10px] ${
-                    (titleEditor?.storage.characterCount?.characters() ?? 0) >=
-                    MAX_TITLE_LENGTH
+                    (titleCharCount ?? 0) >= MAX_TITLE_TEXT_LENGTH
                       ? "text-red-600 font-semibold"
                       : "text-gray-500/60"
                   }`}
                 >
-                  {titleEditor?.storage.characterCount?.characters() ?? 0}/{MAX_TITLE_LENGTH}
+                  {titleCharCount ?? 0}/{MAX_TITLE_TEXT_LENGTH}
                 </span>
               </div>
 
@@ -972,13 +999,12 @@ export function StickyNote({
               <div className="flex justify-end">
                 <span
                   className={`text-[10px] ${
-                    (contentEditor?.storage.characterCount?.characters() ?? 0) >=
-                    MAX_CONTENT_LENGTH
+                    (contentCharCount ?? 0) >= MAX_CONTENT_TEXT_LENGTH
                       ? "text-red-600 font-semibold"
                       : "text-gray-500/60"
                   }`}
                 >
-                  {contentEditor?.storage.characterCount?.characters() ?? 0}/{MAX_CONTENT_LENGTH}
+                  {contentCharCount ?? 0}/{MAX_CONTENT_TEXT_LENGTH}
                 </span>
               </div>
             </div>

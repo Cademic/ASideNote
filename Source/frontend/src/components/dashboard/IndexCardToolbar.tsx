@@ -6,7 +6,6 @@ import {
   Italic,
   Underline,
   Strikethrough,
-  Type,
   Palette,
   Check,
   RotateCw,
@@ -21,7 +20,6 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
-  Highlighter,
   Link as LinkIcon,
   Subscript as SubscriptIcon,
   Superscript as SuperscriptIcon,
@@ -30,6 +28,7 @@ import {
   Code,
   Code2,
 } from "lucide-react";
+import { TextColorDropdown, HighlightColorDropdown } from "./NoteToolbar";
 
 interface IndexCardToolbarProps {
   editor: Editor | null;
@@ -66,15 +65,6 @@ const FONT_FAMILIES = [
 const MIN_FONT_SIZE = 8;
 const MAX_FONT_SIZE = 48;
 const FONT_SIZE_PRESETS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
-
-const TEXT_COLORS = [
-  { label: "Black", value: "#1f2937" },
-  { label: "Red", value: "#dc2626" },
-  { label: "Blue", value: "#2563eb" },
-  { label: "Green", value: "#16a34a" },
-  { label: "Orange", value: "#ea580c" },
-  { label: "Purple", value: "#9333ea" },
-];
 
 const CARD_COLOR_SWATCHES = [
   { key: "white", swatch: "bg-white border-gray-300" },
@@ -202,143 +192,6 @@ function FontSizeInput({ editor }: { editor: Editor }) {
       )}
       <option value="custom">Custom...</option>
     </select>
-  );
-}
-
-const HIGHLIGHT_COLORS = [
-  { label: "Yellow", value: "#fef08a" },
-  { label: "Green", value: "#86efac" },
-  { label: "Blue", value: "#93c5fd" },
-  { label: "Pink", value: "#f9a8d4" },
-  { label: "Orange", value: "#fdba74" },
-  { label: "Purple", value: "#c4b5fd" },
-];
-
-function ColorPickerButton({
-  editor,
-  currentColor,
-  type,
-}: {
-  editor: Editor;
-  currentColor: string;
-  type: "text" | "highlight";
-}) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [customColor, setCustomColor] = useState(currentColor);
-
-  function handleColorChange(color: string) {
-    if (type === "text") {
-      editor.chain().focus().setColor(color).run();
-    } else {
-      editor.chain().focus().toggleHighlight({ color }).run();
-    }
-    setCustomColor(color);
-    setShowPicker(false);
-  }
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setShowPicker(!showPicker);
-        }}
-        title="More colors"
-        className="h-4 w-4 rounded border border-black/20 bg-gradient-to-br from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 hover:scale-110 transition-transform"
-      />
-      {showPicker && (
-        <div className="absolute left-0 top-full z-50 mt-1 rounded border border-black/15 bg-white p-2 shadow-lg">
-          <input
-            type="color"
-            value={customColor}
-            onChange={(e) => setCustomColor(e.target.value)}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="h-8 w-full cursor-pointer"
-          />
-          <div className="mt-1 flex gap-1">
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleColorChange(customColor);
-              }}
-              className="h-6 flex-1 rounded bg-black/10 px-2 text-[10px] text-gray-700 hover:bg-black/20"
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setShowPicker(false);
-              }}
-              className="h-6 flex-1 rounded bg-black/10 px-2 text-[10px] text-gray-700 hover:bg-black/20"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function HighlightButton({ editor }: { editor: Editor }) {
-  const [showColors, setShowColors] = useState(false);
-  const highlightColor = editor.getAttributes("highlight").color || "#fef08a";
-
-  return (
-    <div className="relative">
-      <ToolbarButton
-        isActive={editor.isActive("highlight")}
-        onClick={() => {
-          if (editor.isActive("highlight")) {
-            editor.chain().focus().unsetHighlight().run();
-          } else {
-            editor.chain().focus().toggleHighlight({ color: highlightColor }).run();
-          }
-        }}
-        title="Highlight"
-      >
-        <Highlighter className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      {showColors && (
-        <div className="absolute left-0 top-full z-50 mt-1 flex gap-0.5 rounded border border-black/15 bg-white p-1 shadow-lg">
-          {HIGHLIGHT_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                editor.chain().focus().toggleHighlight({ color: c.value }).run();
-                setShowColors(false);
-              }}
-              title={c.label}
-              className={[
-                "h-5 w-5 rounded border transition-transform",
-                highlightColor === c.value
-                  ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                  : "border-black/20 hover:scale-110",
-              ].join(" ")}
-              style={{ backgroundColor: c.value }}
-            />
-          ))}
-          <ColorPickerButton editor={editor} currentColor={highlightColor} type="highlight" />
-        </div>
-      )}
-      <button
-        type="button"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setShowColors(!showColors);
-        }}
-        className="ml-0.5 h-6 w-3 rounded border border-black/15 bg-white/60 text-[8px] text-gray-600 hover:bg-black/10"
-        title="Highlight color"
-      >
-        ▼
-      </button>
-    </div>
   );
 }
 
@@ -674,34 +527,16 @@ export function IndexCardToolbar({
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
-        {/* Text color swatches */}
-        <div className="flex items-center gap-0.5">
-          <Type className="mr-0.5 h-3 w-3 text-gray-500" />
-          {TEXT_COLORS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                editor.chain().focus().setColor(c.value).run();
-              }}
-              title={c.label}
-              className={[
-                "h-4 w-4 rounded-full border transition-transform",
-                currentColor === c.value
-                  ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                  : "border-black/20 hover:scale-110",
-              ].join(" ")}
-              style={{ backgroundColor: c.value }}
-            />
-          ))}
-          <ColorPickerButton editor={editor} currentColor={currentColor} type="text" />
-        </div>
+        <TextColorDropdown editor={editor} currentColor={currentColor} dropdownPlacement="below" />
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
-        {/* Highlight */}
-        <HighlightButton editor={editor} />
+        <HighlightColorDropdown
+          editor={editor}
+          isHighlightActive={state.isHighlight}
+          highlightColor={state.highlightColor ?? "#fef08a"}
+          dropdownPlacement="below"
+        />
 
         {/* Link */}
         <LinkButton editor={editor} />

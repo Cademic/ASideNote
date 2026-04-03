@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { BoardConnectionDto } from "../../types";
 
@@ -30,35 +30,52 @@ function buildCatenaryPath(from: PinPosition, to: PinPosition): string {
 }
 
 /**
- * Read the centre position of every pin on the board, relative to the board
- * container. Returns a Map keyed by note ID.
+ * Read the centre position of every pin relative to the red-string SVG viewport
+ * (same space as path `d` coordinates). Pins are found under `boardEl`; the
+ * reference rect must be the overlay SVG so coords match after the inner canvas
+ * `translate(-contentMinX, -contentMinY)` wrapper.
  */
-function readPinPositions(boardEl: HTMLDivElement, zoom = 1): Map<string, PinPosition> {
+function readPinPositions(
+  boardEl: HTMLDivElement,
+  svgEl: SVGSVGElement | null,
+  zoom = 1,
+): Map<string, PinPosition> {
   const map = new Map<string, PinPosition>();
-  const boardRect = boardEl.getBoundingClientRect();
+  if (!svgEl) return map;
+  const origin = svgEl.getBoundingClientRect();
   const pins = boardEl.querySelectorAll<HTMLElement>("[data-pin-note-id]");
   pins.forEach((pin) => {
     const noteId = pin.getAttribute("data-pin-note-id");
     if (!noteId) return;
     const r = pin.getBoundingClientRect();
-    // getBoundingClientRect returns screen-space coords; divide by zoom to get canvas-space
     map.set(noteId, {
-      x: (r.left + r.width / 2 - boardRect.left) / zoom,
-      y: (r.top + r.height / 2 - boardRect.top) / zoom,
+      x: (r.left + r.width / 2 - origin.left) / zoom,
+      y: (r.top + r.height / 2 - origin.top) / zoom,
     });
   });
   return map;
 }
 
-export function RedStringLayer({
-  connections,
-  linkingFrom,
-  mousePos,
-  boardRef,
-  onDeleteConnection,
-  zoom = 1,
-}: RedStringLayerProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+export const RedStringLayer = forwardRef<SVGSVGElement, RedStringLayerProps>(function RedStringLayer(
+  {
+    connections,
+    linkingFrom,
+    mousePos,
+    boardRef,
+    onDeleteConnection,
+    zoom = 1,
+  },
+  ref,
+) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const setSvgRef = useCallback(
+    (el: SVGSVGElement | null) => {
+      svgRef.current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) (ref as React.MutableRefObject<SVGSVGElement | null>).current = el;
+    },
+    [ref],
+  );
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
 
   // Store latest props in refs so the rAF loop can read them without deps.
@@ -105,7 +122,7 @@ export function RedStringLayer({
         return;
       }
 
-      const pins = readPinPositions(board, zoomRef.current);
+      const pins = readPinPositions(board, svg, zoomRef.current);
       const conns = connectionsRef.current;
       const linking = linkingFromRef.current;
       const mouse = mousePosRef.current;
@@ -158,8 +175,8 @@ export function RedStringLayer({
     : null;
 
   let deleteButtonPos: { x: number; y: number; droop: number } | null = null;
-  if (selectedConn && boardRef.current) {
-    const pins = readPinPositions(boardRef.current, zoom);
+  if (selectedConn && boardRef.current && svgRef.current) {
+    const pins = readPinPositions(boardRef.current, svgRef.current, zoom);
     const from = pins.get(selectedConn.fromItemId);
     const to = pins.get(selectedConn.toItemId);
     if (from && to) {
@@ -175,7 +192,7 @@ export function RedStringLayer({
 
   return (
     <svg
-      ref={svgRef}
+      ref={setSvgRef}
       className="pointer-events-none absolute inset-0 z-[9999]"
       width="100%"
       height="100%"
@@ -254,4 +271,4 @@ export function RedStringLayer({
       />
     </svg>
   );
-}
+});

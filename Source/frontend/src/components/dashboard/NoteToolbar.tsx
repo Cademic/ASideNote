@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
   Bold,
+  Highlighter,
   Italic,
   Underline,
   Strikethrough,
@@ -19,10 +20,13 @@ import {
 import {
   FONT_FAMILIES,
   FONT_SIZE_PRESETS,
+  HIGHLIGHT_COLORS,
+  hexForColorInput,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
   TEXT_COLORS,
 } from "./noteToolbarConstants";
+import { fitFixedDropdownToViewport, nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
 
 interface NoteToolbarProps {
   editor: Editor | null;
@@ -72,20 +76,47 @@ function ListDropdownButton({
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (!open) {
       setDropdownStyle(null);
       return;
     }
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    if (dropdownPlacement === "right") {
+      setDropdownStyle({ left: rect.right + 4, top: rect.top });
+    } else {
+      setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+    }
+  }, [open, dropdownPlacement]);
+
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    const el = panelRef.current;
+    const fit = () => fitFixedDropdownToViewport(el, setDropdownStyle);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open, dropdownStyle]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
       if (dropdownPlacement === "right") {
         setDropdownStyle({ left: rect.right + 4, top: rect.top });
       } else {
         setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
       }
-    }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, [open, dropdownPlacement]);
 
   useEffect(() => {
@@ -96,8 +127,8 @@ function ListDropdownButton({
       if ((target as Element).closest?.("[data-board-toolbar-portal]")) return;
       setOpen(false);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
   }, [open]);
 
   const isBullet = editor.isActive("bulletList");
@@ -155,14 +186,6 @@ function ListDropdownButton({
           if (open) {
             setOpen(false);
           } else {
-            const rect = buttonRef.current?.getBoundingClientRect();
-            if (rect) {
-              if (dropdownPlacement === "right") {
-                setDropdownStyle({ left: rect.right + 4, top: rect.top });
-              } else {
-                setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
-              }
-            }
             setOpen(true);
           }
         }}
@@ -180,8 +203,9 @@ function ListDropdownButton({
       {open && dropdownStyle &&
         createPortal(
           <div
+            ref={panelRef}
             data-board-toolbar-portal
-            className="fixed z-[99999] min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            className="fixed z-[99999] min-w-[160px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-gray-800"
             style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -224,7 +248,13 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
   const [showInput, setShowInput] = useState(false);
   const [url, setUrl] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const linkPopupRef = useRef<HTMLDivElement>(null);
   const isLink = isLinkActive;
+
+  useLayoutEffect(() => {
+    if (!showInput || !linkPopupRef.current) return;
+    nudgeAbsoluteElementIntoViewport(linkPopupRef.current);
+  }, [showInput]);
 
   function handleSetLink() {
     if (url.trim()) {
@@ -245,7 +275,8 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
 
   const popupContent = showInput && (
     <div
-      className="absolute left-1/2 top-1/2 z-50 flex w-[calc(100%-40px)] max-w-[320px] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+      ref={linkPopupRef}
+      className="absolute left-1/2 top-1/2 z-50 flex w-[calc(100%-40px)] max-w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
       onMouseDown={(e) => e.stopPropagation()}
     >
       <input
@@ -295,7 +326,8 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
       {noteEl && popupContent && createPortal(popupContent, noteEl)}
       {showInput && !noteEl && (
         <div
-          className="absolute left-1/2 top-full z-50 mt-1 flex w-64 -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          ref={linkPopupRef}
+          className="absolute left-1/2 top-full z-50 mt-1 flex w-64 max-w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <input
@@ -408,6 +440,372 @@ function FontSizeInput({ editor }: { editor: Editor }) {
   );
 }
 
+export function TextColorDropdown({
+  editor,
+  currentColor,
+  dropdownPlacement,
+}: {
+  editor: Editor;
+  currentColor: string;
+  dropdownPlacement: "below" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const [pickerValue, setPickerValue] = useState(() => hexForColorInput(currentColor));
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setDropdownStyle(null);
+      return;
+    }
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    if (dropdownPlacement === "right") {
+      setDropdownStyle({ left: rect.right + 4, top: rect.top });
+    } else {
+      setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+    }
+  }, [open, dropdownPlacement]);
+
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    const el = panelRef.current;
+    const fit = () => fitFixedDropdownToViewport(el, setDropdownStyle);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open, dropdownStyle]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      if (dropdownPlacement === "right") {
+        setDropdownStyle({ left: rect.right + 4, top: rect.top });
+      } else {
+        setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open, dropdownPlacement]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if ((target as Element).closest?.("[data-board-toolbar-portal]")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setPickerValue(hexForColorInput(currentColor));
+  }, [open, currentColor]);
+
+  const panel =
+    open &&
+    dropdownStyle &&
+    createPortal(
+      <div
+        ref={panelRef}
+        data-board-toolbar-portal
+        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Text color
+        </p>
+        <div className="flex flex-wrap gap-1.5 px-2.5">
+          {TEXT_COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                editor.chain().focus().setColor(c.value).run();
+                setOpen(false);
+              }}
+              title={c.label}
+              className={[
+                "h-7 w-7 rounded-full border transition-transform",
+                currentColor === c.value
+                  ? "scale-105 border-gray-800 ring-2 ring-sky-400/80"
+                  : "border-black/20 hover:scale-105",
+              ].join(" ")}
+              style={{ backgroundColor: c.value }}
+            />
+          ))}
+        </div>
+        <div className="mt-2 border-t border-black/10 px-2.5 pt-2 dark:border-white/10">
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              colorInputRef.current?.click();
+            }}
+            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+          >
+            Custom color…
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={pickerValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPickerValue(v);
+              editor.chain().focus().setColor(v).run();
+              setOpen(false);
+            }}
+            className="pointer-events-none fixed h-px w-px opacity-0"
+            tabIndex={-1}
+            aria-hidden
+          />
+        </div>
+      </div>,
+      document.body,
+    );
+
+  return (
+    <div ref={ref} className="relative flex items-center">
+      <button
+        ref={buttonRef}
+        type="button"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (open) {
+            setOpen(false);
+          } else {
+            setOpen(true);
+          }
+        }}
+        title="Text color"
+        className={[
+          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-gray-800/60 dark:border-white/15",
+          open ? "ring-1 ring-sky-400/60" : "hover:bg-black/5 dark:hover:bg-white/10",
+        ].join(" ")}
+      >
+        <Type className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-300" />
+        <span
+          className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/25"
+          style={{ backgroundColor: currentColor }}
+        />
+        <ChevronDown className="h-3 w-3 shrink-0 text-gray-500" />
+      </button>
+      {panel}
+    </div>
+  );
+}
+
+export function HighlightColorDropdown({
+  editor,
+  isHighlightActive,
+  highlightColor,
+  dropdownPlacement,
+}: {
+  editor: Editor;
+  isHighlightActive: boolean;
+  highlightColor: string;
+  dropdownPlacement: "below" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
+  const [pickerValue, setPickerValue] = useState(() => hexForColorInput(highlightColor));
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setDropdownStyle(null);
+      return;
+    }
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    if (dropdownPlacement === "right") {
+      setDropdownStyle({ left: rect.right + 4, top: rect.top });
+    } else {
+      setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+    }
+  }, [open, dropdownPlacement]);
+
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    const el = panelRef.current;
+    const fit = () => fitFixedDropdownToViewport(el, setDropdownStyle);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open, dropdownStyle]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      if (dropdownPlacement === "right") {
+        setDropdownStyle({ left: rect.right + 4, top: rect.top });
+      } else {
+        setDropdownStyle({ left: rect.left, top: rect.bottom + 4 });
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open, dropdownPlacement]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if ((target as Element).closest?.("[data-board-toolbar-portal]")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setPickerValue(hexForColorInput(highlightColor));
+  }, [open, highlightColor]);
+
+  const panel =
+    open &&
+    dropdownStyle &&
+    createPortal(
+      <div
+        ref={panelRef}
+        data-board-toolbar-portal
+        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Highlight
+        </p>
+        {isHighlightActive && (
+          <div className="px-2.5 pb-2">
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                editor.chain().focus().unsetHighlight().run();
+                setOpen(false);
+              }}
+              className="w-full rounded-md border border-black/10 px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+            >
+              Remove highlight
+            </button>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5 px-2.5">
+          {HIGHLIGHT_COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                editor.chain().focus().toggleHighlight({ color: c.value }).run();
+                setOpen(false);
+              }}
+              title={c.label}
+              className={[
+                "h-7 w-7 rounded-md border transition-transform",
+                highlightColor === c.value && isHighlightActive
+                  ? "scale-105 border-gray-800 ring-2 ring-sky-400/80"
+                  : "border-black/20 hover:scale-105",
+              ].join(" ")}
+              style={{ backgroundColor: c.value }}
+            />
+          ))}
+        </div>
+        <div className="mt-2 border-t border-black/10 px-2.5 pt-2 dark:border-white/10">
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              colorInputRef.current?.click();
+            }}
+            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+          >
+            Custom color…
+          </button>
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={pickerValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              setPickerValue(v);
+              editor.chain().focus().toggleHighlight({ color: v }).run();
+              setOpen(false);
+            }}
+            className="pointer-events-none fixed h-px w-px opacity-0"
+            tabIndex={-1}
+            aria-hidden
+          />
+        </div>
+      </div>,
+      document.body,
+    );
+
+  return (
+    <div ref={ref} className="relative flex items-center">
+      <button
+        ref={buttonRef}
+        type="button"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (open) {
+            setOpen(false);
+          } else {
+            setOpen(true);
+          }
+        }}
+        title="Highlight color"
+        className={[
+          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-gray-800/60 dark:border-white/15",
+          isHighlightActive ? "bg-amber-50/80 dark:bg-amber-900/25" : "",
+          open ? "ring-1 ring-sky-400/60" : "hover:bg-black/5 dark:hover:bg-white/10",
+        ].join(" ")}
+      >
+        <Highlighter className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-300" />
+        <span
+          className="h-3.5 w-3.5 shrink-0 rounded border border-black/25"
+          style={{ backgroundColor: highlightColor }}
+        />
+        <ChevronDown className="h-3 w-3 shrink-0 text-gray-500" />
+      </button>
+      {panel}
+    </div>
+  );
+}
+
 /** Visible but non-interactive toolbar (no editor — e.g. no note in edit mode). */
 function NoteToolbarIdleHorizontal() {
   return (
@@ -458,16 +856,17 @@ function NoteToolbarIdleHorizontal() {
           <LinkIcon className="h-3.5 w-3.5" />
         </span>
         <div className="mx-0.5 h-4 w-px bg-black/10" />
-        <div className="flex items-center gap-0.5">
-          <Type className="mr-0.5 h-3 w-3 text-gray-400" />
-          {TEXT_COLORS.map((c) => (
-            <span
-              key={c.value}
-              className="h-4 w-4 rounded-full border border-black/20"
-              style={{ backgroundColor: c.value }}
-            />
-          ))}
-        </div>
+        <span className="flex h-6 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
+          <Type className="h-3.5 w-3.5" />
+          <span className="h-3.5 w-3.5 rounded-full border border-black/20 bg-gray-600" />
+          <ChevronDown className="h-3 w-3" />
+        </span>
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        <span className="flex h-6 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
+          <Highlighter className="h-3.5 w-3.5" />
+          <span className="h-3.5 w-3.5 rounded border border-black/20 bg-yellow-200" />
+          <ChevronDown className="h-3 w-3" />
+        </span>
       </div>
     </div>
   );
@@ -499,6 +898,8 @@ function NoteToolbarActive({
         textAlignCenter: ed.isActive({ textAlign: "center" }),
         textAlignRight: ed.isActive({ textAlign: "right" }),
         color: ed.getAttributes("textStyle").color as string | undefined,
+        isHighlight: ed.isActive("highlight"),
+        highlightColor: (ed.getAttributes("highlight").color as string | undefined) ?? "#fef08a",
       };
     },
   });
@@ -506,6 +907,7 @@ function NoteToolbarActive({
   const state = activeState ?? {
     isBold: false, isItalic: false, isUnderline: false, isStrike: false, isLink: false,
     textAlignLeft: false, textAlignCenter: false, textAlignRight: false, color: undefined,
+    isHighlight: false, highlightColor: "#fef08a",
   };
   const currentColor = state.color ?? "#1f2937";
 
@@ -570,32 +972,6 @@ function NoteToolbarActive({
     </>
   );
 
-  const colorSwatches = (
-    <div className={variant === "vertical" ? "flex flex-col items-center gap-0.5" : "flex items-center gap-0.5"}>
-      <Type className={variant === "vertical" ? "h-3 w-3 text-gray-500" : "mr-0.5 h-3 w-3 text-gray-500"} />
-      <div className={variant === "vertical" ? "flex flex-col gap-0.5" : "flex items-center gap-0.5"}>
-        {TEXT_COLORS.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              editor.chain().focus().setColor(c.value).run();
-            }}
-            title={c.label}
-            className={[
-              "h-4 w-4 rounded-full border transition-transform",
-              currentColor === c.value
-                ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                : "border-black/20 hover:scale-110",
-            ].join(" ")}
-            style={{ backgroundColor: c.value }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-
   if (variant === "vertical") {
     return (
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden px-1.5 py-1.5">
@@ -642,7 +1018,24 @@ function NoteToolbarActive({
 
         <div className="h-px w-full shrink-0 bg-black/10" />
 
-        {colorSwatches}
+        <div className="flex w-full justify-center">
+          <TextColorDropdown
+            editor={editor}
+            currentColor={currentColor}
+            dropdownPlacement={listPlacement}
+          />
+        </div>
+
+        <div className="h-px w-full shrink-0 bg-black/10" />
+
+        <div className="flex w-full justify-center">
+          <HighlightColorDropdown
+            editor={editor}
+            isHighlightActive={state.isHighlight}
+            highlightColor={state.highlightColor}
+            dropdownPlacement={listPlacement}
+          />
+        </div>
       </div>
     );
   }
@@ -694,8 +1087,20 @@ function NoteToolbarActive({
 
         <div className="mx-0.5 h-4 w-px bg-black/10" />
 
-        {/* Text color swatches */}
-        {colorSwatches}
+        <TextColorDropdown
+          editor={editor}
+          currentColor={currentColor}
+          dropdownPlacement={listPlacement}
+        />
+
+        <div className="mx-0.5 h-4 w-px bg-black/10" />
+
+        <HighlightColorDropdown
+          editor={editor}
+          isHighlightActive={state.isHighlight}
+          highlightColor={state.highlightColor}
+          dropdownPlacement={listPlacement}
+        />
       </div>
     </div>
   );

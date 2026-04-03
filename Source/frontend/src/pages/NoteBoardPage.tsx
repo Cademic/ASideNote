@@ -61,6 +61,8 @@ export function NoteBoardPage() {
   const currentUserId = user?.userId ?? null;
 
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
+  const boardNameRef = useRef<string>(board?.name ?? "");
+  boardNameRef.current = board?.name ?? "";
   const [notes, setNotes] = useState<NoteSummaryDto[]>([]);
   const [indexCards, setIndexCards] = useState<IndexCardSummaryDto[]>([]);
   const [imageCards, setImageCards] = useState<BoardImageSummaryDto[]>([]);
@@ -101,7 +103,7 @@ export function NoteBoardPage() {
   type BoardUndoEntry =
     | { type: "note-position"; noteId: string; prevPositionX: number; prevPositionY: number }
     | { type: "note-size"; noteId: string; prevWidth: number | null; prevHeight: number | null }
-    | { type: "note-delete"; note: NoteSummaryDto }
+    | { type: "note-delete"; note: NoteSummaryDto; removedConnections: BoardConnectionDto[] }
     | { type: "connection-create"; connection: BoardConnectionDto }
     | { type: "connection-delete"; connection: BoardConnectionDto }
     | { type: "image-add"; image: BoardImageSummaryDto }
@@ -111,7 +113,8 @@ export function NoteBoardPage() {
     | { type: "card-position"; cardId: string; prevPositionX: number; prevPositionY: number }
     | { type: "card-size"; cardId: string; prevWidth: number | null; prevHeight: number | null }
     | { type: "card-delete"; card: IndexCardSummaryDto }
-    | { type: "card-create"; card: IndexCardSummaryDto };
+    | { type: "card-create"; card: IndexCardSummaryDto }
+    | { type: "note-create"; note: NoteSummaryDto };
   type BoardRedoEntry =
     | { type: "note-position"; noteId: string; positionX: number; positionY: number }
     | { type: "note-size"; noteId: string; width: number; height: number }
@@ -125,7 +128,8 @@ export function NoteBoardPage() {
     | { type: "card-position"; cardId: string; positionX: number; positionY: number }
     | { type: "card-size"; cardId: string; width: number; height: number }
     | { type: "card-delete"; cardId: string }
-    | { type: "card-create"; card: IndexCardSummaryDto };
+    | { type: "card-create"; card: IndexCardSummaryDto }
+    | { type: "note-create"; note: NoteSummaryDto };
   const boardUndoStackRef = useRef<BoardUndoEntry[]>([]);
   const boardRedoStackRef = useRef<BoardRedoEntry[]>([]);
   const notesRef = useRef(notes);
@@ -165,6 +169,8 @@ export function NoteBoardPage() {
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null);
   const [linkMousePos, setLinkMousePos] = useState<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  /** Same element as RedStringLayer’s SVG — use for linking cursor coords (must match SVG viewport, not outer canvas). */
+  const redStringSvgRef = useRef<SVGSVGElement>(null);
   const boardViewportRef = useRef<HTMLDivElement>(null);
 
   // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
@@ -222,10 +228,13 @@ export function NoteBoardPage() {
   const deletedImageIdsRef = useRef<Set<string>>(new Set());
   const deletedNoteIdsRef = useRef<Set<string>>(new Set());
   const deletedCardIdsRef = useRef<Set<string>>(new Set());
+  /** Last note id jumped to via View → Previous/Next note (for cycling order). */
+  const noteNavAnchorRef = useRef<string | null>(null);
   const [pendingImageDrop, setPendingImageDrop] = useState<{ x: number; y: number } | null>(null);
 
   // --- Viewport state (pan & zoom) ---
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [isBoardHovered, setIsBoardHovered] = useState(false);
@@ -233,6 +242,7 @@ export function NoteBoardPage() {
   const scrollSliderYRef = useRef(0);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
+  zoomRef.current = zoom;
   panXRef.current = panX;
   panYRef.current = panY;
 
@@ -835,6 +845,8 @@ export function NoteBoardPage() {
           patchNote(entry.noteId, { width: w, height: h }).catch(() => {});
         } else if (entry.type === "note-delete") {
           const displayColorKey = resolveNoteColorKey(entry.note);
+          const oldNoteId = entry.note.id;
+          const removedConnections = entry.removedConnections ?? [];
           createNote({
             content: entry.note.content,
             boardId: boardId ?? undefined,
@@ -846,12 +858,51 @@ export function NoteBoardPage() {
             color: displayColorKey,
             rotation: entry.note.rotation ?? undefined,
           })
-            .then((created) => {
+            .then(async (created) => {
               boardRedoStackRef.current.push({ type: "note-delete", noteId: created.id });
               const restored = { ...created, color: displayColorKey, rotation: entry.note.rotation ?? created.rotation };
               setNotes((prev) => (prev.some((n) => n.id === created.id) ? prev : [...prev, restored]));
+              if (removedConnections.length === 0 || !boardId) return;
+              try {
+                const newConns = await Promise.all(
+                  removedConnections.map((conn) =>
+                    createConnection({
+                      fromItemId: conn.fromItemId === oldNoteId ? created.id : conn.fromItemId,
+                      toItemId: conn.toItemId === oldNoteId ? created.id : conn.toItemId,
+                      boardId,
+                    }),
+                  ),
+                );
+                setConnections((prev) => {
+                  let next = prev;
+                  for (const nc of newConns) {
+                    if (!next.some((c) => c.id === nc.id)) next = [...next, nc];
+                  }
+                  return next;
+                });
+              } catch {
+                // connections best-effort
+              }
             })
             .catch(() => {});
+        } else if (entry.type === "note-create") {
+          boardRedoStackRef.current.push({ type: "note-create", note: { ...entry.note } });
+          deletedNoteIdsRef.current.add(entry.note.id);
+          setTimeout(() => deletedNoteIdsRef.current.delete(entry.note.id), 2000);
+          setNotes((prev) => prev.filter((n) => n.id !== entry.note.id));
+          setEditingNoteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(entry.note.id);
+            if (primaryEditingNoteIdRef.current === entry.note.id) {
+              primaryEditingNoteIdRef.current = next.size ? next.values().next().value ?? null : null;
+            }
+            return next;
+          });
+          setRichTextToolbar((prev) => (prev?.sourceId === entry.note.id ? null : prev));
+          setConnections((prev) =>
+            prev.filter((c) => c.fromItemId !== entry.note.id && c.toItemId !== entry.note.id),
+          );
+          deleteNote(entry.note.id).catch(() => fetchData());
         } else if (entry.type === "connection-create") {
           boardRedoStackRef.current.push({
             type: "connection-delete",
@@ -1154,6 +1205,24 @@ export function NoteBoardPage() {
               setIndexCards((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, restored]));
             })
             .catch(() => {});
+        } else if (entry.type === "note-create") {
+          const displayColorKey = resolveNoteColorKey(entry.note);
+          createNote({
+            content: entry.note.content,
+            boardId: boardId ?? undefined,
+            title: entry.note.title ?? undefined,
+            positionX: entry.note.positionX ?? 20,
+            positionY: entry.note.positionY ?? 20,
+            width: entry.note.width ?? undefined,
+            height: entry.note.height ?? undefined,
+            color: displayColorKey,
+            rotation: entry.note.rotation ?? undefined,
+          })
+            .then((created) => {
+              const restored = { ...created, color: displayColorKey, rotation: entry.note.rotation ?? created.rotation };
+              setNotes((prev) => (prev.some((n) => n.id === created.id) ? prev : [...prev, restored]));
+            })
+            .catch(() => {});
         }
       }
     }
@@ -1178,6 +1247,84 @@ export function NoteBoardPage() {
     return { x, y };
   }
 
+  function panViewportToBoardPoint(centerX: number, centerY: number) {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const newPanX = (centerScreenX + contentMinX * (zoom + 1)) / zoom - centerX;
+    const newPanY = (centerScreenY + contentMinY * (zoom + 1)) / zoom - centerY;
+    handleViewportChange(zoom, newPanX, newPanY);
+  }
+
+  function getStickyNoteCenter(n: NoteSummaryDto) {
+    const x = n.positionX ?? POSITION_DEFAULT;
+    const y = n.positionY ?? POSITION_DEFAULT;
+    const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
+    const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function sortNotesByCreatedAt(list: NoteSummaryDto[]) {
+    return [...list].sort((a, b) => {
+      const t = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (t !== 0) return t;
+      return a.id.localeCompare(b.id);
+    });
+  }
+
+  function navigateRelativeNote(delta: -1 | 1) {
+    const sorted = sortNotesByCreatedAt(notes);
+    if (sorted.length === 0) return;
+    const n = sorted.length;
+    let idx = 0;
+    const openNoteId = primaryEditingNoteIdRef.current;
+    let navigatedFromOpenNote = false;
+    if (openNoteId && sorted.some((note) => note.id === openNoteId)) {
+      idx = sorted.findIndex((note) => note.id === openNoteId);
+      navigatedFromOpenNote = true;
+    } else {
+      const anchor = noteNavAnchorRef.current;
+      if (anchor && sorted.some((note) => note.id === anchor)) {
+        idx = sorted.findIndex((note) => note.id === anchor);
+      } else {
+        const vp = getViewportCenterInBoardCoords();
+        let best = 0;
+        let bestD = Infinity;
+        sorted.forEach((note, i) => {
+          const c = getStickyNoteCenter(note);
+          const d = (c.x - vp.x) ** 2 + (c.y - vp.y) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        });
+        idx = best;
+      }
+    }
+    const nextIdx = ((idx + delta) % n + n) % n;
+    const target = sorted[nextIdx];
+    noteNavAnchorRef.current = target.id;
+    const c = getStickyNoteCenter(target);
+    panViewportToBoardPoint(c.x, c.y);
+    if (navigatedFromOpenNote) {
+      setEditingNoteIds(new Set([target.id]));
+      setEditingCardIds(new Set());
+      primaryEditingNoteIdRef.current = target.id;
+      primaryEditingCardIdRef.current = null;
+      bringToFront(target.id);
+    }
+  }
+
+  function handleNavigatePreviousNote() {
+    navigateRelativeNote(-1);
+  }
+
+  function handleNavigateNextNote() {
+    navigateRelativeNote(1);
+  }
+
   async function handleQuickAddNote() {
     if (!boardId) return;
     try {
@@ -1194,6 +1341,8 @@ export function NoteBoardPage() {
         height: STICKY_NOTE_DEFAULT_SIZE,
       });
 
+      boardRedoStackRef.current = [];
+      boardUndoStackRef.current.push({ type: "note-create", note: created });
       setNotes((prev) => [created, ...prev]);
       setEditingNoteIds((prev) => new Set(prev).add(created.id));
       primaryEditingNoteIdRef.current = created.id;
@@ -1387,8 +1536,15 @@ export function NoteBoardPage() {
     }
     const deletedNote = notesRef.current.find((n) => n.id === id);
     if (deletedNote) {
+      const removedConnections = connectionsRef.current
+        .filter((c) => c.fromItemId === id || c.toItemId === id)
+        .map((c) => ({ ...c }));
       boardRedoStackRef.current = [];
-      boardUndoStackRef.current.push({ type: "note-delete", note: { ...deletedNote } });
+      boardUndoStackRef.current.push({
+        type: "note-delete",
+        note: { ...deletedNote },
+        removedConnections,
+      });
     }
     setNotes((prev) => prev.filter((n) => n.id !== id));
     setEditingNoteIds((prev) => {
@@ -1856,18 +2012,34 @@ export function NoteBoardPage() {
   // =============================================
 
   function handleSaveToFile() {
-    const payload = createBoardExportPayload("NoteBoard", board?.name ?? "Board", {
-      notes,
-      indexCards,
-      imageCards,
-      connections,
-      viewport: { zoom, panX, panY },
+    const boardName = boardNameRef.current || "Board";
+    const payload = createBoardExportPayload("NoteBoard", boardName, {
+      notes: notesRef.current,
+      indexCards: indexCardsRef.current,
+      imageCards: imageCardsRef.current,
+      connections: connectionsRef.current,
+      viewport: { zoom: zoomRef.current, panX: panXRef.current, panY: panYRef.current },
     });
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
-    triggerBoardDownload(blob, buildBoardExportFilename(board?.name ?? "board"));
+    triggerBoardDownload(blob, buildBoardExportFilename(boardName));
   }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.repeat) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.defaultPrevented) return;
+      if (e.key.toLowerCase() !== "s") return;
+
+      e.preventDefault();
+      handleSaveToFile();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [boardId]);
 
   function handleLoadFromFile() {
     loadFileInputRef.current?.click();
@@ -2030,6 +2202,8 @@ export function NoteBoardPage() {
           width: STICKY_NOTE_DEFAULT_SIZE,
           height: STICKY_NOTE_DEFAULT_SIZE,
         });
+        boardRedoStackRef.current = [];
+        boardUndoStackRef.current.push({ type: "note-create", note: created });
         setNotes((prev) => [...prev, created]);
         setEditingNoteIds((prev) => new Set(prev).add(created.id));
         primaryEditingNoteIdRef.current = created.id;
@@ -2121,8 +2295,8 @@ export function NoteBoardPage() {
     if (!linkingFrom) return;
 
     function onMouseMove(e: MouseEvent) {
-      if (!boardRef.current) return;
-      const rect = boardRef.current.getBoundingClientRect();
+      const rect = redStringSvgRef.current?.getBoundingClientRect();
+      if (!rect) return;
       setLinkMousePos({
         x: (e.clientX - rect.left) / zoom,
         y: (e.clientY - rect.top) / zoom,
@@ -2228,6 +2402,9 @@ export function NoteBoardPage() {
           autoEnlargeNotes={autoEnlargeNotes}
           onAutoEnlargeNotesChange={setAutoEnlargeNotes}
           richTextToolbar={richTextToolbar}
+          onNavigatePreviousNote={handleNavigatePreviousNote}
+          onNavigateNextNote={handleNavigateNextNote}
+          noteNavigationDisabled={notes.length === 0}
         />
       </div>
       <BoardConnectedUsers users={connectedUsers} />
@@ -2299,6 +2476,7 @@ export function NoteBoardPage() {
           </div>
 
           <RedStringLayer
+            ref={redStringSvgRef}
             connections={connections}
             linkingFrom={linkingFrom}
             mousePos={linkMousePos}
