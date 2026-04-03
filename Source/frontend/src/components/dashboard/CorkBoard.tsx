@@ -195,7 +195,9 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
 
       if (isWheelOverEditableText(e.target)) return;
 
-      const { dx, dy } = wheelEventDeltaPixels(e, viewport);
+      const wheelEl = viewportRef.current;
+      if (!wheelEl) return;
+      const { dx, dy } = wheelEventDeltaPixels(e, wheelEl);
       if (dx === 0 && dy === 0) return;
 
       e.preventDefault();
