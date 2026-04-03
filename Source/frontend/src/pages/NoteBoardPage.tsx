@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
@@ -49,6 +49,8 @@ import {
   buildBoardExportFilename,
   parseBoardExportFile,
 } from "../lib/boardExport";
+import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
+import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
@@ -173,6 +175,8 @@ export function NoteBoardPage() {
   /** Same element as RedStringLayer’s SVG — use for linking cursor coords (must match SVG viewport, not outer canvas). */
   const redStringSvgRef = useRef<SVGSVGElement>(null);
   const boardViewportRef = useRef<HTMLDivElement>(null);
+  /** CorkBoard scroll viewport — center for menu/zoom matches visible canvas (not outer wrapper). */
+  const corkBoardScrollRef = useRef<HTMLDivElement>(null);
 
   // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
   const CANVAS_PADDING = 300;
@@ -233,23 +237,22 @@ export function NoteBoardPage() {
   const noteNavAnchorRef = useRef<string | null>(null);
   const [pendingImageDrop, setPendingImageDrop] = useState<{ x: number; y: number } | null>(null);
 
-  // --- Viewport state (pan & zoom) ---
-  const [zoom, setZoom] = useState(1);
+  // --- Viewport state (pan & zoom); seed from last session for this board ---
+  const [zoom, setZoom] = useState(() => readBoardViewportDefaults(boardId).zoom);
   const zoomRef = useRef(zoom);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [isBoardHovered, setIsBoardHovered] = useState(false);
-  const scrollSliderXRef = useRef(0);
-  const scrollSliderYRef = useRef(0);
+  const [panX, setPanX] = useState(() => readBoardViewportDefaults(boardId).panX);
+  const [panY, setPanY] = useState(() => readBoardViewportDefaults(boardId).panY);
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
   zoomRef.current = zoom;
   panXRef.current = panX;
   panYRef.current = panY;
 
-  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump
+  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump.
+  // Skip until the board has finished loading so placeholder bounds → real notes don't erase restored pan/zoom.
   const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
   useEffect(() => {
+    if (isLoading) return;
     const prev = prevContentMinRef.current;
     if (prev === null) {
       prevContentMinRef.current = {
@@ -267,7 +270,7 @@ export function NoteBoardPage() {
     if (dx === 0 && dy === 0) return;
     setPanX((p) => p + (dx * (zoom + 1)) / zoom);
     setPanY((p) => p + (dy * (zoom + 1)) / zoom);
-  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom]);
+  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom, isLoading]);
 
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -289,29 +292,27 @@ export function NoteBoardPage() {
   useEffect(() => {
     if (!boardId) return;
     prevContentMinRef.current = null;
-    try {
-      const saved = localStorage.getItem(`board-viewport-${boardId}`);
-      if (saved) {
-        const { zoom: z, panX: px, panY: py } = JSON.parse(saved);
-        if (typeof z === "number") setZoom(z);
-        if (typeof px === "number") setPanX(px);
-        if (typeof py === "number") setPanY(py);
-      }
-    } catch {
-      // ignore parse errors
-    }
+    const { zoom: z, panX: px, panY: py } = readBoardViewport(boardId);
+    if (z !== undefined) setZoom(z);
+    if (px !== undefined) setPanX(px);
+    if (py !== undefined) setPanY(py);
   }, [boardId]);
 
-  // Persist viewport to localStorage (debounced)
+  // Persist viewport to localStorage (debounced); flush on cleanup and pagehide so last view is not lost
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!boardId) return;
+    if (boardId === undefined || boardId === "") return;
+    const id = boardId;
+    function flush() {
+      persistBoardViewport(id, zoomRef.current, panXRef.current, panYRef.current);
+    }
     if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
-    viewportTimerRef.current = setTimeout(() => {
-      localStorage.setItem(`board-viewport-${boardId}`, JSON.stringify({ zoom, panX, panY }));
-    }, 300);
+    viewportTimerRef.current = setTimeout(flush, 300);
+    window.addEventListener("pagehide", flush);
     return () => {
+      window.removeEventListener("pagehide", flush);
       if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
+      flush();
     };
   }, [boardId, zoom, panX, panY]);
 
@@ -351,6 +352,27 @@ export function NoteBoardPage() {
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
+  }
+
+  /** View → Zoom submenu / presets: zoom around center of visible board (same math as Ctrl+wheel). */
+  function handleBoardMenuZoomChange(newZoom: number) {
+    const el = corkBoardScrollRef.current;
+    const { contentMinX, contentMinY } = canvasBounds;
+    if (!el) {
+      handleViewportChange(newZoom, panX, panY);
+      return;
+    }
+    const { panX: nx, panY: ny } = corkZoomAroundScreenPoint(
+      panX,
+      panY,
+      zoom,
+      newZoom,
+      el.clientWidth / 2,
+      el.clientHeight / 2,
+      contentMinX,
+      contentMinY,
+    );
+    handleViewportChange(newZoom, nx, ny);
   }
 
   // Keep refs in sync so document listeners can read latest value
@@ -442,6 +464,11 @@ export function NoteBoardPage() {
     } finally {
       setIsLoading(false);
     }
+  }, [boardId]);
+
+  useLayoutEffect(() => {
+    if (!boardId) return;
+    setIsLoading(true);
   }, [boardId]);
 
   useEffect(() => {
@@ -2393,7 +2420,7 @@ export function NoteBoardPage() {
         <BoardMenuBar
           boardType="NoteBoard"
           zoom={zoom}
-          onZoomChange={(z) => handleViewportChange(z, panX, panY)}
+          onZoomChange={handleBoardMenuZoomChange}
           onSaveToFile={handleSaveToFile}
           onLoadFromFile={handleLoadFromFile}
           onUndo={triggerMenuUndo}
@@ -2431,11 +2458,10 @@ export function NoteBoardPage() {
       <div
         ref={boardViewportRef}
         className="relative flex-1 min-h-0"
-        onMouseEnter={() => setIsBoardHovered(true)}
-        onMouseLeave={() => setIsBoardHovered(false)}
       >
         <CorkBoard
               topBar={boardTopBar}
+              scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
               onBoardMouseMove={handleBoardMouseMove}
@@ -2596,68 +2622,6 @@ export function NoteBoardPage() {
             onChange={handleImageFileSelect}
           />
         </CorkBoard>
-
-        {/* Hover-only pan scrollbars (horizontal & vertical) */}
-        {isBoardHovered && (
-          <div className="pointer-events-none absolute inset-0">
-            {/* Horizontal scrollbar (full board width, slightly above bottom border like vertical inset) */}
-            <div className="pointer-events-auto absolute bottom-2 left-3 right-3 px-3">
-              <input
-                type="range"
-                min={-5000}
-                max={5000}
-                defaultValue={0}
-                onChange={(e) => {
-                  const raw = Number(e.target.value || 0);
-                  if (Number.isNaN(raw)) return;
-                  const prev = scrollSliderXRef.current;
-                  const delta = raw - prev;
-                  if (delta !== 0) {
-                    const SCROLL_SPEED = 2;
-                    const nextPanX = panXRef.current - delta * SCROLL_SPEED;
-                    handleViewportChange(zoom, nextPanX, panYRef.current);
-                  }
-                  // When thumb reaches either end, snap back to center (pan unchanged)
-                  if (raw <= -5000 || raw >= 5000) {
-                    scrollSliderXRef.current = 0;
-                    e.currentTarget.value = "0";
-                  } else {
-                    scrollSliderXRef.current = raw;
-                  }
-                }}
-                className="board-scrollbar-range board-scrollbar-range-h w-full h-2 cursor-pointer"
-              />
-            </div>
-            {/* Vertical scrollbar (full board height, vertical style, evenly inset from frame) */}
-            <div className="pointer-events-auto absolute top-3 bottom-3 right-3 flex items-stretch py-3">
-              <input
-                type="range"
-                min={-5000}
-                max={5000}
-                defaultValue={0}
-                onChange={(e) => {
-                  const raw = Number(e.target.value || 0);
-                  if (Number.isNaN(raw)) return;
-                  const prev = scrollSliderYRef.current;
-                  const delta = raw - prev;
-                  if (delta !== 0) {
-                    const SCROLL_SPEED = 1;
-                    const nextPanY = panYRef.current - delta * SCROLL_SPEED;
-                    handleViewportChange(zoom, panXRef.current, nextPanY);
-                  }
-                  if (raw <= -5000 || raw >= 5000) {
-                    scrollSliderYRef.current = 0;
-                    e.currentTarget.value = "0";
-                  } else {
-                    scrollSliderYRef.current = raw;
-                  }
-                }}
-                style={{ writingMode: "vertical-rl" }}
-                className="board-scrollbar-range board-scrollbar-range-v h-full w-3 cursor-pointer"
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       {boardContextMenu && (
