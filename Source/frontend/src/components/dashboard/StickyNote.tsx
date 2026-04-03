@@ -17,6 +17,7 @@ import { FontSize } from "../../lib/tiptap-font-size";
 import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
+import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -905,10 +906,8 @@ export function StickyNote({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    const stripHtml = (html: string) =>
-                      html.replace(/<[^>]*>/g, "").trim();
                     const hasContent =
-                      !!(note.content && stripHtml(note.content).length > 0);
+                      !!(note.content && stripHtmlForPlainText(note.content).length > 0);
                     if (hasContent) {
                       setShowDeleteConfirm(true);
                     } else {
@@ -926,11 +925,8 @@ export function StickyNote({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                // Strip HTML to check if there's actual text content
-                const stripHtml = (html: string) =>
-                  html.replace(/<[^>]*>/g, "").trim();
                 const hasContent =
-                  !!(note.content && stripHtml(note.content).length > 0);
+                  !!(note.content && stripHtmlForPlainText(note.content).length > 0);
                 if (hasContent) {
                   setShowDeleteConfirm(true);
                 } else {

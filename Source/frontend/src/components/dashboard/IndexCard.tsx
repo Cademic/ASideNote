@@ -22,6 +22,7 @@ import { FontSize } from "../../lib/tiptap-font-size";
 import { INDEX_CARD_COLORS } from "./indexCardColors";
 import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
+import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -753,10 +754,8 @@ export function IndexCard({
                       type="button"
                       onClick={() => {
                         setMenuOpen(false);
-                        const stripHtml = (html: string) =>
-                          html.replace(/<[^>]*>/g, "").trim();
                         const hasContent =
-                          !!(card.content && stripHtml(card.content).length > 0);
+                          !!(card.content && stripHtmlForPlainText(card.content).length > 0);
                         if (hasContent) {
                           setShowDeleteConfirm(true);
                         } else {
@@ -774,10 +773,8 @@ export function IndexCard({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    const stripHtml = (html: string) =>
-                      html.replace(/<[^>]*>/g, "").trim();
                     const hasContent =
-                      !!(card.content && stripHtml(card.content).length > 0);
+                      !!(card.content && stripHtmlForPlainText(card.content).length > 0);
                     if (hasContent) {
                       setShowDeleteConfirm(true);
                     } else {
