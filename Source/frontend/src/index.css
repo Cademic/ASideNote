@@ -282,6 +282,45 @@ body {
     radial-gradient(ellipse at 90% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 50%) !important;
 }
 
+/* NoteBoard-only scrollbar tinting */
+.note-board-page .corkboard-surface {
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.14);
+}
+
+.note-board-page .corkboard-surface::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.note-board-page .corkboard-surface::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.note-board-page .corkboard-surface::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+}
+
+.note-board-page .corkboard-surface::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.note-board-page .corkboard-surface.corkboard-surface--whiteboard {
+  scrollbar-color: rgba(0, 0, 0, 0.38) rgba(0, 0, 0, 0.14);
+}
+
+.note-board-page .corkboard-surface.corkboard-surface--whiteboard::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.note-board-page .corkboard-surface.corkboard-surface--whiteboard::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.note-board-page .corkboard-surface.corkboard-surface--whiteboard::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
 /* Chalk Board Styles */
 .chalkboard-frame {
   padding: 12px;

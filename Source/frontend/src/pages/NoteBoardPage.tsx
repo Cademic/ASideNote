@@ -2440,7 +2440,7 @@ export function NoteBoardPage() {
   );
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="note-board-page relative flex h-full flex-col">
       <input
         ref={loadFileInputRef}
         type="file"
