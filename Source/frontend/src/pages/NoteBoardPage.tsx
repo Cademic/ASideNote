@@ -2456,7 +2456,11 @@ export function NoteBoardPage() {
       >
         <CorkBoard
               topBar={boardTopBar}
-              topBarAside={!isHubConnected ? <BoardConnectedUsers users={connectedUsers} /> : undefined}
+              topBarAside={
+                !isHubConnected && connectedUsers.length > 0
+                  ? <BoardConnectedUsers users={connectedUsers} />
+                  : undefined
+              }
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}

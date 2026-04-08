@@ -1260,45 +1260,52 @@ export function ChalkBoardPage() {
 
   return (
     <div className="relative flex h-full w-full flex-col">
-      {/* Menu bar - above the chalkboard frame */}
-      <div className="notepad-card flex-shrink-0 !overflow-visible border-b-0 rounded-b-none z-10">
-        <div className="notepad-spiral-strip" />
-        <div className="flex items-center gap-3 px-3 py-2">
-          <div className="min-w-0 flex-1">
-            <BoardMenuBar
-              boardType="ChalkBoard"
-              zoom={zoom}
-              onZoomChange={(z) => handleViewportChange(z, panX, panY)}
-              onSaveToFile={handleSaveToFile}
-              onLoadFromFile={handleLoadFromFile}
-              onUndo={triggerMenuUndo}
-              onRedo={triggerMenuRedo}
-              canUndo={
-                mode === "draw" ? true : noteUndoStackRef.current.length > 0
-              }
-              canRedo={
-                mode === "draw" ? true : noteRedoStackRef.current.length > 0
-              }
-              onInsertStickyNote={handleAddStickyNote}
-              backgroundTheme={backgroundTheme}
-              onBackgroundThemeChange={setBackgroundTheme}
-              autoEnlargeNotes={autoEnlargeNotes}
-              onAutoEnlargeNotesChange={setAutoEnlargeNotes}
-            />
-          </div>
-          <BoardConnectedUsers users={connectedUsers} />
-        </div>
-      </div>
       {/* Chalkboard frame - border color matches background theme */}
       <div
         className={[
-          "chalkboard-frame relative flex-1 min-h-0 flex flex-col overflow-auto rounded-t-none",
+          "chalkboard-frame relative flex-1 min-h-0 flex flex-col overflow-hidden rounded-t-none",
           backgroundTheme === "whiteboard" && "chalkboard-frame--whiteboard",
           backgroundTheme === "blackboard" && "chalkboard-frame--blackboard",
         ]
           .filter(Boolean)
           .join(" ")}
       >
+        {/* Menu card inside frame, overlapping chalkboard surface under top border */}
+        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start gap-2 px-2 sm:top-3 sm:px-3">
+          {connectedUsers.length > 0 ? (
+            <div className="invisible shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
+              <BoardConnectedUsers users={connectedUsers} />
+            </div>
+          ) : null}
+          <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
+            <div className="notepad-spiral-strip" />
+            <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
+              <div className="min-w-0 w-full flex-1">
+                <BoardMenuBar
+                  boardType="ChalkBoard"
+                  zoom={zoom}
+                  onZoomChange={(z) => handleViewportChange(z, panX, panY)}
+                  onSaveToFile={handleSaveToFile}
+                  onLoadFromFile={handleLoadFromFile}
+                  onUndo={triggerMenuUndo}
+                  onRedo={triggerMenuRedo}
+                  canUndo={mode === "draw" ? true : noteUndoStackRef.current.length > 0}
+                  canRedo={mode === "draw" ? true : noteRedoStackRef.current.length > 0}
+                  onInsertStickyNote={handleAddStickyNote}
+                  backgroundTheme={backgroundTheme}
+                  onBackgroundThemeChange={setBackgroundTheme}
+                  autoEnlargeNotes={autoEnlargeNotes}
+                  onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+                />
+              </div>
+            </div>
+          </div>
+          {connectedUsers.length > 0 ? (
+            <div className="pointer-events-auto shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
+              <BoardConnectedUsers users={connectedUsers} />
+            </div>
+          ) : null}
+        </div>
         <input
           ref={loadFileInputRef}
           type="file"
