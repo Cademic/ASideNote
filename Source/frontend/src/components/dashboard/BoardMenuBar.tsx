@@ -127,13 +127,26 @@ export function BoardMenuBar({
   const dropdownClass =
     "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
 
+  const noteToolbarExpandedClass =
+    "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center";
+
+  const collapsibleMenusClassName = [
+    "w-full min-h-0 transition-[max-height,opacity] duration-300 ease-in-out motion-reduce:transition-none motion-reduce:duration-0",
+    // overflow-hidden clips absolutely positioned dropdowns; only use it while collapsed.
+    isCollapsed
+      ? "max-h-0 overflow-hidden opacity-0 pointer-events-none"
+      : "max-h-[min(70vh,28rem)] overflow-visible opacity-100",
+  ].join(" ");
+
   return (
     <div
       ref={menuBarRef}
       data-board-menu-bar
-      className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1.5"
+      className="relative flex min-w-0 w-full flex-1 flex-col px-2 pb-6 pt-1.5"
     >
-      <div className={isCollapsed ? "hidden" : "flex flex-shrink-0 items-center gap-1"}>
+      <div className={collapsibleMenusClassName}>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-1">
       {/* File */}
       <div className="relative">
         <button
@@ -167,6 +180,9 @@ export function BoardMenuBar({
               <Upload className="h-3.5 w-3.5" />
               Load from file
             </button>
+            <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
+            <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
+            <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
       </div>
@@ -380,23 +396,25 @@ export function BoardMenuBar({
       </div>
       </div>
 
-      <div
-        className={isCollapsed ? "hidden" : "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center"}
-      >
+      <div className={noteToolbarExpandedClass}>
         <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
           <NoteToolbar editor={richTextToolbar?.editor ?? null} />
         </div>
       </div>
+        </div>
+      </div>
 
-      <button
-        type="button"
-        onClick={() => setIsCollapsed((prev) => !prev)}
-        title={isCollapsed ? "Expand menu" : "Minimize menu"}
-        aria-label={isCollapsed ? "Expand menu" : "Minimize menu"}
-        className="absolute bottom-0 left-1/2 z-[100] flex h-7 px-2 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-md border border-border/50 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] text-foreground/75 shadow-sm transition-colors hover:bg-foreground/5 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)]"
-      >
-        {isCollapsed ? <ChevronDown className="h-4 w-4" strokeWidth={2.5} /> : <ChevronUp className="h-4 w-4" strokeWidth={2.5} />}
-      </button>
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[100] flex justify-center">
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          title={isCollapsed ? "Expand menu" : "Minimize menu"}
+          aria-label={isCollapsed ? "Expand menu" : "Minimize menu"}
+          className="pointer-events-auto flex h-7 min-w-7 translate-y-1/2 items-center justify-center rounded-md border border-border/50 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-2 text-foreground/75 shadow-sm transition-colors hover:bg-foreground/5 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)]"
+        >
+          {isCollapsed ? <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.5} /> : <ChevronUp className="h-4 w-4 shrink-0" strokeWidth={2.5} />}
+        </button>
+      </div>
     </div>
   );
 }

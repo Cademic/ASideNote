@@ -165,7 +165,7 @@ export function ChalkToolbar({
   return (
     <div
       ref={wrapperRef}
-      className="absolute z-30 pointer-events-auto"
+      className="absolute z-30 pointer-events-none"
       style={
         position !== null
           ? {
@@ -178,13 +178,13 @@ export function ChalkToolbar({
     >
       <div
         ref={containerRef}
-        className={`flex items-center rounded-2xl border border-white/10 bg-gray-900/80 shadow-2xl backdrop-blur-md transition-all ${scale} ${padSize} ${isExpanded ? "gap-1" : "gap-0"}`}
+        className={`pointer-events-none flex items-center rounded-2xl border border-white/10 bg-gray-900/80 shadow-2xl backdrop-blur-md transition-all ${scale} ${padSize} ${isExpanded ? "gap-1" : "gap-0"}`}
       >
         {isExpanded ? (
           <>
             {/* Drag handle */}
             <div
-              className={`flex cursor-grab items-center justify-center pr-1 ${btnSize} touch-none text-white/40 hover:text-white/60 active:cursor-grabbing`}
+              className={`pointer-events-auto flex cursor-grab items-center justify-center pr-1 ${btnSize} touch-none text-white/40 hover:text-white/60 active:cursor-grabbing`}
               onPointerDown={handleDragStart}
               onPointerMove={handleDragMove}
               onPointerUp={handleDragEnd}
@@ -245,7 +245,7 @@ export function ChalkToolbar({
                   }
                 }}
                 className={[
-                  `flex ${btnSize} items-center justify-center rounded-full transition-all`,
+                  `pointer-events-auto flex ${btnSize} items-center justify-center rounded-full transition-all`,
                   brushColor === c.value && mode === "draw" && tool === "pen"
                     ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900/80 scale-110"
                     : "hover:scale-110 opacity-80 hover:opacity-100",
@@ -268,7 +268,7 @@ export function ChalkToolbar({
                 title={s.label}
                 onClick={() => onBrushSizeChange(s.value)}
                 className={[
-                  `flex ${btnSize} items-center justify-center rounded-lg transition-all`,
+                  `pointer-events-auto flex ${btnSize} items-center justify-center rounded-lg transition-all`,
                   brushSize === s.value
                     ? "bg-white/20 text-white"
                     : "text-white/50 hover:text-white/80 hover:bg-white/10",
@@ -320,7 +320,7 @@ export function ChalkToolbar({
               </ToolButton>
 
               {showClearConfirm && (
-                <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-md">
+                <div className="pointer-events-auto absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-md">
                   <p className="mb-2 text-xs font-medium text-white/80">
                     Clear entire canvas?
                   </p>
@@ -347,7 +347,7 @@ export function ChalkToolbar({
         ) : (
           <button
             type="button"
-            className={`flex ${btnSize} cursor-grab items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:cursor-grabbing`}
+            className={`pointer-events-auto flex ${btnSize} cursor-grab items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white active:cursor-grabbing`}
             onPointerDown={handleDragStart}
             onPointerMove={handleDragMove}
             onPointerUp={handleCollapsedPointerUp}
@@ -380,7 +380,7 @@ function ToolButton({ children, active, onClick, title, className, iconClassName
       onClick={onClick}
       title={title}
       className={[
-        "flex items-center justify-center rounded-lg transition-all",
+        "pointer-events-auto flex items-center justify-center rounded-lg transition-all",
         active
           ? "bg-white/20 text-white shadow-inner"
           : "text-white/50 hover:text-white/80 hover:bg-white/10",

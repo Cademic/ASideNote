@@ -314,6 +314,8 @@ body {
 .chalkboard-surface {
   border-radius: 2px;
   box-shadow: inset 0 0 8px 2px rgba(0, 0, 0, 0.3);
+  /* Avoid browser scroll anchoring fighting programmatic scroll ↔ pan sync (jumps to “center”). */
+  overflow-anchor: none;
 }
 
 /* Chalkboard frame – gray metallic (shared by whiteboard/blackboard) */
