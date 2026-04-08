@@ -104,8 +104,6 @@ export function ChalkBoardPage() {
   const NOTE_DEFAULT_SIZE = 270;
   const POSITION_DEFAULT = 20;
   const chalkNotesBounds = useMemo(() => {
-    let minX = 0;
-    let minY = 0;
     let maxX = DEFAULT_CANVAS_SIZE;
     let maxY = DEFAULT_CANVAS_SIZE;
     for (const n of notes) {
@@ -113,15 +111,16 @@ export function ChalkBoardPage() {
       const y = n.positionY ?? POSITION_DEFAULT;
       const w = n.width ?? NOTE_DEFAULT_SIZE;
       const h = n.height ?? NOTE_DEFAULT_SIZE;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
     }
-    const contentMinX = minX - CANVAS_PADDING;
-    const contentMinY = minY - CANVAS_PADDING;
-    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
-    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
+    // Keep note-space origin aligned with drawing-space origin (0,0) so notes
+    // can always be placed directly over drawings without drifting past an
+    // implicit negative-offset boundary.
+    const contentMinX = 0;
+    const contentMinY = 0;
+    const canvasWidth = Math.max(DEFAULT_CANVAS_SIZE, maxX + CANVAS_PADDING);
+    const canvasHeight = Math.max(DEFAULT_CANVAS_SIZE, maxY + CANVAS_PADDING);
     return { contentMinX, contentMinY, canvasWidth, canvasHeight };
   }, [notes]);
 
@@ -1296,6 +1295,23 @@ export function ChalkBoardPage() {
                   onBackgroundThemeChange={setBackgroundTheme}
                   autoEnlargeNotes={autoEnlargeNotes}
                   onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+                  chalkTools={
+                    <ChalkToolbar
+                      embedded
+                      mode={mode}
+                      tool={tool}
+                      brushColor={brushColor}
+                      brushSize={brushSize}
+                      onModeChange={handleModeChange}
+                      onToolChange={handleToolChange}
+                      onBrushColorChange={handleBrushColorChange}
+                      onBrushSizeChange={handleBrushSizeChange}
+                      onUndo={() => canvasRef.current?.undo()}
+                      onRedo={() => canvasRef.current?.redo()}
+                      onClear={() => canvasRef.current?.clear()}
+                      onAddStickyNote={handleAddStickyNote}
+                    />
+                  }
                 />
               </div>
             </div>
@@ -1425,20 +1441,6 @@ export function ChalkBoardPage() {
               onCenterView={handleCenterView}
             />
           </div>
-          <ChalkToolbar
-              mode={mode}
-              tool={tool}
-              brushColor={brushColor}
-              brushSize={brushSize}
-              onModeChange={handleModeChange}
-              onToolChange={handleToolChange}
-              onBrushColorChange={handleBrushColorChange}
-              onBrushSizeChange={handleBrushSizeChange}
-              onUndo={() => canvasRef.current?.undo()}
-              onRedo={() => canvasRef.current?.redo()}
-              onClear={() => canvasRef.current?.clear()}
-        onAddStickyNote={handleAddStickyNote}
-      />
         </div>
 
         {boardContextMenu && (

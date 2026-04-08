@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Save,
@@ -55,6 +55,7 @@ interface BoardMenuBarProps {
   onNavigatePreviousNote?: () => void;
   onNavigateNextNote?: () => void;
   noteNavigationDisabled?: boolean;
+  chalkTools?: ReactNode;
 }
 
 export function BoardMenuBar({
@@ -78,11 +79,15 @@ export function BoardMenuBar({
   onNavigatePreviousNote,
   onNavigateNextNote,
   noteNavigationDisabled = false,
+  chalkTools,
 }: BoardMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [chalkToolsPage, setChalkToolsPage] = useState(0);
   const menuBarRef = useRef<HTMLDivElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const chalkTouchStartXRef = useRef<number | null>(null);
+  const chalkTouchStartYRef = useRef<number | null>(null);
 
   const closeMenu = () => setOpenMenu(null);
 
@@ -116,6 +121,36 @@ export function BoardMenuBar({
   useEffect(() => {
     if (isCollapsed) setOpenMenu(null);
   }, [isCollapsed]);
+
+  function goToPrevChalkToolsPage() {
+    setChalkToolsPage((prev) => Math.max(0, prev - 1));
+  }
+
+  function goToNextChalkToolsPage() {
+    setChalkToolsPage((prev) => Math.min(1, prev + 1));
+  }
+
+  function handleChalkToolsTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    chalkTouchStartXRef.current = touch.clientX;
+    chalkTouchStartYRef.current = touch.clientY;
+  }
+
+  function handleChalkToolsTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    const startX = chalkTouchStartXRef.current;
+    const startY = chalkTouchStartYRef.current;
+    chalkTouchStartXRef.current = null;
+    chalkTouchStartYRef.current = null;
+    if (startX == null || startY == null) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    if (Math.abs(deltaX) < 40 || Math.abs(deltaY) > 40) return;
+    if (deltaX < 0) goToNextChalkToolsPage();
+    else goToPrevChalkToolsPage();
+  }
 
   const menuTriggerClass = (menu: OpenMenu) =>
     `px-3 py-1.5 text-sm transition-colors rounded-md ${
@@ -397,9 +432,53 @@ export function BoardMenuBar({
       </div>
 
       <div className={noteToolbarExpandedClass}>
-        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
-          <NoteToolbar editor={richTextToolbar?.editor ?? null} />
-        </div>
+        {boardType === "ChalkBoard" && chalkTools ? (
+          <div className="relative min-w-0 w-full">
+            <div className="flex min-w-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={goToPrevChalkToolsPage}
+                disabled={chalkToolsPage === 0}
+                title="Previous tools"
+                aria-label="Previous tools"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div
+                className="min-w-0 flex-1 overflow-hidden touch-pan-y"
+                onTouchStart={handleChalkToolsTouchStart}
+                onTouchEnd={handleChalkToolsTouchEnd}
+              >
+                <div
+                  className="flex transition-transform duration-300 ease-out motion-reduce:transition-none"
+                  style={{ transform: `translateX(-${chalkToolsPage * 100}%)` }}
+                >
+                  <div className="w-full shrink-0 min-w-0">
+                    {chalkTools}
+                  </div>
+                  <div className="w-full shrink-0 min-w-0 [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                    <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={goToNextChalkToolsPage}
+                disabled={chalkToolsPage === 1}
+                title="Next tools"
+                aria-label="Next tools"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+            <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+          </div>
+        )}
       </div>
         </div>
       </div>
