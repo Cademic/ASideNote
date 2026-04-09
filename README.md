@@ -111,7 +111,9 @@ The application is built with a clean-architecture ASP.NET Core 8 backend and a 
 
 - Light, dark, and system-preference modes
 - CSS variable-based theming
-- Instant switching with persistence
+- Smooth theme transitions (fast text fade, slightly slower surface-color fade)
+- Respects `prefers-reduced-motion`
+- Persistent user preference
 
 ---
 
@@ -306,7 +308,7 @@ Infrastructure Layer (DbContext, Repositories, Migrations, External Services)
 
 ### Frontend State Management
 
-- **React Context API** for global state (auth, theme)
+- **React Context API** for global state (auth, theme, preferences)
 - **Component-level useState** for UI state
 - **Optimistic updates** with background API persistence
 - **Axios interceptors** for automatic token attachment and refresh
@@ -420,4 +422,3 @@ Detailed documentation is available in the `Docs/` directory:
 - Centralized log drain (Datadog, Better Stack)
 - External uptime monitoring
 - User data export and account deletion (GDPR)
-- Privacy policy and terms of service pages

@@ -7,8 +7,15 @@ html.theme-transition,
 html.theme-transition *,
 html.theme-transition *::before,
 html.theme-transition *::after {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
-  transition-duration: 120ms, 240ms, 240ms, 120ms, 120ms, 120ms, 240ms;
+  transition-property: color, background, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
+  transition-duration: 140ms, 360ms, 360ms, 360ms, 140ms, 140ms, 140ms, 360ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Keep navbar in sync with page surface during theme switch */
+html.theme-transition .navbar-surface {
+  transition-property: background, border-color, box-shadow;
+  transition-duration: 360ms, 360ms, 360ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
