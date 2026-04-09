@@ -236,6 +236,7 @@ export function NoteBoardPage() {
   /** Last note id jumped to via View → Previous/Next note (for cycling order). */
   const noteNavAnchorRef = useRef<string | null>(null);
   const [pendingImageDrop, setPendingImageDrop] = useState<{ x: number; y: number } | null>(null);
+  const [pendingNoteDeleteConfirmId, setPendingNoteDeleteConfirmId] = useState<string | null>(null);
 
   // --- Viewport state (pan & zoom); seed from last session for this board ---
   const [zoom, setZoom] = useState(() => readBoardViewportDefaults(boardId).zoom);
@@ -2020,7 +2021,15 @@ export function NoteBoardPage() {
         { label: "Edit", icon: Pencil, onClick: () => handleStartEdit(note.id) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateNote(note) },
         { label: "Bring to front", icon: Layers, onClick: () => bringToFront(note.id) },
-        { label: "Delete", icon: Trash2, onClick: () => handleDelete(note.id), divider: true },
+        {
+          label: "Delete",
+          icon: Trash2,
+          onClick: () => {
+            setItemContextMenu(null);
+            setPendingNoteDeleteConfirmId(note.id);
+          },
+          divider: true,
+        },
       ];
     }
     if (itemContextMenu.type === "card") {
@@ -2533,6 +2542,10 @@ export function NoteBoardPage() {
               onDragStart={handleNoteDragStart}
               onDragStop={handleDragStop}
               onDelete={handleDelete}
+              requestDeleteConfirm={pendingNoteDeleteConfirmId === note.id}
+              onDeleteConfirmHandled={(id) =>
+                setPendingNoteDeleteConfirmId((prev) => (prev === id ? null : prev))
+              }
               onDuplicate={(id) => {
                 const n = notes.find((note) => note.id === id);
                 if (n) handleDuplicateNote(n);

@@ -57,6 +57,10 @@ interface StickyNoteProps {
   enlargeWhenEditing?: boolean;
   /** Registers the active TipTap editor with the board menu bar while editing */
   onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
+  /** Parent can request this note to run delete flow (used by board-level context menu). */
+  requestDeleteConfirm?: boolean;
+  /** Called after a parent delete request has been handled/opened. */
+  onDeleteConfirmHandled?: (id: string) => void;
 }
 
 /** Default width and height for sticky notes on boards (square). */
@@ -190,6 +194,8 @@ export function StickyNote({
   zoom = 1,
   enlargeWhenEditing = false,
   onRichTextToolbarChange,
+  requestDeleteConfirm = false,
+  onDeleteConfirmHandled,
 }: StickyNoteProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const ignoreBlurUntilRef = useRef<number>(0);
@@ -705,6 +711,36 @@ export function StickyNote({
 
   const noteColorKeys = Object.keys(NOTE_COLORS);
 
+  function hasVisibleText(html?: string | null) {
+    if (!html) return false;
+    return stripHtmlForPlainText(html).trim().length > 0;
+  }
+
+  function hasFormattingMarkup(html?: string | null) {
+    if (!html) return false;
+    if (hasVisibleText(html)) return false;
+    return /<(strong|b|em|i|u|s|mark|a|h[1-6]|blockquote|code|pre|ul|ol|li|span|font)[^>]*>/i.test(html);
+  }
+
+  function shouldConfirmDelete() {
+    return (
+      hasVisibleText(note.title) ||
+      hasVisibleText(note.content) ||
+      hasFormattingMarkup(note.title) ||
+      hasFormattingMarkup(note.content)
+    );
+  }
+
+  useEffect(() => {
+    if (!requestDeleteConfirm) return;
+    if (shouldConfirmDelete()) {
+      setShowDeleteConfirm(true);
+    } else {
+      onDelete(note.id);
+    }
+    onDeleteConfirmHandled?.(note.id);
+  }, [requestDeleteConfirm, note.id, note.title, note.content, onDeleteConfirmHandled, onDelete]);
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
@@ -713,6 +749,7 @@ export function StickyNote({
       onStop={handleDragStop}
       onDrag={(_e, data) => onDrag?.(note.id, data.x, data.y)}
       handle=".sticky-handle"
+      cancel=".note-action-btn, .note-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
     >
@@ -827,19 +864,21 @@ export function StickyNote({
           <div className="relative flex items-center gap-0.5" ref={menuRef}>
             <button
               type="button"
+              className="note-action-btn touch-manipulation rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
               onClick={(e) => {
                 e.stopPropagation();
                 setMenuOpen((open) => !open);
               }}
-              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label="Note options"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
             {menuOpen && (
               <div
-                className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                className="note-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
                 onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                   Color
@@ -906,9 +945,7 @@ export function StickyNote({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    const hasContent =
-                      !!(note.content && stripHtmlForPlainText(note.content).length > 0);
-                    if (hasContent) {
+                    if (shouldConfirmDelete()) {
                       setShowDeleteConfirm(true);
                     } else {
                       onDelete(note.id);
@@ -923,17 +960,16 @@ export function StickyNote({
             )}
             <button
               type="button"
+              className="note-action-btn touch-manipulation rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
               onClick={(e) => {
                 e.stopPropagation();
-                const hasContent =
-                  !!(note.content && stripHtmlForPlainText(note.content).length > 0);
-                if (hasContent) {
+                if (shouldConfirmDelete()) {
                   setShowDeleteConfirm(true);
                 } else {
                   onDelete(note.id);
                 }
               }}
-              className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label="Delete note"
             >
               <X className="h-3.5 w-3.5" />
