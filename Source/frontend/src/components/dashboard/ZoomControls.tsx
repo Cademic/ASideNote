@@ -1,6 +1,6 @@
 import { ZoomIn, ZoomOut, Maximize, Crosshair } from "lucide-react";
 
-const MIN_ZOOM = 0.25;
+const DEFAULT_MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.0;
 
 interface ZoomControlsProps {
@@ -8,11 +8,13 @@ interface ZoomControlsProps {
   onZoomChange: (zoom: number) => void;
   onReset: () => void;
   onCenterView?: () => void;
+  /** When set (e.g. chalkboard fit-to-board), zoom out cannot go below this */
+  minZoom?: number;
 }
 
-export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView }: ZoomControlsProps) {
+export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView, minZoom = DEFAULT_MIN_ZOOM }: ZoomControlsProps) {
   const handleZoomChange = (newZoom: number) => {
-    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(newZoom * 100) / 100));
+    const clamped = Math.max(minZoom, Math.min(MAX_ZOOM, Math.round(newZoom * 100) / 100));
     onZoomChange(clamped);
   };
 
@@ -22,7 +24,7 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView }: Zoom
         type="button"
         onClick={() => handleZoomChange(zoom - 0.1)}
         className="shrink-0 rounded p-1 text-foreground/70 transition-colors hover:bg-background hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-        disabled={zoom <= MIN_ZOOM}
+        disabled={zoom <= minZoom}
         title="Zoom out"
         aria-label="Zoom out"
       >
@@ -32,7 +34,7 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView }: Zoom
       <div className="hidden sm:flex min-w-[4rem] shrink items-center gap-1.5 w-24 md:w-32 lg:w-40">
         <input
           type="range"
-          min={MIN_ZOOM}
+          min={minZoom}
           max={MAX_ZOOM}
           step={0.01}
           value={zoom}

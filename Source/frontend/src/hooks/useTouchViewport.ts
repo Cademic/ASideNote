@@ -9,6 +9,8 @@ interface UseTouchViewportOptions {
   onTouchPanEnd?: () => void;
   contentMinX?: number;
   contentMinY?: number;
+  /** Applied before onViewportChange and used when updating gesture baseline (avoids drift vs parent clamp). */
+  normalizeViewport?: (zoom: number, panX: number, panY: number) => { zoom: number; panX: number; panY: number };
 }
 
 export function useTouchViewport(
@@ -27,6 +29,7 @@ export function useTouchViewport(
     onTouchPanEnd,
     contentMinX,
     contentMinY,
+    normalizeViewport,
   } = options;
 
   const touchModeRef = useRef<"pan" | "pinch" | null>(null);
@@ -57,13 +60,15 @@ export function useTouchViewport(
   const panXRef = useRef(panX);
   const panYRef = useRef(panY);
   const onViewportChangeRef = useRef(onViewportChange);
+  const normalizeViewportRef = useRef(normalizeViewport);
 
   useEffect(() => {
     zoomRef.current = zoom;
     panXRef.current = panX;
     panYRef.current = panY;
     onViewportChangeRef.current = onViewportChange;
-  }, [zoom, panX, panY, onViewportChange]);
+    normalizeViewportRef.current = normalizeViewport;
+  }, [zoom, panX, panY, onViewportChange, normalizeViewport]);
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
@@ -178,13 +183,23 @@ export function useTouchViewport(
         } else if (resolutionFactor === 1) {
           const newPanX = start.panX + start.centerX * (1 / newZoom - 1 / start.zoom);
           const newPanY = start.panY + start.centerY * (1 / newZoom - 1 / start.zoom);
-          onViewportChangeRef.current(newZoom, newPanX, newPanY);
+          const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
+            zoom: newZoom,
+            panX: newPanX,
+            panY: newPanY,
+          };
+          onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
         } else {
           const vpScale = start.zoom / resolutionFactor;
           const newVpScale = newZoom / resolutionFactor;
           const newPanX = start.panX + start.centerX * (1 / newVpScale - 1 / vpScale);
           const newPanY = start.panY + start.centerY * (1 / newVpScale - 1 / vpScale);
-          onViewportChangeRef.current(newZoom, newPanX, newPanY);
+          const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
+            zoom: newZoom,
+            panX: newPanX,
+            panY: newPanY,
+          };
+          onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
         }
       } else if (distanceChange > PINCH_THRESHOLD && initialDistance && initialMidpoint && mode === "pan") {
         // Switch from pan to pinch mode - use current distance as pinch start
@@ -219,16 +234,21 @@ export function useTouchViewport(
         // This ensures smooth incremental updates without relying on async state updates
         const newPanX = start.panX + dx;
         const newPanY = start.panY + dy;
-        onViewportChangeRef.current(zoomRef.current, newPanX, newPanY);
-        
+        const norm = normalizeViewportRef.current?.(zoomRef.current, newPanX, newPanY) ?? {
+          zoom: zoomRef.current,
+          panX: newPanX,
+          panY: newPanY,
+        };
+        onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
+
         // Update start position for next move (use current touch position and newly calculated pan)
         // This creates a smooth chain of incremental updates
         touchStartRef.current = {
           type: "pan",
           x: midpointX,
           y: midpointY,
-          panX: newPanX, // Track the pan we just set
-          panY: newPanY, // Next delta will be calculated from here
+          panX: norm.panX,
+          panY: norm.panY,
           initialDistance: start.initialDistance,
           initialMidpoint: start.initialMidpoint,
         };

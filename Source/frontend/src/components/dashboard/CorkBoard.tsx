@@ -10,6 +10,8 @@ interface CorkBoardProps {
   children: ReactNode;
   /** Renders inside the board frame, directly under the top wood edge (e.g. menu bar). */
   topBar?: ReactNode;
+  /** Optional strip to the right of the notepad card (e.g. connected users) so the menu card stays full-width. */
+  topBarAside?: ReactNode;
   boardRef?: React.RefObject<HTMLDivElement | null>;
   onDropItem?: (type: string, x: number, y: number) => void;
   /** Board-space (canvas) coords when mouse moves over the viewport */
@@ -53,7 +55,27 @@ const DEFAULT_CANVAS_SIZE = 10000;
 const SCROLL_EPS = 0.5;
 const PAN_EPS = 1e-4;
 
-export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouseMove, onBoardMouseLeave, onBoardClick, zoom, panX, panY, onViewportChange, backgroundTheme = "default", onBoardContextMenu, canvasWidth = DEFAULT_CANVAS_SIZE, canvasHeight = DEFAULT_CANVAS_SIZE, contentMinX = 0, contentMinY = 0, scrollContainerRef }: CorkBoardProps) {
+export function CorkBoard({
+  children,
+  topBar,
+  topBarAside,
+  boardRef,
+  onDropItem,
+  onBoardMouseMove,
+  onBoardMouseLeave,
+  onBoardClick,
+  zoom,
+  panX,
+  panY,
+  onViewportChange,
+  backgroundTheme = "default",
+  onBoardContextMenu,
+  canvasWidth = DEFAULT_CANVAS_SIZE,
+  canvasHeight = DEFAULT_CANVAS_SIZE,
+  contentMinX = 0,
+  contentMinY = 0,
+  scrollContainerRef,
+}: CorkBoardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -363,11 +385,25 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
   const cursorClass = isPanning ? "cursor-grabbing" : isSpaceHeld ? "cursor-grab" : "";
 
   return (
-    <div className="relative flex h-full w-full flex-col corkboard-frame">
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden corkboard-frame">
       {topBar ? (
-        <div className="notepad-card relative z-30 shrink-0 !overflow-visible rounded-t-md rounded-b-none border-b-0 shadow-none">
-          <div className="notepad-spiral-strip !border-b-0" />
-          <div className="px-2 py-1.5 sm:px-3 sm:py-2">{topBar}</div>
+        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start gap-2 px-2 sm:top-3 sm:px-3">
+          {topBarAside ? (
+            <div className="invisible shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
+              {topBarAside}
+            </div>
+          ) : null}
+          <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
+            <div className="notepad-spiral-strip" />
+            <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
+              <div className="min-w-0 w-full flex-1">{topBar}</div>
+            </div>
+          </div>
+          {topBarAside ? (
+            <div className="pointer-events-auto shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
+              {topBarAside}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {/* Viewport: native scroll encodes pan (see boardViewportScroll); canvas has no translate(pan) */}

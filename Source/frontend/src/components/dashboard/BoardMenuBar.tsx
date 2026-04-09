@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Save,
@@ -55,6 +55,7 @@ interface BoardMenuBarProps {
   onNavigatePreviousNote?: () => void;
   onNavigateNextNote?: () => void;
   noteNavigationDisabled?: boolean;
+  chalkTools?: ReactNode;
 }
 
 export function BoardMenuBar({
@@ -78,11 +79,17 @@ export function BoardMenuBar({
   onNavigatePreviousNote,
   onNavigateNextNote,
   noteNavigationDisabled = false,
+  chalkTools,
 }: BoardMenuBarProps) {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [chalkToolsPage, setChalkToolsPage] = useState(0);
+  const [isCompactToolsViewport, setIsCompactToolsViewport] = useState<boolean>(() => window.innerWidth < 1024);
   const menuBarRef = useRef<HTMLDivElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const chalkTouchStartXRef = useRef<number | null>(null);
+  const chalkTouchStartYRef = useRef<number | null>(null);
+  const chalkTouchStartedOnScrollableRef = useRef(false);
 
   const closeMenu = () => setOpenMenu(null);
 
@@ -104,7 +111,8 @@ export function BoardMenuBar({
     if (!openMenu || isCollapsed) return;
     function onPointerDown(e: PointerEvent) {
       const t = e.target as Node;
-      if (menuBarRef.current?.contains(t)) return;
+      // Keep open only when interacting with the currently open dropdown panel.
+      if (dropdownPanelRef.current?.contains(t)) return;
       // TipTap toolbar panels are portaled to document.body; still treat as part of the bar.
       if ((e.target as Element).closest?.("[data-board-toolbar-portal]")) return;
       closeMenu();
@@ -117,6 +125,59 @@ export function BoardMenuBar({
     if (isCollapsed) setOpenMenu(null);
   }, [isCollapsed]);
 
+  useEffect(() => {
+    function onResize() {
+      setIsCompactToolsViewport(window.innerWidth < 1024);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const maxPage = isCompactToolsViewport ? 3 : 1;
+    setChalkToolsPage((prev) => Math.min(prev, maxPage));
+  }, [isCompactToolsViewport]);
+
+  function goToPrevChalkToolsPage() {
+    setChalkToolsPage((prev) => Math.max(0, prev - 1));
+  }
+
+  function goToNextChalkToolsPage() {
+    const maxPage = isCompactToolsViewport ? 3 : 1;
+    setChalkToolsPage((prev) => Math.min(maxPage, prev + 1));
+  }
+
+  function handleChalkToolsTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const target = e.target as Element | null;
+    chalkTouchStartedOnScrollableRef.current = Boolean(
+      target?.closest("[data-chalk-tools-scrollable]"),
+    );
+    chalkTouchStartXRef.current = touch.clientX;
+    chalkTouchStartYRef.current = touch.clientY;
+  }
+
+  function handleChalkToolsTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    const startX = chalkTouchStartXRef.current;
+    const startY = chalkTouchStartYRef.current;
+    chalkTouchStartXRef.current = null;
+    chalkTouchStartYRef.current = null;
+    const startedOnScrollable = chalkTouchStartedOnScrollableRef.current;
+    chalkTouchStartedOnScrollableRef.current = false;
+    if (startX == null || startY == null) return;
+    if (startedOnScrollable) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    if (Math.abs(deltaX) < 40 || Math.abs(deltaY) > 40) return;
+    if (deltaX < 0) {
+      goToNextChalkToolsPage();
+    }
+    else goToPrevChalkToolsPage();
+  }
+
   const menuTriggerClass = (menu: OpenMenu) =>
     `px-3 py-1.5 text-sm transition-colors rounded-md ${
       openMenu === menu
@@ -126,14 +187,43 @@ export function BoardMenuBar({
 
   const dropdownClass =
     "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
+  const hasChalkTools = boardType === "ChalkBoard" && Boolean(chalkTools);
+  const showCompactBoardTools =
+    isCompactToolsViewport && (boardType === "NoteBoard" || hasChalkTools);
+  const toolsSlidesCount = showCompactBoardTools
+    ? hasChalkTools
+      ? 4
+      : 3
+    : hasChalkTools
+      ? 2
+      : 1;
+  const maxChalkToolsPage = Math.max(0, toolsSlidesCount - 1);
+
+  const noteToolbarExpandedClass = [
+    "min-h-[38px] min-w-0 flex-1 overflow-visible border-l border-border/50 pl-2 dark:border-border/40",
+    showCompactBoardTools ? "flex flex-col justify-center" : "hidden lg:flex lg:flex-col lg:justify-center",
+  ].join(" ");
+
+  const collapsibleMenusClassName = [
+    "w-full min-h-0 transition-[max-height,opacity] duration-300 ease-in-out motion-reduce:transition-none motion-reduce:duration-0",
+    // overflow-hidden clips absolutely positioned dropdowns; only use it while collapsed.
+    isCollapsed
+      ? "max-h-0 overflow-hidden opacity-0 pointer-events-none"
+      : "max-h-[min(70vh,28rem)] overflow-visible opacity-100",
+  ].join(" ");
+  const compactDropdownClass =
+    "pointer-events-auto absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-border bg-background py-1 shadow-xl";
 
   return (
     <div
       ref={menuBarRef}
       data-board-menu-bar
-      className="relative flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1.5"
+      className="relative flex min-w-0 w-full flex-1 flex-col px-2 pb-6 pt-1.5"
     >
-      <div className={isCollapsed ? "hidden" : "flex flex-shrink-0 items-center gap-1"}>
+      <div className={collapsibleMenusClassName}>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      {!showCompactBoardTools ? (
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-1">
       {/* File */}
       <div className="relative">
         <button
@@ -167,6 +257,9 @@ export function BoardMenuBar({
               <Upload className="h-3.5 w-3.5" />
               Load from file
             </button>
+            <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
+            <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
+            <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
           </div>
         )}
       </div>
@@ -379,24 +472,316 @@ export function BoardMenuBar({
         )}
       </div>
       </div>
+      ) : null}
 
-      <div
-        className={isCollapsed ? "hidden" : "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center"}
-      >
-        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
-          <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+      <div className={noteToolbarExpandedClass}>
+        {hasChalkTools || showCompactBoardTools ? (
+          <div className="relative min-w-0 w-full">
+            <div className="flex min-w-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={goToPrevChalkToolsPage}
+                disabled={chalkToolsPage === 0}
+                title="Previous tools"
+                aria-label="Previous tools"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div
+                className="min-w-0 flex-1 overflow-hidden touch-pan-x"
+                onTouchStart={handleChalkToolsTouchStart}
+                onTouchEnd={handleChalkToolsTouchEnd}
+              >
+                <div
+                  className="flex transition-transform duration-300 ease-out motion-reduce:transition-none"
+                  style={{ transform: `translateX(-${chalkToolsPage * 100}%)` }}
+                >
+                  {isCompactToolsViewport ? (
+                    <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                      <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide touch-pan-x [&>*]:shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
+                          className={menuTriggerClass("file")}
+                        >
+                          File
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "edit" ? null : "edit")}
+                          className={menuTriggerClass("edit")}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "insert" ? null : "insert")}
+                          className={menuTriggerClass("insert")}
+                        >
+                          Insert
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "view" ? null : "view")}
+                          className={menuTriggerClass("view")}
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {hasChalkTools ? (
+                    <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                      <div className="min-w-max">
+                        {chalkTools}
+                      </div>
+                    </div>
+                  ) : null}
+                  {isCompactToolsViewport ? (
+                    <>
+                      <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                          <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="primary" />
+                        </div>
+                      </div>
+                      <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                          <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="secondary" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full shrink-0 min-w-0 [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                      <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={goToNextChalkToolsPage}
+                disabled={chalkToolsPage === maxChalkToolsPage}
+                title="Next tools"
+                aria-label="Next tools"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            {toolsSlidesCount > 1 ? (
+              <div className="mt-1 flex items-center justify-center gap-1.5">
+                {Array.from({ length: toolsSlidesCount }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setChalkToolsPage(idx)}
+                    aria-label={`Open tools slide ${idx + 1}`}
+                    aria-pressed={chalkToolsPage === idx}
+                    className={[
+                      "h-2.5 w-2.5 rounded-full transition-colors",
+                      chalkToolsPage === idx
+                        ? "bg-sky-500 dark:bg-sky-400"
+                        : "bg-foreground/25 hover:bg-foreground/40",
+                    ].join(" ")}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {showCompactBoardTools && openMenu ? (
+              <div ref={dropdownPanelRef} className={compactDropdownClass}>
+                {openMenu === "file" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onSaveToFile();
+                      }}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Save to file
+                    </button>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onLoadFromFile();
+                      }}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Load from file
+                    </button>
+                  </>
+                ) : null}
+                {openMenu === "edit" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onUndo();
+                      }}
+                      disabled={!canUndo}
+                    >
+                      Undo
+                      <span className="ml-auto text-xs text-foreground/50">Ctrl+Z</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onRedo();
+                      }}
+                      disabled={!canRedo}
+                    >
+                      Redo
+                      <span className="ml-auto text-xs text-foreground/50">Ctrl+Y</span>
+                    </button>
+                    <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
+                  </>
+                ) : null}
+                {openMenu === "insert" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onInsertStickyNote();
+                      }}
+                    >
+                      <StickyNoteIcon className="h-3.5 w-3.5 text-yellow-500" />
+                      Sticky Note
+                    </button>
+                    {boardType === "NoteBoard" && onInsertIndexCard ? (
+                      <button
+                        type="button"
+                        className={menuItemClass}
+                        onClick={() => {
+                          closeMenu();
+                          onInsertIndexCard();
+                        }}
+                      >
+                        <CreditCard className="h-3.5 w-3.5 text-sky-500" />
+                        Index Card
+                      </button>
+                    ) : null}
+                    {boardType === "NoteBoard" && onInsertImage ? (
+                      <button
+                        type="button"
+                        className={menuItemClass}
+                        onClick={() => {
+                          closeMenu();
+                          onInsertImage();
+                        }}
+                      >
+                        <ImageIcon className="h-3.5 w-3.5 text-emerald-500" />
+                        Image
+                      </button>
+                    ) : null}
+                    <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
+                  </>
+                ) : null}
+                {openMenu === "view" ? (
+                  <>
+                    <HoverSubmenu label="Background">
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "whiteboard" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("whiteboard");
+                        }}
+                      >
+                        WhiteBoard
+                      </button>
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "blackboard" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("blackboard");
+                        }}
+                      >
+                        Blackboard
+                      </button>
+                      <div className={dividerClass} />
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "default" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("default");
+                        }}
+                      >
+                        Default
+                      </button>
+                    </HoverSubmenu>
+                    <div className={dividerClass} />
+                    <HoverSubmenu label="Zoom">
+                      {ZOOM_PRESETS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`${menuItemClass} ${Math.round(zoom * 100) === p ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                          onClick={() => {
+                            closeMenu();
+                            onZoomChange(p / 100);
+                          }}
+                        >
+                          {p}%
+                        </button>
+                      ))}
+                    </HoverSubmenu>
+                    <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
+                    <div className={dividerClass} />
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onAutoEnlargeNotesChange(!autoEnlargeNotes);
+                      }}
+                    >
+                      <span
+                        className={`mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-current ${
+                          autoEnlargeNotes ? "bg-primary text-primary-foreground" : "bg-transparent"
+                        }`}
+                      >
+                        {autoEnlargeNotes ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                      </span>
+                      Auto-enlarge notes on click
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+            <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+          </div>
+        )}
+      </div>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setIsCollapsed((prev) => !prev)}
-        title={isCollapsed ? "Expand menu" : "Minimize menu"}
-        aria-label={isCollapsed ? "Expand menu" : "Minimize menu"}
-        className="absolute bottom-0 left-1/2 z-[100] flex h-7 px-2 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-md border border-border/50 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] text-foreground/75 shadow-sm transition-colors hover:bg-foreground/5 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)]"
-      >
-        {isCollapsed ? <ChevronDown className="h-4 w-4" strokeWidth={2.5} /> : <ChevronUp className="h-4 w-4" strokeWidth={2.5} />}
-      </button>
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-[100] flex justify-center">
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          title={isCollapsed ? "Expand menu" : "Minimize menu"}
+          aria-label={isCollapsed ? "Expand menu" : "Minimize menu"}
+          className="pointer-events-auto flex h-7 min-w-7 translate-y-1/2 items-center justify-center rounded-md border border-border/50 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-2 text-foreground/75 shadow-sm transition-colors hover:bg-foreground/5 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)]"
+        >
+          {isCollapsed ? <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={2.5} /> : <ChevronUp className="h-4 w-4 shrink-0" strokeWidth={2.5} />}
+        </button>
+      </div>
     </div>
   );
 }

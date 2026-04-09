@@ -30,6 +30,8 @@ interface NoteToolbarProps {
   editor: Editor | null;
   /** Horizontal bar (default) or narrow vertical strip for left-docked toolbars */
   variant?: "horizontal" | "vertical";
+  /** Optional horizontal segmentation for compact carousel layouts */
+  segment?: "all" | "primary" | "secondary";
 }
 
 function ToolbarButton({
@@ -720,7 +722,7 @@ export function HighlightColorDropdown({
 }
 
 /** Visible but non-interactive toolbar (no editor — e.g. no note in edit mode). */
-function NoteToolbarIdleHorizontal() {
+function NoteToolbarIdleHorizontal({ segment = "all" }: { segment?: "all" | "primary" | "secondary" }) {
   return (
     <div
       className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1 opacity-[0.55]"
@@ -728,45 +730,63 @@ function NoteToolbarIdleHorizontal() {
       aria-label="Text formatting. Open a note or card to edit."
       aria-disabled="true"
     >
-      <div className="flex flex-wrap items-center gap-1 pointer-events-none select-none">
-        <FontFamilySearch editor={null} />
-        <FontSizeSearch editor={null} />
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        {[Bold, Italic, Underline, Strikethrough].map((Icon, i) => (
+      <div className="flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap pointer-events-none select-none scrollbar-hide">
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0">
+            <FontFamilySearch
+              editor={null}
+              className="shrink-0"
+              inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0">
+            <FontSizeSearch
+              editor={null}
+              className="shrink-0"
+              inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "primary") &&
+          [Bold, Italic, Underline, Strikethrough].map((Icon, i) => (
           <span
             key={i}
-            className="flex h-6 w-6 items-center justify-center rounded text-gray-400"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400"
           >
             <Icon className="h-3.5 w-3.5" />
           </span>
         ))}
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        {[AlignLeft, AlignCenter, AlignRight].map((Icon, i) => (
-          <span key={i} className="flex h-6 w-6 items-center justify-center rounded text-gray-400">
+        {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "primary") &&
+          [AlignLeft, AlignCenter, AlignRight].map((Icon, i) => (
+          <span key={i} className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400">
             <Icon className="h-3.5 w-3.5" />
           </span>
         ))}
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        <span className="flex h-6 items-center gap-0.5 rounded px-1.5 text-gray-400">
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "secondary") && <span className="flex h-6 shrink-0 items-center gap-0.5 rounded px-1.5 text-gray-400">
           <List className="h-3.5 w-3.5" />
           <ChevronDown className="h-3 w-3" />
-        </span>
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        <span className="flex h-6 w-6 items-center justify-center text-gray-400">
+        </span>}
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "secondary") && <span className="flex h-6 w-6 shrink-0 items-center justify-center text-gray-400">
           <LinkIcon className="h-3.5 w-3.5" />
-        </span>
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        <span className="flex h-6 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
+        </span>}
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "secondary") && <span className="flex h-6 shrink-0 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
           <Type className="h-3.5 w-3.5" />
           <span className="h-3.5 w-3.5 rounded-full border border-black/20 bg-gray-600" />
           <ChevronDown className="h-3 w-3" />
-        </span>
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-        <span className="flex h-6 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
+        </span>}
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
+        {(segment === "all" || segment === "secondary") && <span className="flex h-6 shrink-0 items-center gap-1 rounded border border-black/15 px-1.5 text-gray-400">
           <Highlighter className="h-3.5 w-3.5" />
           <span className="h-3.5 w-3.5 rounded border border-black/20 bg-yellow-200" />
           <ChevronDown className="h-3 w-3" />
-        </span>
+        </span>}
       </div>
     </div>
   );
@@ -775,6 +795,7 @@ function NoteToolbarIdleHorizontal() {
 function NoteToolbarActive({
   editor,
   variant = "horizontal",
+  segment = "all",
 }: NoteToolbarProps & { editor: Editor }) {
   const activeState = useEditorState({
     editor,
@@ -921,55 +942,84 @@ function NoteToolbarActive({
   }
 
   return (
-    <div className="space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
+    <div className="note-toolbar-horizontal space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
       {/* Row 1: Text formatting */}
-      <div className="flex flex-wrap items-center gap-1">
-        {/* Font family (searchable) */}
-        <div onMouseDown={(e) => e.stopPropagation()}>
-          <FontFamilySearch editor={editor} variant="horizontal" />
-        </div>
+      <div className="note-toolbar-row flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
+        {/* Font family / size (searchable) */}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+            <FontFamilySearch
+              editor={editor}
+              variant="horizontal"
+              className="shrink-0"
+              inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+            <FontSizeSearch
+              editor={editor}
+              variant="horizontal"
+              defaultSize={14}
+              className="shrink-0"
+              inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
+            />
+          </div>
+        )}
 
-        {/* Font size (searchable) */}
-        <div onMouseDown={(e) => e.stopPropagation()}>
-          <FontSizeSearch editor={editor} variant="horizontal" defaultSize={14} />
-        </div>
+        {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {(segment === "all" || segment === "primary") && (
+          <div className="flex shrink-0 flex-nowrap items-center gap-1">{formattingRow}</div>
+        )}
 
-        {/* Bold / Italic / Underline / Strikethrough */}
-        <div className="flex flex-wrap items-center gap-1">{formattingRow}</div>
+        {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {(segment === "all" || segment === "primary") && (
+          <div className="flex shrink-0 flex-nowrap items-center gap-1">{alignRow}</div>
+        )}
 
-        {/* Text alignment */}
-        <div className="flex flex-wrap items-center gap-1">{alignRow}</div>
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {(segment === "all" || segment === "secondary") && (
+          <div className="shrink-0">
+            <ListDropdownButton editor={editor} dropdownPlacement={listPlacement} />
+          </div>
+        )}
 
-        {/* List dropdown */}
-        <ListDropdownButton editor={editor} dropdownPlacement={listPlacement} />
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {(segment === "all" || segment === "secondary") && (
+          <div className="shrink-0">
+            <LinkButton editor={editor} isLinkActive={state.isLink} />
+          </div>
+        )}
 
-        {/* Link / Unlink */}
-        <LinkButton editor={editor} isLinkActive={state.isLink} />
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
+        {(segment === "all" || segment === "secondary") && (
+          <div className="shrink-0">
+            <TextColorDropdown
+              editor={editor}
+              currentColor={currentColor}
+              dropdownPlacement={listPlacement}
+            />
+          </div>
+        )}
 
-        <TextColorDropdown
-          editor={editor}
-          currentColor={currentColor}
-          dropdownPlacement={listPlacement}
-        />
+        {(segment === "all" || segment === "secondary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 
-        <div className="mx-0.5 h-4 w-px bg-black/10" />
-
-        <HighlightColorDropdown
-          editor={editor}
-          isHighlightActive={state.isHighlight}
-          highlightColor={state.highlightColor}
-          dropdownPlacement={listPlacement}
-        />
+        {(segment === "all" || segment === "secondary") && (
+          <div className="shrink-0">
+            <HighlightColorDropdown
+              editor={editor}
+              isHighlightActive={state.isHighlight}
+              highlightColor={state.highlightColor}
+              dropdownPlacement={listPlacement}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -978,7 +1028,7 @@ function NoteToolbarActive({
 export function NoteToolbar(props: NoteToolbarProps) {
   if (!props.editor) {
     if (props.variant === "vertical") return null;
-    return <NoteToolbarIdleHorizontal />;
+    return <NoteToolbarIdleHorizontal segment={props.segment ?? "all"} />;
   }
   return <NoteToolbarActive {...props} editor={props.editor} />;
 }
