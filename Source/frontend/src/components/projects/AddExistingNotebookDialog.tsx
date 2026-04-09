@@ -82,14 +82,14 @@ export function AddExistingNotebookDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
         onClick={onClose}
         onKeyDown={() => {}}
         role="presentation"
       />
 
       <div
-        className="relative mx-4 flex w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl"
+        className="relative mx-4 flex w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl animate-dialog-enter motion-reduce:animate-none"
         style={{ maxHeight: "80vh" }}
       >
         <div className="flex items-center justify-between border-b border-border/40 px-6 py-4">
@@ -148,7 +148,7 @@ export function AddExistingNotebookDialog({
                       setSelectedId(isSelected ? null : notebook.id)
                     }
                     className={[
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 motion-reduce:transition-none",
                       isSelected
                         ? "bg-amber-50 ring-2 ring-amber-400 dark:bg-amber-950/30 dark:ring-amber-500"
                         : "hover:bg-foreground/[0.03]",

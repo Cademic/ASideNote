@@ -780,7 +780,7 @@ export function StickyNote({
       >
         <div
           className={[
-            "relative flex min-h-0 flex-col overflow-visible rounded shadow-lg transition-shadow hover:shadow-xl",
+            "relative flex min-h-0 flex-col overflow-visible rounded shadow-lg transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-xl motion-reduce:transition-none motion-reduce:hover:transform-none",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
             focusedBy?.length ? "ring-[3px]" : "",
             color.bg,
@@ -841,16 +841,21 @@ export function StickyNote({
         >
           {/* Larger invisible hit-area */}
           <div className="absolute -inset-2" />
-          <div
-            className={[
-              "h-4 w-4 rounded-full shadow-md border-2 border-white/60 transition-transform duration-150",
-              color.pin,
-              onPinMouseDown ? "cursor-pointer group-hover/pin:scale-150" : "",
-              isLinking ? "animate-pulse group-hover/pin:scale-150 group-hover/pin:ring-2 group-hover/pin:ring-red-400" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          />
+          <div className="relative">
+            {isLinking && (
+              <span className="absolute inset-0 rounded-full animate-ripple-out motion-reduce:hidden" style={{ background: "rgb(248 113 113 / 0.5)" }} />
+            )}
+            <div
+              className={[
+                "relative h-4 w-4 rounded-full shadow-md border-2 border-white/60 transition-[transform] duration-150 ease-out-smooth motion-reduce:transition-none",
+                color.pin,
+                onPinMouseDown ? "cursor-pointer group-hover/pin:scale-150" : "",
+                isLinking ? "group-hover/pin:scale-150 group-hover/pin:ring-2 group-hover/pin:ring-red-400" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            />
+          </div>
         </div>
 
         {/* Drag handle + more menu + delete */}

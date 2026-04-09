@@ -28,7 +28,7 @@ const AdminPage = lazy(() => import("../pages/AdminPage").then((m) => ({ default
 function PageFallback() {
   return (
     <div className="flex min-h-[50vh] items-center justify-center" aria-hidden>
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
     </div>
   );
 }

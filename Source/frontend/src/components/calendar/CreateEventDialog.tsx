@@ -131,8 +131,8 @@ export function CreateEventDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto animate-dialog-enter motion-reduce:animate-none">
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
@@ -153,7 +153,7 @@ export function CreateEventDialog({
             <button
               type="button"
               onClick={() => setEventType("Event")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-[colors,box-shadow] duration-150 motion-reduce:transition-none ${
                 eventType === "Event"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-foreground/50 hover:text-foreground/70"
@@ -164,7 +164,7 @@ export function CreateEventDialog({
             <button
               type="button"
               onClick={() => setEventType("Note")}
-              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-[colors,box-shadow] duration-150 motion-reduce:transition-none ${
                 eventType === "Note"
                   ? "bg-background text-foreground shadow-sm"
                   : "text-foreground/50 hover:text-foreground/70"
@@ -363,10 +363,10 @@ export function CreateEventDialog({
                   type="button"
                   onClick={() => setColor(c.value)}
                   title={c.label}
-                  className={`h-7 w-7 rounded-full ${c.bg} transition-all ${
+                  className={`h-7 w-7 rounded-full ${c.bg} transition-[transform,opacity,box-shadow] duration-150 ease-spring motion-reduce:transition-none ${
                     color === c.value
                       ? `ring-2 ${c.ring} ring-offset-2 ring-offset-background scale-110`
-                      : "opacity-60 hover:opacity-100"
+                      : "opacity-60 hover:opacity-100 hover:scale-105"
                   }`}
                 />
               ))}

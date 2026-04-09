@@ -93,7 +93,7 @@ export function CalendarDayCell({
             e.stopPropagation();
             onClickDay(date);
           }}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/20 opacity-0 transition-all hover:bg-foreground/5 hover:text-foreground/50 group-hover:opacity-100"
+          className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/20 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/50 group-hover:opacity-100 motion-reduce:transition-none"
           title="Add event"
         >
           <Plus className="h-3 w-3" />

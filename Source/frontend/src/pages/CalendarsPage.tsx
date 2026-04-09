@@ -228,12 +228,22 @@ export function CalendarsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <span className="text-sm text-foreground/60">
-            Loading calendar...
-          </span>
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-6 py-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="skeleton h-8 w-32" />
+            <div className="flex gap-2">
+              <div className="skeleton h-9 w-24" />
+              <div className="skeleton h-9 w-28" />
+            </div>
+          </div>
+          {/* Calendar grid skeleton */}
+          <div className="skeleton mb-4 h-12 w-full rounded-lg" />
+          <div className="grid grid-cols-7 gap-px">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <div key={i} className="skeleton h-20 rounded-none first:rounded-tl last:rounded-br" />
+            ))}
+          </div>
         </div>
       </div>
     );

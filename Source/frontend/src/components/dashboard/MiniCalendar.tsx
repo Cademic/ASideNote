@@ -401,7 +401,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
         <button
           type="button"
           onClick={() => navigate("/calendar")}
-          className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-1.5 text-xs font-medium text-foreground/60 transition-all hover:border-sky-400 hover:text-sky-600 hover:shadow-sm dark:hover:text-sky-400"
+          className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-1.5 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-sky-400 hover:text-sky-600 hover:shadow-sm dark:hover:text-sky-400 motion-reduce:transition-none"
         >
           View Full Calendar
           <ArrowRight className="h-3.5 w-3.5" />

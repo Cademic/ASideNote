@@ -97,13 +97,13 @@ export function AddMemberDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
         onClick={handleClose}
         onKeyDown={() => {}}
         role="presentation"
       />
 
-      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none">
         <button
           type="button"
           onClick={handleClose}
@@ -297,7 +297,7 @@ function RolePicker({
           type="button"
           onClick={() => setRole("Viewer")}
           className={[
-            "flex flex-col items-center gap-1 rounded-lg border p-3 text-xs transition-all",
+            "flex flex-col items-center gap-1 rounded-lg border p-3 text-xs transition-colors duration-150 motion-reduce:transition-none",
             role === "Viewer"
               ? "border-primary bg-primary/5 text-primary"
               : "border-border text-foreground/60 hover:border-foreground/30",
@@ -312,7 +312,7 @@ function RolePicker({
           type="button"
           onClick={() => setRole("Editor")}
           className={[
-            "flex flex-col items-center gap-1 rounded-lg border p-3 text-xs transition-all",
+            "flex flex-col items-center gap-1 rounded-lg border p-3 text-xs transition-colors duration-150 motion-reduce:transition-none",
             role === "Editor"
               ? "border-primary bg-primary/5 text-primary"
               : "border-border text-foreground/60 hover:border-foreground/30",

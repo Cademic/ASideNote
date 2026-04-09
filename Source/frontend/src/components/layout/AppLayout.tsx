@@ -315,7 +315,13 @@ export function AppLayout() {
               : "flex-1 overflow-auto p-4"
           }
         >
-          <Outlet context={outletContext} />
+          {isBoardDetailRoute ? (
+            <Outlet context={outletContext} />
+          ) : (
+            <div key={location.key} className="animate-page-enter motion-reduce:animate-none h-full">
+              <Outlet context={outletContext} />
+            </div>
+          )}
         </main>
         {isBoardDetailRoute && isMobile && boardOpenArrowVisible && (
           <button

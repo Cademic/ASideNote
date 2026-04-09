@@ -525,7 +525,7 @@ export function ProjectDetailPage() {
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-foreground/5">
               <div
-                className={`h-full rounded-full ${projectColors.progress} transition-all`}
+                className={`h-full rounded-full ${projectColors.progress} transition-[width] duration-[600ms] ease-spring motion-reduce:transition-none`}
                 style={{ width: `${Math.min(project.progress, 100)}%` }}
               />
             </div>
@@ -570,7 +570,7 @@ export function ProjectDetailPage() {
                   type="button"
                   onClick={() => handleTabClick(tab.id)}
                   className={[
-                    "flex flex-shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-all",
+                    "flex flex-shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
                     isActive
                       ? "border-violet-500 text-violet-600 dark:text-violet-400"
                       : "border-transparent text-foreground/50 hover:text-foreground",
@@ -807,7 +807,7 @@ function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoar
               type="button"
               onClick={() => setTypeFilter(t.value)}
               className={[
-                "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
                 typeFilter === t.value
                   ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
                   : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
@@ -822,7 +822,7 @@ function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoar
             <button
               type="button"
               onClick={onAddExisting}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-all hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400"
+              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
             >
               <FolderOpen className="h-3.5 w-3.5" />
               Add Existing
@@ -830,7 +830,7 @@ function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoar
             <button
               type="button"
               onClick={onCreateBoard}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
             >
               <Plus className="h-3.5 w-3.5" />
               New Board
@@ -853,7 +853,7 @@ function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoar
               <button
                 type="button"
                 onClick={onAddExisting}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400"
+                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 Add Existing Board
@@ -861,7 +861,7 @@ function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoar
               <button
                 type="button"
                 onClick={onCreateBoard}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-primary/40 hover:text-primary hover:shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create New Board
@@ -919,7 +919,7 @@ function NotebooksTab({
             <button
               type="button"
               onClick={onAddExisting}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-all hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400"
+              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400 motion-reduce:transition-none"
             >
               <FolderOpen className="h-3.5 w-3.5" />
               Add Existing
@@ -928,7 +928,7 @@ function NotebooksTab({
               type="button"
               onClick={onCreateNotebook}
               disabled={!canCreateNotebook}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-500"
+              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
             >
               <Plus className="h-3.5 w-3.5" />
               New Notebook
@@ -955,7 +955,7 @@ function NotebooksTab({
               <button
                 type="button"
                 onClick={onAddExisting}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400"
+                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400 motion-reduce:transition-none"
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 Add Existing Notebook
@@ -964,7 +964,7 @@ function NotebooksTab({
                 type="button"
                 onClick={onCreateNotebook}
                 disabled={!canCreateNotebook}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-primary/40 hover:text-primary hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create New Notebook
@@ -1006,7 +1006,7 @@ function MembersTab({ project, isOwner, onAddMember, onMemberChanged }: MembersT
           <button
             type="button"
             onClick={onAddMember}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
           >
             <Plus className="h-3.5 w-3.5" />
             Add Member
@@ -1153,10 +1153,10 @@ function SettingsTab({
                 onClick={() => !readOnly && onColorChange(c.value)}
                 disabled={readOnly}
                 title={c.label}
-                className={`h-7 w-7 rounded-full ${c.bg} transition-all ${
+                className={`h-7 w-7 rounded-full ${c.bg} transition-[transform,opacity,box-shadow] duration-150 ease-spring motion-reduce:transition-none ${
                   editColor === c.value
                     ? `ring-2 ${c.ring} ring-offset-2 ring-offset-background scale-110`
-                    : "opacity-60 hover:opacity-100"
+                    : "opacity-60 hover:opacity-100 hover:scale-105"
                 } disabled:cursor-default disabled:opacity-70`}
               />
             ))}

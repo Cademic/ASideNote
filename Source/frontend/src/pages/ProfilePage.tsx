@@ -318,7 +318,7 @@ function FriendCard({
               e.stopPropagation();
               setMenuOpen((v) => !v);
             }}
-            className="rounded-lg p-1 text-foreground/40 opacity-0 transition-all hover:bg-foreground/10 hover:text-foreground/60 group-hover:opacity-100"
+            className="rounded-lg p-1 text-foreground/40 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/10 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
             title="Friend options"
             aria-label="Friend options"
           >
@@ -743,7 +743,7 @@ export function ProfilePage() {
                 <button
                   type="button"
                   onClick={handleEditProfile}
-                  className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 dark:bg-amber-600 dark:hover:bg-amber-500"
+                  className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
                   <PencilLine className="h-4 w-4" />
                   <span>Edit profile</span>

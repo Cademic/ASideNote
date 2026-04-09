@@ -131,14 +131,14 @@ export function CreateBoardDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
         onClick={handleClose}
         onKeyDown={() => {}}
         role="presentation"
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 mx-4">
+      <div className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 mx-4 animate-dialog-enter motion-reduce:animate-none">
         {/* Close button */}
         <button
           type="button"
@@ -212,7 +212,7 @@ export function CreateBoardDialog({
                     type="button"
                     onClick={() => setBoardType(type.value)}
                     className={[
-                      "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-all",
+                      "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-xs transition-[transform,colors,box-shadow] duration-150 ease-spring motion-reduce:transition-none",
                       boardType === type.value
                         ? "border-primary bg-primary/5 text-primary"
                         : "border-border text-foreground/60 hover:border-foreground/30",
@@ -326,10 +326,10 @@ export function CreateBoardDialog({
                     type="button"
                     onClick={() => setProjectColor(c.value)}
                     title={c.label}
-                    className={`h-7 w-7 rounded-full ${c.bg} transition-all ${
+                    className={`h-7 w-7 rounded-full ${c.bg} transition-[transform,opacity,box-shadow] duration-150 ease-spring motion-reduce:transition-none ${
                       projectColor === c.value
                         ? `ring-2 ${c.ring} ring-offset-2 ring-offset-background scale-110`
-                        : "opacity-60 hover:opacity-100"
+                        : "opacity-60 hover:opacity-100 hover:scale-105"
                     }`}
                   />
                 ))}

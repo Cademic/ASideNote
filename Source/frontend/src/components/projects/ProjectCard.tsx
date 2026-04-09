@@ -138,7 +138,7 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
         }
       }}
       className={[
-        "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-all duration-200 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-primary/20",
+        "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
       ].join(" ")}
     >
@@ -174,7 +174,7 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
               setMenuOpen((v) => !v);
             }
           }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-all hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
           title="Project actions"
         >
           <MoreVertical className="h-4 w-4" />
@@ -383,7 +383,7 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
         <div className="mb-3">
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/5">
             <div
-              className={`h-full rounded-full ${colors.progress} transition-all`}
+              className={`h-full rounded-full ${colors.progress} transition-[width] duration-[600ms] ease-spring motion-reduce:transition-none`}
               style={{ width: `${Math.min(project.progress, 100)}%` }}
             />
           </div>
