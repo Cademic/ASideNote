@@ -482,7 +482,7 @@ interface ToolButtonProps {
   className?: string;
   iconClassName?: string;
   embedded?: boolean;
-  buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  buttonRef?: React.Ref<HTMLButtonElement>;
 }
 
 function ToolButton({ children, active, onClick, title, className, iconClassName = "h-4 w-4", embedded = false, buttonRef }: ToolButtonProps) {
