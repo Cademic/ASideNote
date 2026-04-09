@@ -317,6 +317,8 @@ export function CorkBoard({ children, topBar, boardRef, onDropItem, onBoardMouse
     resolutionFactor: 1,
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
+    contentMinX,
+    contentMinY,
   });
 
   // ---- Zoom controls ----

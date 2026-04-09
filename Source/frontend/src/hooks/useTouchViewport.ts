@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
 
 interface UseTouchViewportOptions {
   resolutionFactor?: number;
@@ -6,6 +7,8 @@ interface UseTouchViewportOptions {
   maxZoom?: number;
   onTouchPanStart?: () => void;
   onTouchPanEnd?: () => void;
+  contentMinX?: number;
+  contentMinY?: number;
 }
 
 export function useTouchViewport(
@@ -22,6 +25,8 @@ export function useTouchViewport(
     maxZoom = 2.0,
     onTouchPanStart,
     onTouchPanEnd,
+    contentMinX,
+    contentMinY,
   } = options;
 
   const touchModeRef = useRef<"pan" | "pinch" | null>(null);
@@ -158,7 +163,19 @@ export function useTouchViewport(
         const newZoom = clamp(start.zoom * scale, minZoom, maxZoom);
 
         // Adjust pan to keep the midpoint fixed
-        if (resolutionFactor === 1) {
+        if (resolutionFactor === 1 && contentMinX != null && contentMinY != null) {
+          const anchored = corkZoomAroundScreenPoint(
+            start.panX,
+            start.panY,
+            start.zoom,
+            newZoom,
+            start.centerX,
+            start.centerY,
+            contentMinX,
+            contentMinY,
+          );
+          onViewportChangeRef.current(newZoom, anchored.panX, anchored.panY);
+        } else if (resolutionFactor === 1) {
           const newPanX = start.panX + start.centerX * (1 / newZoom - 1 / start.zoom);
           const newPanY = start.panY + start.centerY * (1 / newZoom - 1 / start.zoom);
           onViewportChangeRef.current(newZoom, newPanX, newPanY);
