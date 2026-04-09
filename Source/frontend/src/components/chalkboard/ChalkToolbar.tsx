@@ -298,7 +298,12 @@ export function ChalkToolbar({
           ].join(" ")}
         >
           <div
-            className={`h-3 w-3 min-h-3 min-w-3 shrink-0 sm:h-4 sm:min-h-4 sm:min-w-4 rounded-full border ${c.value.toLowerCase() === "#000000" ? "border-white/40" : "border-white/20"}`}
+            className={[
+              "h-4 w-4 min-h-4 min-w-4 shrink-0 sm:h-5 sm:min-h-5 sm:min-w-5 rounded-full border",
+              embedded
+                ? "border-foreground/35 shadow-[0_1px_2px_rgba(0,0,0,0.25),0_0_0_1px_rgba(255,255,255,0.35)]"
+                : "border-white/50 shadow-[0_1px_3px_rgba(0,0,0,0.45),0_0_0_1px_rgba(0,0,0,0.45)]",
+            ].join(" ")}
             style={{ backgroundColor: c.value }}
           />
         </button>
