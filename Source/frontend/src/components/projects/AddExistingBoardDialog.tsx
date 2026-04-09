@@ -103,14 +103,14 @@ export function AddExistingBoardDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
         onClick={onClose}
         onKeyDown={() => {}}
         role="presentation"
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 flex w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl"
+      <div className="relative mx-4 flex w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl animate-dialog-enter motion-reduce:animate-none"
         style={{ maxHeight: "80vh" }}
       >
         {/* Header */}
@@ -170,7 +170,7 @@ export function AddExistingBoardDialog({
                       setSelectedId(isSelected ? null : board.id)
                     }
                     className={[
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors duration-150 motion-reduce:transition-none",
                       isSelected
                         ? "bg-violet-50 ring-2 ring-violet-400 dark:bg-violet-950/30 dark:ring-violet-500"
                         : "hover:bg-foreground/[0.03]",

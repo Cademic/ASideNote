@@ -135,7 +135,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 <button
                   type="button"
                   onClick={() => navigate(seg.path)}
-                  className={`rounded-lg px-2 py-1 text-sm transition-all truncate text-left ${
+                  className={`rounded-lg px-2 py-1 text-sm transition-colors duration-150 truncate text-left motion-reduce:transition-none ${
                     isLast
                       ? "min-w-0 flex-1 font-semibold text-foreground hover:bg-foreground/5"
                       : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground max-w-[100px] sm:max-w-none"
@@ -145,8 +145,8 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 >
                   {showShortFirst ? (
                     <>
-                      <span className="sm:hidden">…</span>
-                      <span className="hidden sm:inline">{seg.label}</span>
+                      <span className="inline max-[420px]:hidden">{seg.label}</span>
+                      <span className="hidden max-[420px]:inline">Dash...</span>
                     </>
                   ) : (
                     seg.label
@@ -208,7 +208,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
             </span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 text-foreground/40 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 text-foreground/40 transition-transform duration-150 ease-out-smooth motion-reduce:transition-none ${dropdownOpen ? "rotate-180" : ""}`}
             aria-hidden
           />
         </button>

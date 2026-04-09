@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
 
 interface UseTouchViewportOptions {
   resolutionFactor?: number;
@@ -32,17 +31,8 @@ export function useTouchViewport(
     contentMinY,
   } = options;
 
-  const touchModeRef = useRef<"pan" | "pinch" | null>(null);
+  const touchModeRef = useRef<"pinch" | null>(null);
   const touchStartRef = useRef<
-    | {
-        type: "pan";
-        x: number;
-        y: number;
-        panX: number;
-        panY: number;
-        initialDistance?: number;
-        initialMidpoint?: { x: number; y: number };
-      }
     | {
         type: "pinch";
         d0: number;
@@ -51,6 +41,8 @@ export function useTouchViewport(
         zoom: number;
         panX: number;
         panY: number;
+        anchorWorldX: number;
+        anchorWorldY: number;
       }
     | null
   >(null);
@@ -108,24 +100,34 @@ export function useTouchViewport(
         const rect1 = viewport!.getBoundingClientRect();
         const midpoint = getMidpoint(t1, t2, rect1);
 
-        // Start with pan mode (can switch to pinch if distance changes)
-        // Capture current pan/zoom state at gesture start
-        touchModeRef.current = "pan";
-        const startMidpointX = midpoint.x + rect1.left;
-        const startMidpointY = midpoint.y + rect1.top;
+        // Start directly in pinch mode so zoom is always anchored to the fingers.
+        touchModeRef.current = "pinch";
+        const startZoom = zoomRef.current;
+        const startPanX = panXRef.current;
+        const startPanY = panYRef.current;
+        const anchorWorldX =
+          resolutionFactor === 1 && contentMinX != null
+            ? (midpoint.x + contentMinX * (startZoom + 1)) / startZoom - startPanX
+            : midpoint.x / (startZoom / resolutionFactor) - startPanX;
+        const anchorWorldY =
+          resolutionFactor === 1 && contentMinY != null
+            ? (midpoint.y + contentMinY * (startZoom + 1)) / startZoom - startPanY
+            : midpoint.y / (startZoom / resolutionFactor) - startPanY;
         touchStartRef.current = {
-          type: "pan",
-          x: startMidpointX,
-          y: startMidpointY,
-          panX: panXRef.current, // Capture current pan state
-          panY: panYRef.current, // Capture current pan state
-          initialDistance: d0,
-          initialMidpoint: midpoint,
+          type: "pinch",
+          d0,
+          centerX: midpoint.x,
+          centerY: midpoint.y,
+          zoom: startZoom,
+          panX: startPanX,
+          panY: startPanY,
+          anchorWorldX,
+          anchorWorldY,
         };
         onTouchPanStart?.();
       } else if (touchCount === 1 && touchModeRef.current !== null) {
         // If we had a 2-finger gesture and one finger lifted, end it
-        if (touchModeRef.current === "pan" || touchModeRef.current === "pinch") {
+        if (touchModeRef.current === "pinch") {
           onTouchPanEnd?.();
         }
         touchModeRef.current = null;
@@ -155,30 +157,18 @@ export function useTouchViewport(
       const rect2 = viewport!.getBoundingClientRect();
       const currentDistance = getDistance(t1, t2);
       const currentMidpoint = getMidpoint(t1, t2, rect2);
-      const initialDistance = start.type === "pan" ? start.initialDistance : undefined;
-      const initialMidpoint = start.type === "pan" ? start.initialMidpoint : undefined;
-
-      // Detect if this is a pinch (distance changed significantly) or pan (distance stayed similar)
-      const distanceChange = initialDistance ? Math.abs(currentDistance - initialDistance) / initialDistance : 0;
-      const PINCH_THRESHOLD = 0.05; // 5% change indicates pinch
-
       if (mode === "pinch" && start.type === "pinch") {
-        // Already in pinch mode - use pinch start state
+        // Unified two-finger transform: pinch zoom + two-finger pan around the live midpoint.
         const scale = currentDistance / start.d0;
         const newZoom = clamp(start.zoom * scale, minZoom, maxZoom);
 
-        // Adjust pan to keep the midpoint fixed
+        // Keep the same board-space anchor under the current midpoint.
         if (resolutionFactor === 1 && contentMinX != null && contentMinY != null) {
-          const anchored = corkZoomAroundScreenPoint(
-            start.panX,
-            start.panY,
-            start.zoom,
-            newZoom,
-            currentMidpoint.x,
-            currentMidpoint.y,
-            contentMinX,
-            contentMinY,
-          );
+          const anchoredPanX =
+            (currentMidpoint.x + contentMinX * (newZoom + 1)) / newZoom - start.anchorWorldX;
+          const anchoredPanY =
+            (currentMidpoint.y + contentMinY * (newZoom + 1)) / newZoom - start.anchorWorldY;
+          const anchored = { panX: anchoredPanX, panY: anchoredPanY };
           const norm = normalizeViewportRef.current?.(newZoom, anchored.panX, anchored.panY) ?? {
             zoom: newZoom,
             panX: anchored.panX,
@@ -193,10 +183,12 @@ export function useTouchViewport(
             zoom: norm.zoom,
             panX: norm.panX,
             panY: norm.panY,
+            anchorWorldX: start.anchorWorldX,
+            anchorWorldY: start.anchorWorldY,
           };
         } else if (resolutionFactor === 1) {
-          const newPanX = start.panX + currentMidpoint.x * (1 / newZoom - 1 / start.zoom);
-          const newPanY = start.panY + currentMidpoint.y * (1 / newZoom - 1 / start.zoom);
+          const newPanX = currentMidpoint.x / newZoom - start.anchorWorldX;
+          const newPanY = currentMidpoint.y / newZoom - start.anchorWorldY;
           const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
             zoom: newZoom,
             panX: newPanX,
@@ -211,12 +203,13 @@ export function useTouchViewport(
             zoom: norm.zoom,
             panX: norm.panX,
             panY: norm.panY,
+            anchorWorldX: start.anchorWorldX,
+            anchorWorldY: start.anchorWorldY,
           };
         } else {
-          const vpScale = start.zoom / resolutionFactor;
           const newVpScale = newZoom / resolutionFactor;
-          const newPanX = start.panX + currentMidpoint.x * (1 / newVpScale - 1 / vpScale);
-          const newPanY = start.panY + currentMidpoint.y * (1 / newVpScale - 1 / vpScale);
+          const newPanX = currentMidpoint.x / newVpScale - start.anchorWorldX;
+          const newPanY = currentMidpoint.y / newVpScale - start.anchorWorldY;
           const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
             zoom: newZoom,
             panX: newPanX,
@@ -231,59 +224,10 @@ export function useTouchViewport(
             zoom: norm.zoom,
             panX: norm.panX,
             panY: norm.panY,
+            anchorWorldX: start.anchorWorldX,
+            anchorWorldY: start.anchorWorldY,
           };
         }
-      } else if (distanceChange > PINCH_THRESHOLD && initialDistance && initialMidpoint && mode === "pan") {
-        // Switch from pan to pinch mode - use current distance as pinch start
-        // Note: We're still in a gesture, so drawing should remain disabled
-        // Don't call onTouchPanEnd here - we're just switching modes
-        touchModeRef.current = "pinch";
-        const pinchStartZoom = zoomRef.current;
-        const pinchStartPanX = panXRef.current;
-        const pinchStartPanY = panYRef.current;
-        
-        touchStartRef.current = {
-          type: "pinch",
-          d0: currentDistance, // Use current distance as the base for pinch
-          centerX: currentMidpoint.x,
-          centerY: currentMidpoint.y,
-          zoom: pinchStartZoom,
-          panX: pinchStartPanX,
-          panY: pinchStartPanY,
-        };
-        
-        // No zoom change on switch - just establish the pinch baseline
-        // The next touchmove will start zooming from this point
-      } else if (mode === "pan" && start.type === "pan") {
-        // Update pan (2-finger pan) - use midpoint movement
-        // Calculate incremental delta from last touch position for smooth continuous movement
-        const midpointX = currentMidpoint.x + rect2.left;
-        const midpointY = currentMidpoint.y + rect2.top;
-        const dx = (resolutionFactor * (midpointX - start.x)) / zoomRef.current;
-        const dy = (resolutionFactor * (midpointY - start.y)) / zoomRef.current;
-        
-        // Calculate new pan by adding delta to the last known pan position (from start state)
-        // This ensures smooth incremental updates without relying on async state updates
-        const newPanX = start.panX + dx;
-        const newPanY = start.panY + dy;
-        const norm = normalizeViewportRef.current?.(zoomRef.current, newPanX, newPanY) ?? {
-          zoom: zoomRef.current,
-          panX: newPanX,
-          panY: newPanY,
-        };
-        onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
-
-        // Update start position for next move (use current touch position and newly calculated pan)
-        // This creates a smooth chain of incremental updates
-        touchStartRef.current = {
-          type: "pan",
-          x: midpointX,
-          y: midpointY,
-          panX: norm.panX,
-          panY: norm.panY,
-          initialDistance: start.initialDistance,
-          initialMidpoint: start.initialMidpoint,
-        };
       }
     }
 
@@ -294,14 +238,14 @@ export function useTouchViewport(
       if (touchCount < 2) {
         // Less than 2 fingers - end gesture (1 finger or 0 fingers)
         // Prevent default and stop propagation if we were handling a gesture
-        if (touchModeRef.current === "pan" || touchModeRef.current === "pinch") {
+        if (touchModeRef.current === "pinch") {
           e.preventDefault();
           e.stopPropagation();
           onTouchPanEnd?.();
         }
         touchModeRef.current = null;
         touchStartRef.current = null;
-      } else if (touchCount === 2 && (touchModeRef.current === "pan" || touchModeRef.current === "pinch")) {
+      } else if (touchCount === 2 && touchModeRef.current === "pinch") {
         // Still have 2 fingers but one was lifted - prevent default to avoid canvas interference
         e.preventDefault();
         e.stopPropagation();

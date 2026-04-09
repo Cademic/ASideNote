@@ -152,7 +152,7 @@ export function LandingPage() {
             {isAuthenticated ? (
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
@@ -167,7 +167,7 @@ export function LandingPage() {
                 </Link>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
                   Get Started
                 </Link>
@@ -184,7 +184,11 @@ export function LandingPage() {
           <div className="notepad-body relative px-8 py-12 sm:px-16 sm:py-16">
             <div className="mx-auto max-w-3xl text-center">
               <img
-                src="/ASideNoteText.png"
+                src={
+                  effectiveTheme === "dark"
+                    ? "/ASideNotTextDark.png"
+                    : "/ASideNoteText.png"
+                }
                 alt="Your visual workspace for ideas"
                 className="mx-auto mb-6 h-32 w-auto object-contain sm:h-[10rem]"
               />
@@ -204,7 +208,7 @@ export function LandingPage() {
                 {isAuthenticated ? (
                   <Link
                     to="/dashboard"
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                   >
                     <LayoutDashboard className="h-4 w-4" />
                     Go to Dashboard
@@ -214,14 +218,14 @@ export function LandingPage() {
                   <>
                     <Link
                       to="/register"
-                      className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                      className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                     >
                       Create Free Account
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                     <Link
                       to="/login"
-                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-6 py-3 text-sm font-semibold text-foreground transition-all hover:border-border/80 hover:bg-surface/80"
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-6 py-3 text-sm font-semibold text-foreground transition-colors duration-150 hover:border-border/80 hover:bg-surface/80 motion-reduce:transition-none"
                     >
                       Sign In
                     </Link>
@@ -270,7 +274,7 @@ export function LandingPage() {
           {FEATURES.map((feature) => (
             <div
               key={feature.title}
-              className="paper-card group relative flex flex-col rounded-lg p-5 pt-7 transition-all duration-200 hover:-translate-y-1"
+              className="paper-card group relative flex flex-col rounded-lg p-5 pt-7 transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none"
             >
               {/* Colored tape strip */}
               <div
@@ -380,7 +384,7 @@ export function LandingPage() {
             {isAuthenticated ? (
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Go to Dashboard
@@ -390,14 +394,14 @@ export function LandingPage() {
               <>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500"
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
                   Get Started &mdash; It&apos;s Free
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-6 py-3 text-sm font-semibold text-foreground transition-all hover:bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/20 dark:hover:bg-amber-900/30"
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-6 py-3 text-sm font-semibold text-foreground transition-colors duration-150 hover:bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 motion-reduce:transition-none"
                 >
                   Sign In
                 </Link>

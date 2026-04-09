@@ -28,8 +28,8 @@ export function CreateNotebookDialog({ isOpen, error, onClose, onCreate }: Creat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={handleClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
+      <div className="fixed inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none" onClick={handleClose} aria-hidden="true" />
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl animate-dialog-enter motion-reduce:animate-none">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Create notebook</h2>
           <button

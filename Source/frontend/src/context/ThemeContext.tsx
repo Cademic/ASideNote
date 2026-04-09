@@ -1,9 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -36,6 +38,8 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
+  const transitionTimerRef = useRef<number | null>(null);
+
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const storedValue = window.localStorage.getItem(STORAGE_KEY);
     if (storedValue === "light" || storedValue === "dark" || storedValue === "system") {
@@ -48,13 +52,26 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     resolveTheme(themeMode),
   );
 
+  const applyThemeClass = useCallback((next: EffectiveTheme) => {
+    const htmlElement = document.documentElement;
+    htmlElement.classList.add("theme-transition");
+    htmlElement.classList.toggle("dark", next === "dark");
+
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current);
+    }
+    transitionTimerRef.current = window.setTimeout(() => {
+      htmlElement.classList.remove("theme-transition");
+      transitionTimerRef.current = null;
+    }, 220);
+  }, []);
+
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, themeMode);
     const next = resolveTheme(themeMode);
     setEffectiveTheme(next);
-    const htmlElement = document.documentElement;
-    htmlElement.classList.toggle("dark", next === "dark");
-  }, [themeMode]);
+    applyThemeClass(next);
+  }, [applyThemeClass, themeMode]);
 
   useEffect(() => {
     if (themeMode !== "system") {
@@ -64,13 +81,22 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     function handleChange() {
       const isDark = query.matches;
-      setEffectiveTheme(isDark ? "dark" : "light");
-      const htmlElement = document.documentElement;
-      htmlElement.classList.toggle("dark", isDark);
+      const next = isDark ? "dark" : "light";
+      setEffectiveTheme(next);
+      applyThemeClass(next);
     }
     query.addEventListener("change", handleChange);
     return () => query.removeEventListener("change", handleChange);
-  }, [themeMode]);
+  }, [applyThemeClass, themeMode]);
+
+  useEffect(
+    () => () => {
+      if (transitionTimerRef.current !== null) {
+        window.clearTimeout(transitionTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const value = useMemo<ThemeContextValue>(
     () => ({

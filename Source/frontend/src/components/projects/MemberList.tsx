@@ -203,7 +203,7 @@ function MemberRow({
           <button
             type="button"
             onClick={() => setIsRoleOpen(!isRoleOpen)}
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all ${config.bg} ${config.className} hover:opacity-80`}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-opacity duration-150 ${config.bg} ${config.className} hover:opacity-80 motion-reduce:transition-none`}
           >
             <Icon className="h-3 w-3" />
             {member.role}

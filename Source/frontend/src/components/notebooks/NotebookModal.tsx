@@ -298,7 +298,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 dark:bg-amber-600 dark:hover:bg-amber-500"
+            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
           >
             Close
           </button>
@@ -320,7 +320,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-background"
+      className="fixed inset-0 z-50 flex flex-col bg-background animate-page-enter motion-reduce:animate-none"
       role="dialog"
       aria-modal="true"
       aria-label="Notebook"
@@ -342,7 +342,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
                   type="button"
                   onClick={() => setDownloadMenuOpen((v) => !v)}
                   disabled={exporting}
-                  className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-foreground/70 transition-all hover:bg-amber-100/50 hover:text-foreground disabled:opacity-50 dark:hover:bg-amber-900/20"
+                  className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-foreground/70 transition-colors duration-150 hover:bg-amber-100/50 hover:text-foreground disabled:opacity-50 dark:hover:bg-amber-900/20 motion-reduce:transition-none"
                 aria-label="Download"
                 aria-expanded={downloadMenuOpen}
               >

@@ -79,14 +79,14 @@ export function CreateProjectDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
         onClick={handleClose}
         onKeyDown={() => {}}
         role="presentation"
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none">
         {/* Close button */}
         <button
           type="button"
@@ -160,10 +160,10 @@ export function CreateProjectDialog({
                   type="button"
                   onClick={() => setColor(c.value)}
                   title={c.label}
-                  className={`h-7 w-7 rounded-full ${c.bg} transition-all ${
+                  className={`h-7 w-7 rounded-full ${c.bg} transition-[transform,opacity,box-shadow] duration-150 ease-spring motion-reduce:transition-none ${
                     color === c.value
                       ? `ring-2 ${c.ring} ring-offset-2 ring-offset-background scale-110`
-                      : "opacity-60 hover:opacity-100"
+                      : "opacity-60 hover:opacity-100 hover:scale-105"
                   }`}
                 />
               ))}

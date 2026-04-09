@@ -303,10 +303,22 @@ export function BoardsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <span className="text-sm text-foreground/60">Loading boards...</span>
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-6 py-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="skeleton h-8 w-32" />
+            <div className="skeleton h-9 w-28" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="paper-card relative flex flex-col rounded-lg p-5 pt-7 h-36">
+                <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-lg skeleton" />
+                <div className="skeleton h-4 w-3/4 mb-2" />
+                <div className="skeleton h-3 w-1/2 mb-1" />
+                <div className="skeleton h-3 w-2/3 mt-auto" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -358,7 +370,7 @@ export function BoardsPage() {
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-md dark:bg-amber-600 dark:hover:bg-amber-500"
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-md active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
             >
               <Plus className="h-4 w-4" />
               <span>New Board</span>
@@ -375,7 +387,7 @@ export function BoardsPage() {
               type="button"
               onClick={() => setBoardTypeFilter(filter.value)}
               className={[
-                "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
                 boardTypeFilter === filter.value
                   ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                   : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
@@ -400,7 +412,7 @@ export function BoardsPage() {
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-primary/40 hover:text-primary hover:shadow-sm"
+              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
             >
               <Plus className="h-3.5 w-3.5" />
               Create your first board

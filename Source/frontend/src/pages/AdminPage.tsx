@@ -367,7 +367,7 @@ export function AdminPage() {
                       <div className="min-w-0 flex-1">
                         <div className="h-7 overflow-hidden rounded-md bg-foreground/[0.06] dark:bg-foreground/10">
                           <div
-                            className={`h-full rounded-md ${item.color} transition-all duration-500`}
+                            className={`h-full rounded-md ${item.color} transition-[width] duration-500 ease-spring motion-reduce:transition-none`}
                             style={{
                               width: `${Math.round((item.value / maxBarValue) * 100)}%`,
                               minWidth: item.value > 0 ? "4px" : "0",
@@ -416,7 +416,7 @@ export function AdminPage() {
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-foreground/[0.08] dark:bg-foreground/10">
                     <div
-                      className="h-full rounded-full bg-violet-400 dark:bg-violet-500 transition-all duration-500"
+                      className="h-full rounded-full bg-violet-400 dark:bg-violet-500 transition-[width] duration-500 ease-spring motion-reduce:transition-none"
                       style={{
                         width: `${Math.round((stats.usersActiveLast7d / stats.totalUsers) * 100)}%`,
                       }}
@@ -430,7 +430,7 @@ export function AdminPage() {
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-foreground/[0.08] dark:bg-foreground/10">
                     <div
-                      className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400 transition-all duration-500"
+                      className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400 transition-[width] duration-500 ease-spring motion-reduce:transition-none"
                       style={{
                         width: `${Math.round((stats.usersActiveLast24h / stats.totalUsers) * 100)}%`,
                       }}
@@ -548,7 +548,7 @@ export function AdminPage() {
                             title={`${d.period}: ${d.count}`}
                           >
                             <div
-                              className="w-full min-w-0 rounded-t bg-violet-500 transition-all duration-300 hover:bg-violet-600 dark:bg-violet-500 dark:hover:bg-violet-400"
+                              className="w-full min-w-0 rounded-t bg-violet-500 transition-[height,colors] duration-300 ease-spring hover:bg-violet-600 dark:bg-violet-500 dark:hover:bg-violet-400 motion-reduce:transition-none"
                               style={{
                                 height: `${Math.round((d.count / maxCount) * 100)}%`,
                                 minHeight: d.count > 0 ? "4px" : "0",
@@ -603,7 +603,7 @@ export function AdminPage() {
                             title={`${d.period}: ${d.count} logins`}
                           >
                             <div
-                              className="w-full min-w-0 rounded-t bg-emerald-500 transition-all duration-300 hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                              className="w-full min-w-0 rounded-t bg-emerald-500 transition-[height,colors] duration-300 ease-spring hover:bg-emerald-600 dark:bg-emerald-500 dark:hover:bg-emerald-400 motion-reduce:transition-none"
                               style={{
                                 height: `${Math.round((d.count / maxCount) * 100)}%`,
                                 minHeight: d.count > 0 ? "4px" : "0",

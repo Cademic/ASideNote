@@ -516,7 +516,7 @@ export function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 dark:bg-amber-600 dark:hover:bg-amber-500"
+                className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
               >
                 <Plus className="h-4 w-4" />
                 <span>Get Started</span>
@@ -593,7 +593,7 @@ export function DashboardPage() {
               <button
                 type="button"
                 onClick={() => navigate("/projects")}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-primary/40 hover:text-primary hover:shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create your first project
@@ -617,7 +617,7 @@ export function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/projects")}
-                  className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400"
+                  className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
                 >
                   View All Projects
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -1042,7 +1042,7 @@ function BlankPageEmpty({ message, actionLabel, onAction }: BlankPageEmptyProps)
       <button
         type="button"
         onClick={onAction}
-        className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-all hover:border-primary/40 hover:text-primary hover:shadow-sm"
+        className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
       >
         <Plus className="h-3.5 w-3.5" />
         {actionLabel}

@@ -178,7 +178,7 @@ export function Sidebar({
   return (
     <aside
       className={[
-        "sidebar-surface relative flex h-screen flex-col transition-all duration-200",
+        "sidebar-surface relative flex h-screen flex-col transition-[width] duration-200 ease-out-smooth motion-reduce:transition-none",
         expanded ? "w-60" : "w-16",
       ].join(" ")}
     >
@@ -222,7 +222,7 @@ export function Sidebar({
               to={item.to}
               title={item.label}
               className={[
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
                 active
                   ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                   : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
@@ -245,7 +245,7 @@ export function Sidebar({
             to="/admin"
             title="Admin"
             className={[
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150",
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
               isActive("/admin")
                 ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                 : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
@@ -288,7 +288,7 @@ export function Sidebar({
                   to={projectPath}
                   title={project.name}
                   className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                     active
                       ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                       : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
@@ -326,7 +326,7 @@ export function Sidebar({
               <div
                 key={`notebook-${notebook.id}`}
                 className={[
-                  "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                  "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                   "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
                   !expanded && "justify-center",
                 ]
@@ -372,7 +372,7 @@ export function Sidebar({
                   to={boardPath}
                   title={board.name}
                   className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                     active
                       ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                       : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
@@ -433,7 +433,7 @@ export function Sidebar({
                   to={getBoardPath(board)}
                   title={board.name}
                   className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150",
+                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                     active
                       ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
                       : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
@@ -505,7 +505,7 @@ export function Sidebar({
                 }}
                 title={tool.label}
                 className={[
-                  "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/60 transition-all hover:bg-foreground/[0.04] hover:text-foreground",
+                  "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/60 transition-colors duration-150 hover:bg-foreground/[0.04] hover:text-foreground motion-reduce:transition-none",
                   !expanded && "justify-center",
                 ]
                   .filter(Boolean)
@@ -542,7 +542,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-all hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-950/60 dark:text-amber-400/60 dark:hover:bg-amber-900/50 dark:hover:text-amber-300"
+          className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-colors duration-150 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-950/60 dark:text-amber-400/60 dark:hover:bg-amber-900/50 dark:hover:text-amber-300 motion-reduce:transition-none"
           aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
           {isOpen ? (
