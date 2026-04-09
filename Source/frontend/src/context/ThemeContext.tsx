@@ -63,7 +63,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     transitionTimerRef.current = window.setTimeout(() => {
       htmlElement.classList.remove("theme-transition");
       transitionTimerRef.current = null;
-    }, 220);
+    }, 420);
   }, []);
 
   useEffect(() => {
