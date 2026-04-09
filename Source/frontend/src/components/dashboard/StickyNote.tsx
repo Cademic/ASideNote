@@ -749,7 +749,7 @@ export function StickyNote({
       onStop={handleDragStop}
       onDrag={(_e, data) => onDrag?.(note.id, data.x, data.y)}
       handle=".sticky-handle"
-      cancel=".note-action-btn, .note-options-menu"
+      cancel=".note-action-area, .note-action-btn, .note-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
     >
@@ -861,7 +861,12 @@ export function StickyNote({
           }}
         >
           <GripVertical className="h-3.5 w-3.5 text-black/20" />
-          <div className="relative flex items-center gap-0.5" ref={menuRef}>
+          <div
+            className="note-action-area relative flex items-center gap-0.5"
+            ref={menuRef}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               className="note-action-btn touch-manipulation rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
@@ -869,6 +874,8 @@ export function StickyNote({
                 e.stopPropagation();
                 setMenuOpen((open) => !open);
               }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label="Note options"
             >
@@ -878,6 +885,8 @@ export function StickyNote({
               <div
                 className="note-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -969,6 +978,8 @@ export function StickyNote({
                   onDelete(note.id);
                 }
               }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label="Delete note"
             >

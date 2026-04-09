@@ -184,7 +184,11 @@ export function LandingPage() {
           <div className="notepad-body relative px-8 py-12 sm:px-16 sm:py-16">
             <div className="mx-auto max-w-3xl text-center">
               <img
-                src="/ASideNoteText.png"
+                src={
+                  effectiveTheme === "dark"
+                    ? "/ASideNotTextDark.png"
+                    : "/ASideNoteText.png"
+                }
                 alt="Your visual workspace for ideas"
                 className="mx-auto mb-6 h-32 w-auto object-contain sm:h-[10rem]"
               />

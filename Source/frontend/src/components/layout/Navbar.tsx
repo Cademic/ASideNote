@@ -145,8 +145,8 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 >
                   {showShortFirst ? (
                     <>
-                      <span className="sm:hidden">…</span>
-                      <span className="hidden sm:inline">{seg.label}</span>
+                      <span className="inline max-[420px]:hidden">{seg.label}</span>
+                      <span className="hidden max-[420px]:inline">Dash...</span>
                     </>
                   ) : (
                     seg.label
