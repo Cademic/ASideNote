@@ -14,7 +14,7 @@ export interface ScrollSize {
 }
 
 /** Padding origin so pan≈0 maps to a mid-range scroll position and pan can go positive or negative. */
-export const BOARD_SCROLL_ORIGIN = 400_000;
+export const BOARD_SCROLL_ORIGIN = 10_000;
 
 export interface CorkScrollLayout extends ScrollSize {
   canvasLeft: number;
@@ -137,4 +137,77 @@ export function chalkZoomAroundScreenPoint(
     panX: panX + screenX * (1 / newVpScale - 1 / vpScale),
     panY: panY + screenY * (1 / newVpScale - 1 / vpScale),
   };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** Visible world width/height (chalk coords) for a viewport in CSS pixels at the given zoom. */
+export function chalkVisibleWorldSize(
+  viewportWidth: number,
+  viewportHeight: number,
+  zoom: number,
+  resolutionFactor: number,
+): { vw: number; vh: number } {
+  const rf = resolutionFactor;
+  return {
+    vw: (rf * viewportWidth) / zoom,
+    vh: (rf * viewportHeight) / zoom,
+  };
+}
+
+/**
+ * Minimum zoom so the drawable board fully covers the viewport (no “letterbox” pan dead zone).
+ * Matches screen→world mapping: worldX = (rf * screenX) / zoom - panX.
+ */
+export function chalkMinZoomForBoard(
+  viewportWidth: number,
+  viewportHeight: number,
+  boardWidth: number,
+  boardHeight: number,
+  resolutionFactor: number,
+  absoluteMinZoom: number,
+): number {
+  if (viewportWidth <= 0 || viewportHeight <= 0) return absoluteMinZoom;
+  const rf = resolutionFactor;
+  const zx = (rf * viewportWidth) / boardWidth;
+  const zy = (rf * viewportHeight) / boardHeight;
+  return Math.max(absoluteMinZoom, zx, zy);
+}
+
+/**
+ * Keeps the visible world rectangle inside [0, boardWidth] × [0, boardHeight].
+ * Uses the same convention as ChalkBoardPage: top-left visible world at (-panX, -panY).
+ */
+export function chalkClampPan(
+  panX: number,
+  panY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  zoom: number,
+  boardWidth: number,
+  boardHeight: number,
+  resolutionFactor: number,
+): { panX: number; panY: number } {
+  if (viewportWidth <= 0 || viewportHeight <= 0 || zoom <= 0) {
+    return { panX, panY };
+  }
+  const { vw, vh } = chalkVisibleWorldSize(viewportWidth, viewportHeight, zoom, resolutionFactor);
+
+  let cx: number;
+  if (vw <= boardWidth) {
+    cx = clamp(panX, vw - boardWidth, 0);
+  } else {
+    cx = (vw - boardWidth) / 2;
+  }
+
+  let cy: number;
+  if (vh <= boardHeight) {
+    cy = clamp(panY, vh - boardHeight, 0);
+  } else {
+    cy = (vh - boardHeight) / 2;
+  }
+
+  return { panX: cx, panY: cy };
 }

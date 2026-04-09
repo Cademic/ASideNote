@@ -2415,37 +2415,32 @@ export function NoteBoardPage() {
   const isEmpty = notes.length === 0 && indexCards.length === 0 && imageCards.length === 0;
 
   const boardTopBar = (
-    <div className="flex items-center gap-2 sm:gap-3">
-      <div className="min-w-0 flex-1">
-        <BoardMenuBar
-          boardType="NoteBoard"
-          zoom={zoom}
-          onZoomChange={handleBoardMenuZoomChange}
-          onSaveToFile={handleSaveToFile}
-          onLoadFromFile={handleLoadFromFile}
-          onUndo={triggerMenuUndo}
-          onRedo={triggerMenuRedo}
-          canUndo={boardUndoStackRef.current.length > 0}
-          canRedo={boardRedoStackRef.current.length > 0}
-          onInsertStickyNote={handleQuickAddNote}
-          onInsertIndexCard={handleQuickAddCard}
-          onInsertImage={handleQuickAddImage}
-          backgroundTheme={backgroundTheme}
-          onBackgroundThemeChange={setBackgroundTheme}
-          autoEnlargeNotes={autoEnlargeNotes}
-          onAutoEnlargeNotesChange={setAutoEnlargeNotes}
-          richTextToolbar={richTextToolbar}
-          onNavigatePreviousNote={handleNavigatePreviousNote}
-          onNavigateNextNote={handleNavigateNextNote}
-          noteNavigationDisabled={notes.length === 0}
-        />
-      </div>
-      {!isHubConnected && <BoardConnectedUsers users={connectedUsers} />}
-    </div>
+    <BoardMenuBar
+      boardType="NoteBoard"
+      zoom={zoom}
+      onZoomChange={handleBoardMenuZoomChange}
+      onSaveToFile={handleSaveToFile}
+      onLoadFromFile={handleLoadFromFile}
+      onUndo={triggerMenuUndo}
+      onRedo={triggerMenuRedo}
+      canUndo={boardUndoStackRef.current.length > 0}
+      canRedo={boardRedoStackRef.current.length > 0}
+      onInsertStickyNote={handleQuickAddNote}
+      onInsertIndexCard={handleQuickAddCard}
+      onInsertImage={handleQuickAddImage}
+      backgroundTheme={backgroundTheme}
+      onBackgroundThemeChange={setBackgroundTheme}
+      autoEnlargeNotes={autoEnlargeNotes}
+      onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+      richTextToolbar={richTextToolbar}
+      onNavigatePreviousNote={handleNavigatePreviousNote}
+      onNavigateNextNote={handleNavigateNextNote}
+      noteNavigationDisabled={notes.length === 0}
+    />
   );
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="note-board-page relative flex h-full flex-col">
       <input
         ref={loadFileInputRef}
         type="file"
@@ -2461,6 +2456,11 @@ export function NoteBoardPage() {
       >
         <CorkBoard
               topBar={boardTopBar}
+              topBarAside={
+                !isHubConnected && connectedUsers.length > 0
+                  ? <BoardConnectedUsers users={connectedUsers} />
+                  : undefined
+              }
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
