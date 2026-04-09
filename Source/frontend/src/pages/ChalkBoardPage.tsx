@@ -59,6 +59,7 @@ export function ChalkBoardPage() {
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
   const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
+  const noteNavAnchorRef = useRef<string | null>(null);
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
   const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
   const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
@@ -244,6 +245,91 @@ export function ChalkBoardPage() {
     setZoom(newZoom);
     setPanX(newPanX);
     setPanY(newPanY);
+  }
+
+  function getViewportCenterInBoardCoords() {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 400, y: 300 };
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const x = (centerScreenX + chalkNotesBounds.contentMinX) * (RESOLUTION_FACTOR / zoom) - panX;
+    const y = (centerScreenY + chalkNotesBounds.contentMinY) * (RESOLUTION_FACTOR / zoom) - panY;
+    return { x, y };
+  }
+
+  function panViewportToBoardPoint(centerX: number, centerY: number) {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const centerScreenX = rect.width / 2;
+    const centerScreenY = rect.height / 2;
+    const newPanX = (centerScreenX + chalkNotesBounds.contentMinX) * (RESOLUTION_FACTOR / zoom) - centerX;
+    const newPanY = (centerScreenY + chalkNotesBounds.contentMinY) * (RESOLUTION_FACTOR / zoom) - centerY;
+    handleViewportChange(zoom, newPanX, newPanY);
+  }
+
+  function getStickyNoteCenter(n: NoteSummaryDto) {
+    const x = n.positionX ?? POSITION_DEFAULT;
+    const y = n.positionY ?? POSITION_DEFAULT;
+    const w = n.width ?? NOTE_DEFAULT_SIZE;
+    const h = n.height ?? NOTE_DEFAULT_SIZE;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function sortNotesByCreatedAt(list: NoteSummaryDto[]) {
+    return [...list].sort((a, b) => {
+      const t = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (t !== 0) return t;
+      return a.id.localeCompare(b.id);
+    });
+  }
+
+  function navigateRelativeNote(delta: -1 | 1) {
+    const sorted = sortNotesByCreatedAt(notes);
+    if (sorted.length === 0) return;
+    const n = sorted.length;
+    let idx = 0;
+    const openNoteId = primaryEditingNoteIdRef.current;
+    let navigatedFromOpenNote = false;
+    if (openNoteId && sorted.some((note) => note.id === openNoteId)) {
+      idx = sorted.findIndex((note) => note.id === openNoteId);
+      navigatedFromOpenNote = true;
+    } else {
+      const anchor = noteNavAnchorRef.current;
+      if (anchor && sorted.some((note) => note.id === anchor)) {
+        idx = sorted.findIndex((note) => note.id === anchor);
+      } else {
+        const vp = getViewportCenterInBoardCoords();
+        let best = 0;
+        let bestD = Infinity;
+        sorted.forEach((note, i) => {
+          const c = getStickyNoteCenter(note);
+          const d = (c.x - vp.x) ** 2 + (c.y - vp.y) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = i;
+          }
+        });
+        idx = best;
+      }
+    }
+    const nextIdx = ((idx + delta) % n + n) % n;
+    const target = sorted[nextIdx];
+    noteNavAnchorRef.current = target.id;
+    const c = getStickyNoteCenter(target);
+    panViewportToBoardPoint(c.x, c.y);
+    if (navigatedFromOpenNote) {
+      setEditingNoteIds(new Set([target.id]));
+      primaryEditingNoteIdRef.current = target.id;
+      bringToFront(target.id);
+    }
+  }
+
+  function handleNavigatePreviousNote() {
+    navigateRelativeNote(-1);
+  }
+
+  function handleNavigateNextNote() {
+    navigateRelativeNote(1);
   }
 
   // --- Wheel zoom (Ctrl/Cmd + scroll) ---
@@ -1329,6 +1415,9 @@ export function ChalkBoardPage() {
                   autoEnlargeNotes={autoEnlargeNotes}
                   onAutoEnlargeNotesChange={setAutoEnlargeNotes}
                   richTextToolbar={richTextToolbar}
+                  onNavigatePreviousNote={handleNavigatePreviousNote}
+                  onNavigateNextNote={handleNavigateNextNote}
+                  noteNavigationDisabled={notes.length === 0}
                   chalkTools={
                     <ChalkToolbar
                       embedded

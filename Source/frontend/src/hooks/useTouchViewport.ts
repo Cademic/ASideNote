@@ -7,10 +7,10 @@ interface UseTouchViewportOptions {
   maxZoom?: number;
   onTouchPanStart?: () => void;
   onTouchPanEnd?: () => void;
-  contentMinX?: number;
-  contentMinY?: number;
   /** Applied before onViewportChange and used when updating gesture baseline (avoids drift vs parent clamp). */
   normalizeViewport?: (zoom: number, panX: number, panY: number) => { zoom: number; panX: number; panY: number };
+  contentMinX?: number;
+  contentMinY?: number;
 }
 
 export function useTouchViewport(
@@ -27,9 +27,9 @@ export function useTouchViewport(
     maxZoom = 2.0,
     onTouchPanStart,
     onTouchPanEnd,
+    normalizeViewport,
     contentMinX,
     contentMinY,
-    normalizeViewport,
   } = options;
 
   const touchModeRef = useRef<"pan" | "pinch" | null>(null);
@@ -174,32 +174,64 @@ export function useTouchViewport(
             start.panY,
             start.zoom,
             newZoom,
-            start.centerX,
-            start.centerY,
+            currentMidpoint.x,
+            currentMidpoint.y,
             contentMinX,
             contentMinY,
           );
-          onViewportChangeRef.current(newZoom, anchored.panX, anchored.panY);
+          const norm = normalizeViewportRef.current?.(newZoom, anchored.panX, anchored.panY) ?? {
+            zoom: newZoom,
+            panX: anchored.panX,
+            panY: anchored.panY,
+          };
+          onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
+          touchStartRef.current = {
+            type: "pinch",
+            d0: currentDistance,
+            centerX: currentMidpoint.x,
+            centerY: currentMidpoint.y,
+            zoom: norm.zoom,
+            panX: norm.panX,
+            panY: norm.panY,
+          };
         } else if (resolutionFactor === 1) {
-          const newPanX = start.panX + start.centerX * (1 / newZoom - 1 / start.zoom);
-          const newPanY = start.panY + start.centerY * (1 / newZoom - 1 / start.zoom);
+          const newPanX = start.panX + currentMidpoint.x * (1 / newZoom - 1 / start.zoom);
+          const newPanY = start.panY + currentMidpoint.y * (1 / newZoom - 1 / start.zoom);
           const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
             zoom: newZoom,
             panX: newPanX,
             panY: newPanY,
           };
           onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
+          touchStartRef.current = {
+            type: "pinch",
+            d0: currentDistance,
+            centerX: currentMidpoint.x,
+            centerY: currentMidpoint.y,
+            zoom: norm.zoom,
+            panX: norm.panX,
+            panY: norm.panY,
+          };
         } else {
           const vpScale = start.zoom / resolutionFactor;
           const newVpScale = newZoom / resolutionFactor;
-          const newPanX = start.panX + start.centerX * (1 / newVpScale - 1 / vpScale);
-          const newPanY = start.panY + start.centerY * (1 / newVpScale - 1 / vpScale);
+          const newPanX = start.panX + currentMidpoint.x * (1 / newVpScale - 1 / vpScale);
+          const newPanY = start.panY + currentMidpoint.y * (1 / newVpScale - 1 / vpScale);
           const norm = normalizeViewportRef.current?.(newZoom, newPanX, newPanY) ?? {
             zoom: newZoom,
             panX: newPanX,
             panY: newPanY,
           };
           onViewportChangeRef.current(norm.zoom, norm.panX, norm.panY);
+          touchStartRef.current = {
+            type: "pinch",
+            d0: currentDistance,
+            centerX: currentMidpoint.x,
+            centerY: currentMidpoint.y,
+            zoom: norm.zoom,
+            panX: norm.panX,
+            panY: norm.panY,
+          };
         }
       } else if (distanceChange > PINCH_THRESHOLD && initialDistance && initialMidpoint && mode === "pan") {
         // Switch from pan to pinch mode - use current distance as pinch start
@@ -289,5 +321,5 @@ export function useTouchViewport(
       viewport.removeEventListener("touchend", handleTouchEnd);
       viewport.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [viewportRef, resolutionFactor, minZoom, maxZoom, onTouchPanStart, onTouchPanEnd]);
+  }, [viewportRef, resolutionFactor, minZoom, maxZoom, onTouchPanStart, onTouchPanEnd, contentMinX, contentMinY]);
 }

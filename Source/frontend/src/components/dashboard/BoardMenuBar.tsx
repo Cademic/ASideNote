@@ -738,6 +738,38 @@ export function BoardMenuBar({
                         </button>
                       ))}
                     </HoverSubmenu>
+                    {onNavigatePreviousNote && onNavigateNextNote ? (
+                      <>
+                        <div className={dividerClass} />
+                        <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground/45">
+                          Notes
+                        </p>
+                        <button
+                          type="button"
+                          className={menuItemClass}
+                          disabled={noteNavigationDisabled}
+                          onClick={() => {
+                            closeMenu();
+                            onNavigatePreviousNote();
+                          }}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                          Previous note
+                        </button>
+                        <button
+                          type="button"
+                          className={menuItemClass}
+                          disabled={noteNavigationDisabled}
+                          onClick={() => {
+                            closeMenu();
+                            onNavigateNextNote();
+                          }}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                          Next note
+                        </button>
+                      </>
+                    ) : null}
                     <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
                     <div className={dividerClass} />
                     <button
