@@ -563,6 +563,7 @@ export function IndexCard({
       onStop={handleDragStop}
       onDrag={(_e, data) => onDrag?.(card.id, data.x, data.y)}
       handle=".index-card-handle"
+      cancel=".index-card-action-area, .index-card-action-btn, .index-card-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
     >
@@ -677,21 +678,21 @@ export function IndexCard({
               }}
             >
               <GripVertical className="h-3.5 w-3.5 text-black/20" />
-              <div className="relative flex items-center gap-0.5" ref={menuRef}>
+              <div className="index-card-action-area relative flex items-center gap-0.5" ref={menuRef}>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setMenuOpen((open) => !open);
                   }}
-                  className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+                  className="index-card-action-btn rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
                   aria-label="Index card options"
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>
                 {menuOpen && (
                   <div
-                    className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    className="index-card-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -706,7 +707,7 @@ export function IndexCard({
                             onColorChange(card.id, key);
                             setMenuOpen(false);
                           }}
-                          className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
+                          className={`index-card-action-btn h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
                             colorKey === key
                               ? "border-gray-700 ring-2 ring-gray-400 ring-offset-1 dark:border-gray-300 dark:ring-gray-500"
                               : "border-gray-300 dark:border-gray-500"
@@ -730,7 +731,7 @@ export function IndexCard({
                             setMenuOpen(false);
                           }}
                           className={[
-                            "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
+                            "index-card-action-btn flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
                             (card.rotation ?? 0) === deg
                               ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
                               : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
@@ -749,7 +750,7 @@ export function IndexCard({
                           onDuplicate(card.id);
                           setMenuOpen(false);
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="index-card-action-btn flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
                         <Copy className="h-3.5 w-3.5" />
                         Duplicate card
@@ -767,7 +768,7 @@ export function IndexCard({
                           onDelete(card.id);
                         }
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      className="index-card-action-btn flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Delete card
@@ -786,7 +787,7 @@ export function IndexCard({
                       onDelete(card.id);
                     }
                   }}
-                  className="rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
+                  className="index-card-action-btn rounded p-0.5 text-black/30 transition-colors hover:bg-black/10 hover:text-black/60"
                   aria-label="Delete index card"
                 >
                   <X className="h-3.5 w-3.5" />
