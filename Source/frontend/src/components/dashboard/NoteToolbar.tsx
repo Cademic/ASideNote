@@ -731,21 +731,25 @@ function NoteToolbarIdleHorizontal({ segment = "all" }: { segment?: "all" | "pri
       aria-disabled="true"
     >
       <div className="flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap pointer-events-none select-none scrollbar-hide">
-        <div className="shrink-0">
-          <FontFamilySearch
-            editor={null}
-            className="shrink-0"
-            inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
-          />
-        </div>
-        <div className="shrink-0">
-          <FontSizeSearch
-            editor={null}
-            className="shrink-0"
-            inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
-          />
-        </div>
-        <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0">
+            <FontFamilySearch
+              editor={null}
+              className="shrink-0"
+              inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0">
+            <FontSizeSearch
+              editor={null}
+              className="shrink-0"
+              inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
         {(segment === "all" || segment === "primary") &&
           [Bold, Italic, Underline, Strikethrough].map((Icon, i) => (
           <span
@@ -941,26 +945,28 @@ function NoteToolbarActive({
     <div className="note-toolbar-horizontal space-y-1.5 border-b border-black/10 px-2 pb-2 pt-1">
       {/* Row 1: Text formatting */}
       <div className="note-toolbar-row flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide">
-        {/* Font family (searchable) */}
-        <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
-          <FontFamilySearch
-            editor={editor}
-            variant="horizontal"
-            className="shrink-0"
-            inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
-          />
-        </div>
-
-        {/* Font size (searchable) */}
-        <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
-          <FontSizeSearch
-            editor={editor}
-            variant="horizontal"
-            defaultSize={14}
-            className="shrink-0"
-            inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
-          />
-        </div>
+        {/* Font family / size (searchable) */}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+            <FontFamilySearch
+              editor={editor}
+              variant="horizontal"
+              className="shrink-0"
+              inputClassName="!min-w-[7rem] !max-w-[9rem] !text-[9px]"
+            />
+          </div>
+        )}
+        {(segment === "all" || segment === "primary") && (
+          <div className="shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+            <FontSizeSearch
+              editor={editor}
+              variant="horizontal"
+              defaultSize={14}
+              className="shrink-0"
+              inputClassName="!min-w-[3rem] !max-w-[3.75rem] !text-[9px]"
+            />
+          </div>
+        )}
 
         {(segment === "all" || segment === "primary") && <div className="mx-0.5 h-4 w-px shrink-0 bg-black/10" />}
 

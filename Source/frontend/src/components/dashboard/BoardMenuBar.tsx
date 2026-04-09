@@ -89,6 +89,7 @@ export function BoardMenuBar({
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
   const chalkTouchStartXRef = useRef<number | null>(null);
   const chalkTouchStartYRef = useRef<number | null>(null);
+  const chalkTouchStartedOnScrollableRef = useRef(false);
 
   const closeMenu = () => setOpenMenu(null);
 
@@ -110,7 +111,8 @@ export function BoardMenuBar({
     if (!openMenu || isCollapsed) return;
     function onPointerDown(e: PointerEvent) {
       const t = e.target as Node;
-      if (menuBarRef.current?.contains(t)) return;
+      // Keep open only when interacting with the currently open dropdown panel.
+      if (dropdownPanelRef.current?.contains(t)) return;
       // TipTap toolbar panels are portaled to document.body; still treat as part of the bar.
       if ((e.target as Element).closest?.("[data-board-toolbar-portal]")) return;
       closeMenu();
@@ -132,7 +134,7 @@ export function BoardMenuBar({
   }, []);
 
   useEffect(() => {
-    const maxPage = isCompactToolsViewport ? 4 : 1;
+    const maxPage = isCompactToolsViewport ? 3 : 1;
     setChalkToolsPage((prev) => Math.min(prev, maxPage));
   }, [isCompactToolsViewport]);
 
@@ -141,13 +143,17 @@ export function BoardMenuBar({
   }
 
   function goToNextChalkToolsPage() {
-    const maxPage = isCompactToolsViewport ? 4 : 1;
+    const maxPage = isCompactToolsViewport ? 3 : 1;
     setChalkToolsPage((prev) => Math.min(maxPage, prev + 1));
   }
 
   function handleChalkToolsTouchStart(e: React.TouchEvent<HTMLDivElement>) {
     const touch = e.changedTouches[0];
     if (!touch) return;
+    const target = e.target as Element | null;
+    chalkTouchStartedOnScrollableRef.current = Boolean(
+      target?.closest("[data-chalk-tools-scrollable]"),
+    );
     chalkTouchStartXRef.current = touch.clientX;
     chalkTouchStartYRef.current = touch.clientY;
   }
@@ -157,7 +163,10 @@ export function BoardMenuBar({
     const startY = chalkTouchStartYRef.current;
     chalkTouchStartXRef.current = null;
     chalkTouchStartYRef.current = null;
+    const startedOnScrollable = chalkTouchStartedOnScrollableRef.current;
+    chalkTouchStartedOnScrollableRef.current = false;
     if (startX == null || startY == null) return;
+    if (startedOnScrollable) return;
     const touch = e.changedTouches[0];
     if (!touch) return;
     const deltaX = touch.clientX - startX;
@@ -178,11 +187,21 @@ export function BoardMenuBar({
 
   const dropdownClass =
     "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
-  const showCompactChalkTools = boardType === "ChalkBoard" && Boolean(chalkTools) && isCompactToolsViewport;
+  const hasChalkTools = boardType === "ChalkBoard" && Boolean(chalkTools);
+  const showCompactBoardTools =
+    isCompactToolsViewport && (boardType === "NoteBoard" || hasChalkTools);
+  const toolsSlidesCount = showCompactBoardTools
+    ? hasChalkTools
+      ? 4
+      : 3
+    : hasChalkTools
+      ? 2
+      : 1;
+  const maxChalkToolsPage = Math.max(0, toolsSlidesCount - 1);
 
   const noteToolbarExpandedClass = [
-    "min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40",
-    showCompactChalkTools ? "flex flex-col justify-center" : "hidden lg:flex lg:flex-col lg:justify-center",
+    "min-h-[38px] min-w-0 flex-1 overflow-visible border-l border-border/50 pl-2 dark:border-border/40",
+    showCompactBoardTools ? "flex flex-col justify-center" : "hidden lg:flex lg:flex-col lg:justify-center",
   ].join(" ");
 
   const collapsibleMenusClassName = [
@@ -192,6 +211,8 @@ export function BoardMenuBar({
       ? "max-h-0 overflow-hidden opacity-0 pointer-events-none"
       : "max-h-[min(70vh,28rem)] overflow-visible opacity-100",
   ].join(" ");
+  const compactDropdownClass =
+    "pointer-events-auto absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-border bg-background py-1 shadow-xl";
 
   return (
     <div
@@ -201,7 +222,7 @@ export function BoardMenuBar({
     >
       <div className={collapsibleMenusClassName}>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      {!showCompactChalkTools ? (
+      {!showCompactBoardTools ? (
       <div className="flex flex-shrink-0 flex-wrap items-center gap-1">
       {/* File */}
       <div className="relative">
@@ -454,7 +475,7 @@ export function BoardMenuBar({
       ) : null}
 
       <div className={noteToolbarExpandedClass}>
-        {boardType === "ChalkBoard" && chalkTools ? (
+        {hasChalkTools || showCompactBoardTools ? (
           <div className="relative min-w-0 w-full">
             <div className="flex min-w-0 items-center gap-1">
               <button
@@ -468,7 +489,7 @@ export function BoardMenuBar({
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <div
-                className="min-w-0 flex-1 overflow-hidden touch-pan-y"
+                className="min-w-0 flex-1 overflow-hidden touch-pan-x"
                 onTouchStart={handleChalkToolsTouchStart}
                 onTouchEnd={handleChalkToolsTouchEnd}
               >
@@ -477,8 +498,8 @@ export function BoardMenuBar({
                   style={{ transform: `translateX(-${chalkToolsPage * 100}%)` }}
                 >
                   {isCompactToolsViewport ? (
-                    <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
-                      <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide [&>*]:shrink-0">
+                    <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                      <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide touch-pan-x [&>*]:shrink-0">
                         <button
                           type="button"
                           onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
@@ -510,19 +531,21 @@ export function BoardMenuBar({
                       </div>
                     </div>
                   ) : null}
-                  <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
-                    <div className="min-w-max">
-                      {chalkTools}
+                  {hasChalkTools ? (
+                    <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
+                      <div className="min-w-max">
+                        {chalkTools}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                   {isCompactToolsViewport ? (
                     <>
-                      <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                      <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
                         <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
                           <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="primary" />
                         </div>
                       </div>
-                      <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                      <div data-chalk-tools-scrollable className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide touch-pan-x">
                         <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
                           <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="secondary" />
                         </div>
@@ -538,7 +561,7 @@ export function BoardMenuBar({
               <button
                 type="button"
                 onClick={goToNextChalkToolsPage}
-                disabled={chalkToolsPage === (isCompactToolsViewport ? 4 : 1)}
+                disabled={chalkToolsPage === maxChalkToolsPage}
                 title="Next tools"
                 aria-label="Next tools"
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
@@ -546,6 +569,198 @@ export function BoardMenuBar({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+            {toolsSlidesCount > 1 ? (
+              <div className="mt-1 flex items-center justify-center gap-1.5">
+                {Array.from({ length: toolsSlidesCount }).map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setChalkToolsPage(idx)}
+                    aria-label={`Open tools slide ${idx + 1}`}
+                    aria-pressed={chalkToolsPage === idx}
+                    className={[
+                      "h-2.5 w-2.5 rounded-full transition-colors",
+                      chalkToolsPage === idx
+                        ? "bg-sky-500 dark:bg-sky-400"
+                        : "bg-foreground/25 hover:bg-foreground/40",
+                    ].join(" ")}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {showCompactBoardTools && openMenu ? (
+              <div ref={dropdownPanelRef} className={compactDropdownClass}>
+                {openMenu === "file" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onSaveToFile();
+                      }}
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Save to file
+                    </button>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onLoadFromFile();
+                      }}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Load from file
+                    </button>
+                  </>
+                ) : null}
+                {openMenu === "edit" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onUndo();
+                      }}
+                      disabled={!canUndo}
+                    >
+                      Undo
+                      <span className="ml-auto text-xs text-foreground/50">Ctrl+Z</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onRedo();
+                      }}
+                      disabled={!canRedo}
+                    >
+                      Redo
+                      <span className="ml-auto text-xs text-foreground/50">Ctrl+Y</span>
+                    </button>
+                    <BoardMenuMobileEditToolkit editor={richTextToolbar?.editor ?? null} />
+                  </>
+                ) : null}
+                {openMenu === "insert" ? (
+                  <>
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onInsertStickyNote();
+                      }}
+                    >
+                      <StickyNoteIcon className="h-3.5 w-3.5 text-yellow-500" />
+                      Sticky Note
+                    </button>
+                    {boardType === "NoteBoard" && onInsertIndexCard ? (
+                      <button
+                        type="button"
+                        className={menuItemClass}
+                        onClick={() => {
+                          closeMenu();
+                          onInsertIndexCard();
+                        }}
+                      >
+                        <CreditCard className="h-3.5 w-3.5 text-sky-500" />
+                        Index Card
+                      </button>
+                    ) : null}
+                    {boardType === "NoteBoard" && onInsertImage ? (
+                      <button
+                        type="button"
+                        className={menuItemClass}
+                        onClick={() => {
+                          closeMenu();
+                          onInsertImage();
+                        }}
+                      >
+                        <ImageIcon className="h-3.5 w-3.5 text-emerald-500" />
+                        Image
+                      </button>
+                    ) : null}
+                    <BoardMenuMobileInsertToolkit editor={richTextToolbar?.editor ?? null} />
+                  </>
+                ) : null}
+                {openMenu === "view" ? (
+                  <>
+                    <HoverSubmenu label="Background">
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "whiteboard" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("whiteboard");
+                        }}
+                      >
+                        WhiteBoard
+                      </button>
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "blackboard" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("blackboard");
+                        }}
+                      >
+                        Blackboard
+                      </button>
+                      <div className={dividerClass} />
+                      <button
+                        type="button"
+                        className={`${menuItemClass} ${backgroundTheme === "default" ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                        onClick={() => {
+                          closeMenu();
+                          onBackgroundThemeChange("default");
+                        }}
+                      >
+                        Default
+                      </button>
+                    </HoverSubmenu>
+                    <div className={dividerClass} />
+                    <HoverSubmenu label="Zoom">
+                      {ZOOM_PRESETS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`${menuItemClass} ${Math.round(zoom * 100) === p ? "bg-sky-50 dark:bg-sky-900/20" : ""}`}
+                          onClick={() => {
+                            closeMenu();
+                            onZoomChange(p / 100);
+                          }}
+                        >
+                          {p}%
+                        </button>
+                      ))}
+                    </HoverSubmenu>
+                    <BoardMenuMobileViewToolkit editor={richTextToolbar?.editor ?? null} />
+                    <div className={dividerClass} />
+                    <button
+                      type="button"
+                      className={menuItemClass}
+                      onClick={() => {
+                        closeMenu();
+                        onAutoEnlargeNotesChange(!autoEnlargeNotes);
+                      }}
+                    >
+                      <span
+                        className={`mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-current ${
+                          autoEnlargeNotes ? "bg-primary text-primary-foreground" : "bg-transparent"
+                        }`}
+                      >
+                        {autoEnlargeNotes ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                      </span>
+                      Auto-enlarge notes on click
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">

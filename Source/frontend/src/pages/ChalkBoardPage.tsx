@@ -1138,6 +1138,8 @@ export function ChalkBoardPage() {
   }
 
   function handleStartEdit(id: string) {
+    setMode("select");
+    canvasRef.current?.setDrawingMode(false);
     setEditingNoteIds(new Set([id]));
     primaryEditingNoteIdRef.current = id;
     bringToFront(id);
