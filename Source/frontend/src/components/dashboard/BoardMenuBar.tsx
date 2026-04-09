@@ -84,6 +84,7 @@ export function BoardMenuBar({
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [chalkToolsPage, setChalkToolsPage] = useState(0);
+  const [isCompactToolsViewport, setIsCompactToolsViewport] = useState<boolean>(() => window.innerWidth < 1024);
   const menuBarRef = useRef<HTMLDivElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
   const chalkTouchStartXRef = useRef<number | null>(null);
@@ -122,12 +123,26 @@ export function BoardMenuBar({
     if (isCollapsed) setOpenMenu(null);
   }, [isCollapsed]);
 
+  useEffect(() => {
+    function onResize() {
+      setIsCompactToolsViewport(window.innerWidth < 1024);
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    const maxPage = isCompactToolsViewport ? 4 : 1;
+    setChalkToolsPage((prev) => Math.min(prev, maxPage));
+  }, [isCompactToolsViewport]);
+
   function goToPrevChalkToolsPage() {
     setChalkToolsPage((prev) => Math.max(0, prev - 1));
   }
 
   function goToNextChalkToolsPage() {
-    setChalkToolsPage((prev) => Math.min(1, prev + 1));
+    const maxPage = isCompactToolsViewport ? 4 : 1;
+    setChalkToolsPage((prev) => Math.min(maxPage, prev + 1));
   }
 
   function handleChalkToolsTouchStart(e: React.TouchEvent<HTMLDivElement>) {
@@ -148,7 +163,9 @@ export function BoardMenuBar({
     const deltaX = touch.clientX - startX;
     const deltaY = touch.clientY - startY;
     if (Math.abs(deltaX) < 40 || Math.abs(deltaY) > 40) return;
-    if (deltaX < 0) goToNextChalkToolsPage();
+    if (deltaX < 0) {
+      goToNextChalkToolsPage();
+    }
     else goToPrevChalkToolsPage();
   }
 
@@ -161,9 +178,12 @@ export function BoardMenuBar({
 
   const dropdownClass =
     "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
+  const showCompactChalkTools = boardType === "ChalkBoard" && Boolean(chalkTools) && isCompactToolsViewport;
 
-  const noteToolbarExpandedClass =
-    "hidden min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40 lg:flex lg:flex-col lg:justify-center";
+  const noteToolbarExpandedClass = [
+    "min-h-[38px] min-w-0 flex-1 overflow-x-auto border-l border-border/50 pl-2 dark:border-border/40",
+    showCompactChalkTools ? "flex flex-col justify-center" : "hidden lg:flex lg:flex-col lg:justify-center",
+  ].join(" ");
 
   const collapsibleMenusClassName = [
     "w-full min-h-0 transition-[max-height,opacity] duration-300 ease-in-out motion-reduce:transition-none motion-reduce:duration-0",
@@ -181,6 +201,7 @@ export function BoardMenuBar({
     >
       <div className={collapsibleMenusClassName}>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      {!showCompactChalkTools ? (
       <div className="flex flex-shrink-0 flex-wrap items-center gap-1">
       {/* File */}
       <div className="relative">
@@ -430,6 +451,7 @@ export function BoardMenuBar({
         )}
       </div>
       </div>
+      ) : null}
 
       <div className={noteToolbarExpandedClass}>
         {boardType === "ChalkBoard" && chalkTools ? (
@@ -454,18 +476,69 @@ export function BoardMenuBar({
                   className="flex transition-transform duration-300 ease-out motion-reduce:transition-none"
                   style={{ transform: `translateX(-${chalkToolsPage * 100}%)` }}
                 >
-                  <div className="w-full shrink-0 min-w-0">
-                    {chalkTools}
+                  {isCompactToolsViewport ? (
+                    <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                      <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide [&>*]:shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
+                          className={menuTriggerClass("file")}
+                        >
+                          File
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "edit" ? null : "edit")}
+                          className={menuTriggerClass("edit")}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "insert" ? null : "insert")}
+                          className={menuTriggerClass("insert")}
+                        >
+                          Insert
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setOpenMenu(openMenu === "view" ? null : "view")}
+                          className={menuTriggerClass("view")}
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                    <div className="min-w-max">
+                      {chalkTools}
+                    </div>
                   </div>
-                  <div className="w-full shrink-0 min-w-0 [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
-                    <NoteToolbar editor={richTextToolbar?.editor ?? null} />
-                  </div>
+                  {isCompactToolsViewport ? (
+                    <>
+                      <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                          <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="primary" />
+                        </div>
+                      </div>
+                      <div className="w-full shrink-0 min-w-0 overflow-x-auto scrollbar-hide">
+                        <div className="min-w-max [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                          <NoteToolbar editor={richTextToolbar?.editor ?? null} segment="secondary" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full shrink-0 min-w-0 [&>div]:border-b-0 [&>div]:pb-1 [&>div]:pt-0">
+                      <NoteToolbar editor={richTextToolbar?.editor ?? null} />
+                    </div>
+                  )}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={goToNextChalkToolsPage}
-                disabled={chalkToolsPage === 1}
+                disabled={chalkToolsPage === (isCompactToolsViewport ? 4 : 1)}
                 title="Next tools"
                 aria-label="Next tools"
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"

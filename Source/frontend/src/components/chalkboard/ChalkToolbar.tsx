@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Pen,
   MousePointer2,
@@ -65,9 +66,11 @@ export function ChalkToolbar({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [position, setPosition] = useState<{ centerX: number; centerY: number } | null>(null);
+  const [clearPopupPos, setClearPopupPos] = useState<{ left: number; top: number } | null>(null);
   const [, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const clearButtonRef = useRef<HTMLButtonElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; centerX: number; centerY: number } | null>(null);
   const draggedRef = useRef(false);
 
@@ -153,13 +156,35 @@ export function ChalkToolbar({
   );
 
   function handleClear() {
+    if (embedded) {
+      const rect = clearButtonRef.current?.getBoundingClientRect();
+      if (rect) {
+        setClearPopupPos({ left: rect.right + 8, top: rect.top + rect.height / 2 });
+      }
+      setShowClearConfirm(true);
+      return;
+    }
     setShowClearConfirm(true);
   }
 
   function confirmClear() {
     setShowClearConfirm(false);
+    setClearPopupPos(null);
     onClear();
   }
+
+  useEffect(() => {
+    if (!embedded || !showClearConfirm) return;
+    function closeOnOutside(e: PointerEvent) {
+      const target = e.target as Node;
+      if (clearButtonRef.current?.contains(target)) return;
+      if ((target as Element).closest?.("[data-chalk-clear-popup]")) return;
+      setShowClearConfirm(false);
+      setClearPopupPos(null);
+    }
+    document.addEventListener("pointerdown", closeOnOutside, true);
+    return () => document.removeEventListener("pointerdown", closeOnOutside, true);
+  }, [embedded, showClearConfirm]);
 
   const scale = "scale-[0.85] sm:scale-100";
   const iconSize = "h-3.5 w-3.5 sm:h-4 sm:w-4";
@@ -327,6 +352,7 @@ export function ChalkToolbar({
       {/* Clear */}
       <div className="relative">
         <ToolButton
+          buttonRef={clearButtonRef}
           onClick={handleClear}
           title="Clear canvas"
         className={`${embedded ? "text-red-600/80 hover:text-red-700 dark:text-red-300/80 dark:hover:text-red-200" : "text-red-400/60 hover:text-red-400"} ${btnSize}`}
@@ -336,7 +362,7 @@ export function ChalkToolbar({
           <Trash2 />
         </ToolButton>
 
-        {showClearConfirm && (
+        {showClearConfirm && !embedded && (
           <div className="pointer-events-auto absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-md">
             <p className="mb-2 text-xs font-medium text-white/80">
               Clear entire canvas?
@@ -344,7 +370,10 @@ export function ChalkToolbar({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setShowClearConfirm(false)}
+                onClick={() => {
+                  setShowClearConfirm(false);
+                  setClearPopupPos(null);
+                }}
                 className="rounded-md px-2.5 py-1 text-xs font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
                 Cancel
@@ -365,12 +394,45 @@ export function ChalkToolbar({
 
   if (embedded) {
     return (
-      <div
-        ref={containerRef}
-        className={`flex items-center rounded-lg bg-transparent shadow-none backdrop-blur-0 transition-all ${scale} ${padSize} gap-1`}
-      >
-        {expandedControls}
-      </div>
+      <>
+        <div
+          ref={containerRef}
+          className={`flex items-center rounded-lg bg-transparent shadow-none backdrop-blur-0 transition-all ${scale} ${padSize} gap-1`}
+        >
+          {expandedControls}
+        </div>
+        {showClearConfirm && clearPopupPos
+          ? createPortal(
+              <div
+                data-chalk-clear-popup
+                className="fixed z-[100000] -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-md"
+                style={{ left: clearPopupPos.left, top: clearPopupPos.top }}
+              >
+                <p className="mb-2 text-xs font-medium text-white/80">Clear entire canvas?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowClearConfirm(false);
+                      setClearPopupPos(null);
+                    }}
+                    className="rounded-md px-2.5 py-1 text-xs font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmClear}
+                    className="rounded-md bg-red-500/80 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-red-500"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
+      </>
     );
   }
 
@@ -420,11 +482,13 @@ interface ToolButtonProps {
   className?: string;
   iconClassName?: string;
   embedded?: boolean;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-function ToolButton({ children, active, onClick, title, className, iconClassName = "h-4 w-4", embedded = false }: ToolButtonProps) {
+function ToolButton({ children, active, onClick, title, className, iconClassName = "h-4 w-4", embedded = false, buttonRef }: ToolButtonProps) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onClick}
       title={title}

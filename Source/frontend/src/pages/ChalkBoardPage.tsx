@@ -3,7 +3,11 @@ import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { ChalkCanvas, CHALKBOARD_BG, RESOLUTION_FACTOR, type ChalkCanvasHandle } from "../components/chalkboard/ChalkCanvas";
 import { ChalkToolbar, type ChalkMode, type ChalkTool } from "../components/chalkboard/ChalkToolbar";
-import { BoardMenuBar, type BoardBackgroundTheme } from "../components/dashboard/BoardMenuBar";
+import {
+  BoardMenuBar,
+  type BoardBackgroundTheme,
+  type BoardRichTextToolbarState,
+} from "../components/dashboard/BoardMenuBar";
 import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
 import { StickyNote } from "../components/dashboard/StickyNote";
 import { ZoomControls } from "../components/dashboard/ZoomControls";
@@ -53,6 +57,7 @@ export function ChalkBoardPage() {
   // --- Notes state ---
   const [notes, setNotes] = useState<NoteSummaryDto[]>([]);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
+  const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
   const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
@@ -133,6 +138,26 @@ export function ChalkBoardPage() {
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<{ x: number; y: number; note: NoteSummaryDto } | null>(null);
   const loadFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRichTextToolbarChange = useCallback(
+    (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => {
+      if (state === null && clearedSourceId !== undefined) {
+        setRichTextToolbar((prev) => (prev?.sourceId === clearedSourceId ? null : prev));
+        return;
+      }
+      if (state === null) {
+        setRichTextToolbar(null);
+        return;
+      }
+      setRichTextToolbar((prev) => {
+        if (prev && prev.sourceId === state.sourceId && prev.editor === state.editor) {
+          return prev;
+        }
+        return state;
+      });
+    },
+    [],
+  );
 
   // --- ChalkBoard UI preferences (persist in localStorage) ---
   const [backgroundTheme, setBackgroundTheme] = useState<BoardBackgroundTheme>(() => {
@@ -333,11 +358,13 @@ export function ChalkBoardPage() {
 
       const target = e.target as Element;
       if (target.closest("[data-board-toolbar-portal]")) return;
+      if (target.closest("[data-board-menu-bar]")) return;
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       if (noteEl?.getAttribute("data-note-id") === primaryNote) return;
 
       setEditingNoteIds(new Set());
       primaryEditingNoteIdRef.current = null;
+      setRichTextToolbar(null);
     }
     document.addEventListener("mousedown", handleDocumentMouseDown, true);
     return () => document.removeEventListener("mousedown", handleDocumentMouseDown, true);
@@ -952,6 +979,7 @@ export function ChalkBoardPage() {
     if (newMode === "draw") {
       setEditingNoteIds(new Set());
       primaryEditingNoteIdRef.current = null;
+      setRichTextToolbar(null);
       canvasRef.current?.setDrawingMode(true);
       if (tool === "eraser") {
         canvasRef.current?.setEraserMode(true);
@@ -1006,6 +1034,7 @@ export function ChalkBoardPage() {
       setEditingNoteIds((prev) => new Set(prev).add(created.id));
       primaryEditingNoteIdRef.current = created.id;
       setMode("select");
+      setRichTextToolbar(null);
       canvasRef.current?.setDrawingMode(false);
     } catch {
       // Silently fail
@@ -1057,6 +1086,7 @@ export function ChalkBoardPage() {
       }
       return next;
     });
+    setRichTextToolbar((prev) => (prev?.sourceId === id ? null : prev));
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, title: title || null, content } : n,
@@ -1104,6 +1134,7 @@ export function ChalkBoardPage() {
     if (primaryEditingNoteIdRef.current === id) {
       primaryEditingNoteIdRef.current = null;
     }
+    setRichTextToolbar((prev) => (prev?.sourceId === id ? null : prev));
   }
 
   function handleStartEdit(id: string) {
@@ -1295,6 +1326,7 @@ export function ChalkBoardPage() {
                   onBackgroundThemeChange={setBackgroundTheme}
                   autoEnlargeNotes={autoEnlargeNotes}
                   onAutoEnlargeNotesChange={setAutoEnlargeNotes}
+                  richTextToolbar={richTextToolbar}
                   chalkTools={
                     <ChalkToolbar
                       embedded
@@ -1425,6 +1457,7 @@ export function ChalkBoardPage() {
                 onExitEdit={handleExitEditNote}
                 onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
                 zoom={zoom / RESOLUTION_FACTOR}
+                onRichTextToolbarChange={handleRichTextToolbarChange}
               />
             ))}
           </div>
