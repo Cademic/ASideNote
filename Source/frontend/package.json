@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@csstools/css-parser-algorithms": "^3.0.5",
+    "@csstools/css-parser-algorithms": "^4.0.0",
     "@csstools/css-tokenizer": "^3.0.4",
     "@floating-ui/dom": "^1.7.6",
     "@microsoft/signalr": "^10.0.0",
