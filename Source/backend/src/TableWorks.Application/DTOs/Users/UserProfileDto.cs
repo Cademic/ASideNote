@@ -8,6 +8,8 @@ public sealed class UserProfileDto
     public string Role { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    /// <summary>Last throttled interaction or app-open (UTC).</summary>
+    public DateTime? LastActivityAt { get; set; }
     public string? ProfilePictureKey { get; set; }
     public string? Bio { get; set; }
     public DateTime? UsernameChangedAt { get; set; }

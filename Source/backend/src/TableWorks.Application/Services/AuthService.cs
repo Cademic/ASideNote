@@ -4,6 +4,7 @@ using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ASideNote.Application.DTOs.Auth;
+using ASideNote.Application.DTOs.Users;
 using ASideNote.Application.Interfaces;
 using ASideNote.Core.Entities;
 using ASideNote.Core.Interfaces;
@@ -35,6 +36,7 @@ public sealed class AuthService : IAuthService
     private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
     private readonly ILogger<AuthService> _logger;
+    private readonly IUserService _userService;
 
     private static readonly string FrontendUrl =
         Environment.GetEnvironmentVariable("FRONTEND_URL") ?? "http://localhost:5173";
@@ -51,7 +53,8 @@ public sealed class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IEmailService emailService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IUserService userService)
     {
         _userRepo = userRepo;
         _refreshTokenRepo = refreshTokenRepo;
@@ -62,6 +65,7 @@ public sealed class AuthService : IAuthService
         _tokenService = tokenService;
         _emailService = emailService;
         _logger = logger;
+        _userService = userService;
     }
 
     // -----------------------------------------------------------------------
@@ -234,6 +238,15 @@ public sealed class AuthService : IAuthService
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _userService.RecordPresenceAsync(userId, new UpdatePresenceRequest { Leave = true }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clear presence on logout for user {UserId}", userId);
+        }
     }
 
     // -----------------------------------------------------------------------

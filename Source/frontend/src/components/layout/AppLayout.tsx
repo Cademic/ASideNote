@@ -7,6 +7,7 @@ import { getPinnedNotebooks, toggleNotebookPin } from "../../api/notebooks";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { useAuth } from "../../context/AuthContext";
+import { useSessionPresence } from "../../hooks/useSessionPresence";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 
 /** Tailwind `lg` breakpoint — below this: sidebar becomes hamburger drawer */
@@ -49,6 +50,7 @@ export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  useSessionPresence(isAuthenticated);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= SIDEBAR_BREAKPOINT);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < SIDEBAR_BREAKPOINT);
   const [boardName, setBoardName] = useState<string | null>(null);

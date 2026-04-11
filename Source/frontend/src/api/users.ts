@@ -11,12 +11,17 @@ import type {
   SentFriendRequestDto,
   FriendStatusDto,
   SendFriendRequestRequest,
+  UpdatePresenceRequest,
 } from "../types";
 import { apiClient } from "./client";
 
 export async function getProfile(): Promise<UserProfileDto> {
   const response = await apiClient.get<UserProfileDto>("/users/me");
   return response.data;
+}
+
+export async function postPresence(data: UpdatePresenceRequest): Promise<void> {
+  await apiClient.post("/users/me/presence", data);
 }
 
 export async function getPublicProfile(userId: string): Promise<UserPublicDto | null> {

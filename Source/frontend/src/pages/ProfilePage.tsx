@@ -245,6 +245,8 @@ function FriendCard({
     return () => document.removeEventListener("click", handleClick);
   }, [menuOpen]);
 
+  const presence = f.presenceStatus ?? "inactive";
+
   async function handleUnadd(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -271,36 +273,44 @@ function FriendCard({
         to={`/profile/${encodeURIComponent(f.username)}`}
         className="flex items-center gap-3 rounded-lg border border-border/40 p-3 transition-colors hover:bg-muted/50"
       >
-        <div className="relative flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
-          {getAvatarUrl(f.profilePictureKey) ? (
-            <img
-              src={getAvatarUrl(f.profilePictureKey)!}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="text-sm font-medium text-foreground/60">
-              {f.username.charAt(0).toUpperCase()}
-            </span>
-          )}
-          {f.lastLoginAt &&
-            Date.now() - new Date(f.lastLoginAt).getTime() < 15 * 60 * 1000 && (
-              <span
-                className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background bg-emerald-500"
-                title="Online"
+        <div className="relative h-10 w-10 flex-shrink-0">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+            {getAvatarUrl(f.profilePictureKey) ? (
+              <img
+                src={getAvatarUrl(f.profilePictureKey)!}
+                alt=""
+                className="h-full w-full object-cover"
               />
+            ) : (
+              <span className="text-sm font-medium text-foreground/60">
+                {f.username.charAt(0).toUpperCase()}
+              </span>
             )}
+          </div>
+          {(presence === "active" || presence === "idle") && (
+            <span
+              className={`pointer-events-none absolute -bottom-1 -right-1 z-10 h-4 w-4 rounded-full border-[3px] border-background shadow-md ring-1 ring-black/10 dark:ring-white/20 ${
+                presence === "active" ? "bg-emerald-500" : "bg-amber-500"
+              }`}
+              title={presence === "active" ? "Active" : "Idle"}
+              aria-hidden
+            />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-foreground">
             {f.username}
           </span>
           <span className="block truncate text-xs text-foreground/50">
-            {f.lastLoginAt
-              ? Date.now() - new Date(f.lastLoginAt).getTime() < 15 * 60 * 1000
-                ? "Online"
-                : `Last active ${formatRelative(f.lastLoginAt)}`
-              : "Never logged in"}
+            {presence === "active"
+              ? "Active"
+              : presence === "idle"
+                ? "Idle"
+                : f.lastActivityAt
+                  ? `Last active ${formatRelative(f.lastActivityAt)}`
+                  : f.lastLoginAt
+                    ? `Last active ${formatRelative(f.lastLoginAt)}`
+                    : "Never logged in"}
           </span>
         </div>
       </Link>
@@ -852,15 +862,13 @@ export function ProfilePage() {
               <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {[...otherUserFriends]
                   .sort((a, b) => {
-                    const ONLINE_MINS = 15;
-                    const now = Date.now();
-                    const isOnline = (last: string | null) =>
-                      last && now - new Date(last).getTime() < ONLINE_MINS * 60 * 1000;
-                    const aOnline = isOnline(a.lastLoginAt) ? 1 : 0;
-                    const bOnline = isOnline(b.lastLoginAt) ? 1 : 0;
-                    if (bOnline !== aOnline) return bOnline - aOnline;
-                    const aTime = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
-                    const bTime = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+                    const order = (s: string | undefined) =>
+                      s === "active" ? 0 : s === "idle" ? 1 : 2;
+                    const ao = order(a.presenceStatus ?? "inactive");
+                    const bo = order(b.presenceStatus ?? "inactive");
+                    if (ao !== bo) return ao - bo;
+                    const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+                    const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
                     return bTime - aTime;
                   })
                   .map((f) => (
@@ -995,15 +1003,13 @@ export function ProfilePage() {
               <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {[...friends]
                   .sort((a, b) => {
-                    const ONLINE_MINS = 15;
-                    const now = Date.now();
-                    const isOnline = (last: string | null) =>
-                      last && now - new Date(last).getTime() < ONLINE_MINS * 60 * 1000;
-                    const aOnline = isOnline(a.lastLoginAt) ? 1 : 0;
-                    const bOnline = isOnline(b.lastLoginAt) ? 1 : 0;
-                    if (bOnline !== aOnline) return bOnline - aOnline;
-                    const aTime = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
-                    const bTime = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+                    const order = (s: string | undefined) =>
+                      s === "active" ? 0 : s === "idle" ? 1 : 2;
+                    const ao = order(a.presenceStatus ?? "inactive");
+                    const bo = order(b.presenceStatus ?? "inactive");
+                    if (ao !== bo) return ao - bo;
+                    const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0;
+                    const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0;
                     return bTime - aTime;
                   })
                   .map((f) => (

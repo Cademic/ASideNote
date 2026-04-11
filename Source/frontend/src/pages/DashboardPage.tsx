@@ -30,7 +30,7 @@ import {
   leaveProject,
 } from "../api/projects";
 import { getNotebooks, createNotebook, deleteNotebook, updateNotebook, toggleNotebookPin } from "../api/notebooks";
-import { getFriends } from "../api/users";
+import { getFriends, getProfile } from "../api/users";
 import { getCalendarEvents } from "../api/calendar-events";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { MiniCalendar } from "../components/dashboard/MiniCalendar";
@@ -96,6 +96,7 @@ export function DashboardPage() {
   const [notebookRenameValue, setNotebookRenameValue] = useState("");
   const [notebookDeleteTarget, setNotebookDeleteTarget] = useState<NotebookSummaryDto | null>(null);
   const [friends, setFriends] = useState<FriendDto[]>([]);
+  const [myLastActivityAt, setMyLastActivityAt] = useState<string | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
 
@@ -124,6 +125,9 @@ export function DashboardPage() {
 
   useEffect(() => {
     getFriends().then(setFriends).catch(() => setFriends([]));
+    getProfile()
+      .then((p) => setMyLastActivityAt(p.lastActivityAt ?? null))
+      .catch(() => setMyLastActivityAt(null));
   }, []);
 
   useEffect(() => {
@@ -565,25 +569,13 @@ export function DashboardPage() {
     if (candidates.length === 0) return { display: "No upcoming events", event: undefined, project: undefined };
     candidates.sort((a, b) => a.startMs - b.startMs);
     const first = candidates[0];
-    const maxLen = 18;
-    const display = first.title.length > maxLen ? first.title.slice(0, maxLen).trim() + "…" : first.title;
-    return { display, event: first.event, project: first.project };
+    return { display: first.title, event: first.event, project: first.project };
   }, [calendarEvents, activeProjects]);
 
-  const friendsOnline = useMemo(() => {
-    const ONLINE_MINS = 15;
-    const now = Date.now();
-    return friends.filter(
-      (f) => f.lastLoginAt && now - new Date(f.lastLoginAt).getTime() < ONLINE_MINS * 60 * 1000,
-    ).length;
-  }, [friends]);
-
-  const mostRecentBoard = useMemo(() => {
-    if (boards.length === 0) return null;
-    return boards.reduce((latest, b) =>
-      new Date(b.updatedAt) > new Date(latest.updatedAt) ? b : latest,
-    );
-  }, [boards]);
+  const friendsOnline = useMemo(
+    () => friends.filter((f) => f.presenceStatus === "active" || f.presenceStatus === "idle").length,
+    [friends],
+  );
 
   const projectNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -685,7 +677,7 @@ export function DashboardPage() {
             color="green"
             icon={Clock}
             label="Last Activity"
-            value={mostRecentBoard ? formatShortDate(mostRecentBoard.updatedAt) : "—"}
+            value={myLastActivityAt ? formatShortDate(myLastActivityAt) : "—"}
             rotation={2}
           />
         </div>
@@ -1065,18 +1057,25 @@ interface StatStickyProps {
   value: string;
   rotation: number;
   onClick?: () => void;
+  /** Shown on hover when the value is visually clipped */
+  valueTooltip?: string;
 }
 
-function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: StatStickyProps) {
-  const baseClassName = `stat-sticky flex flex-col items-center justify-center px-4 py-5 ${STICKY_BG[color]}`;
+function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueTooltip }: StatStickyProps) {
+  const baseClassName = `stat-sticky flex min-h-[7.5rem] w-full min-w-0 flex-col items-center justify-center overflow-hidden px-3 py-5 sm:px-4 ${STICKY_BG[color]}`;
   const style = { transform: `rotate(${rotation}deg)` };
+  const tip = valueTooltip ?? value;
   const content = (
     <>
-      <Icon className={`mb-1.5 h-4 w-4 ${STICKY_ACCENT[color]}`} />
-      <span className={`text-2xl font-bold leading-none ${STICKY_ACCENT[color]}`}>
+      <Icon className={`mb-1.5 h-4 w-4 shrink-0 ${STICKY_ACCENT[color]}`} />
+      <span
+        className={`line-clamp-2 w-full min-w-0 max-w-full break-all px-0.5 text-center text-lg font-bold leading-tight sm:text-xl md:text-2xl ${STICKY_ACCENT[color]}`}
+      >
         {value}
       </span>
-      <span className="mt-1 text-[11px] font-medium text-foreground/45">{label}</span>
+      <span className="mt-1 max-w-full truncate px-0.5 text-center text-[11px] font-medium text-foreground/45">
+        {label}
+      </span>
     </>
   );
 
@@ -1085,6 +1084,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: Stat
       <button
         type="button"
         onClick={onClick}
+        title={tip.length > 0 ? tip : undefined}
         className={`${baseClassName} cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2`}
         style={style}
       >
@@ -1094,7 +1094,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: Stat
   }
 
   return (
-    <div className={baseClassName} style={style}>
+    <div className={baseClassName} style={style} title={tip.length > 0 ? tip : undefined}>
       {content}
     </div>
   );

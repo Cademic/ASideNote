@@ -66,6 +66,25 @@ public sealed class UsersController : ControllerBase
         return Ok();
     }
 
+    /// <summary>Session presence: heartbeat, interaction, or leave (clears presence).</summary>
+    [HttpPost("me/presence")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RecordPresence([FromBody] UpdatePresenceRequest request, CancellationToken cancellationToken)
+    {
+        if (!request.Leave && !request.Interaction && !request.Heartbeat)
+            return BadRequest(new { error = "At least one of leave, interaction, or heartbeat must be true." });
+        try
+        {
+            await _userService.RecordPresenceAsync(_currentUserService.UserId, request, cancellationToken);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        return Ok();
+    }
+
     [HttpPut("me/password")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
