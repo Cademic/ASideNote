@@ -69,11 +69,19 @@ public sealed class ProjectsController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProject(Guid id, [FromBody] UpdateProjectRequest request, CancellationToken cancellationToken)
     {
-        await _projectService.UpdateProjectAsync(_currentUserService.UserId, id, request, cancellationToken);
-        return Ok();
+        try
+        {
+            await _projectService.UpdateProjectAsync(_currentUserService.UserId, id, request, cancellationToken);
+            return Ok();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>Sets whether this project's events appear on the current user's personal (main/dashboard) calendar.</summary>

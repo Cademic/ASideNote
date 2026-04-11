@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useFixedPortalInViewport, useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
+import {
+  useFixedPortalInViewport,
+  useNudgeDropdownToViewport,
+  useSubmenuFlyoutPosition,
+} from "../../lib/useDropdownViewport";
 import { createPortal } from "react-dom";
 import { BookOpen, ChevronRight, Folder, FolderMinus, FolderOpen, MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import type { NotebookSummaryDto, ProjectSummaryDto } from "../../types";
@@ -55,6 +59,39 @@ export function NotebookCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const ellipsisMenuPanelRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
+  const folderSubmenuAnchorRef = useRef<HTMLDivElement>(null);
+  const folderFlyoutPortalRef = useRef<HTMLDivElement>(null);
+  const projectSubmenuAnchorRef = useRef<HTMLDivElement>(null);
+  const projectFlyoutPortalRef = useRef<HTMLDivElement>(null);
+  const folderHoverTimerRef = useRef<number | null>(null);
+  const projectHoverTimerRef = useRef<number | null>(null);
+
+  function clearFolderHoverTimer() {
+    if (folderHoverTimerRef.current != null) {
+      window.clearTimeout(folderHoverTimerRef.current);
+      folderHoverTimerRef.current = null;
+    }
+  }
+  function scheduleFolderClose() {
+    clearFolderHoverTimer();
+    folderHoverTimerRef.current = window.setTimeout(() => {
+      folderHoverTimerRef.current = null;
+      setShowFolderList(false);
+    }, 150);
+  }
+  function clearProjectHoverTimer() {
+    if (projectHoverTimerRef.current != null) {
+      window.clearTimeout(projectHoverTimerRef.current);
+      projectHoverTimerRef.current = null;
+    }
+  }
+  function scheduleProjectClose() {
+    clearProjectHoverTimer();
+    projectHoverTimerRef.current = window.setTimeout(() => {
+      projectHoverTimerRef.current = null;
+      setShowProjectList(false);
+    }, 150);
+  }
 
   const showMenu = Boolean(
     onRename ??
@@ -73,11 +110,19 @@ export function NotebookCard({
     menuOpen && showMenu && menuAnchor !== "ellipsis",
     portalMenuRef,
   );
+
+  const folderFlyoutPos = useSubmenuFlyoutPosition(showFolderList, folderSubmenuAnchorRef);
+  const projectFlyoutPos = useSubmenuFlyoutPosition(showProjectList, projectSubmenuAnchorRef);
+  useFixedPortalInViewport(showFolderList, folderFlyoutPortalRef);
+  useFixedPortalInViewport(showProjectList, projectFlyoutPortalRef);
+
   const projectName = notebook.projectId
     ? activeProjects.find((p) => p.id === notebook.projectId)?.name
     : null;
 
   const closeMenu = () => {
+    clearFolderHoverTimer();
+    clearProjectHoverTimer();
     setMenuOpen(false);
     setMenuAnchor("ellipsis");
     setShowProjectList(false);
@@ -90,7 +135,9 @@ export function NotebookCard({
       const target = e.target as Node;
       const inMenu = menuRef.current?.contains(target) ?? false;
       const inPortal = portalMenuRef.current?.contains(target) ?? false;
-      if (!inMenu && !inPortal) {
+      const inFolderFlyout = folderFlyoutPortalRef.current?.contains(target) ?? false;
+      const inProjectFlyout = projectFlyoutPortalRef.current?.contains(target) ?? false;
+      if (!inMenu && !inPortal && !inFolderFlyout && !inProjectFlyout) {
         setMenuOpen(false);
         setMenuAnchor("ellipsis");
         setShowProjectList(false);
@@ -112,6 +159,13 @@ export function NotebookCard({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [menuOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (folderHoverTimerRef.current != null) window.clearTimeout(folderHoverTimerRef.current);
+      if (projectHoverTimerRef.current != null) window.clearTimeout(projectHoverTimerRef.current);
+    };
+  }, []);
 
   return (
     <div
@@ -206,12 +260,14 @@ export function NotebookCard({
 
             {onSetProjectFolder && (
               <div
+                ref={folderSubmenuAnchorRef}
                 className="relative"
                 onMouseEnter={() => {
+                  clearFolderHoverTimer();
                   setShowFolderList(true);
                   setShowProjectList(false);
                 }}
-                onMouseLeave={() => setShowFolderList(false)}
+                onMouseLeave={() => scheduleFolderClose()}
               >
                 <button
                   type="button"
@@ -226,70 +282,19 @@ export function NotebookCard({
                   Add to folder
                   <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
                 </button>
-
-                {showFolderList && (
-                  <div className="absolute left-full top-0 z-30 pl-1">
-                    <div className="max-h-56 w-48 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg">
-                      {notebook.projectFolderId ? (
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            closeMenu();
-                            onSetProjectFolder(notebook.id, null);
-                          }}
-                        >
-                          <FolderMinus className="h-3.5 w-3.5 shrink-0" />
-                          Remove from folder
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            closeMenu();
-                            onSetProjectFolder(notebook.id, null);
-                          }}
-                        >
-                          Not in a folder
-                          <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                        </button>
-                      )}
-                      {projectFolders.map((f) => (
-                        <button
-                          key={f.id}
-                          type="button"
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                            notebook.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            closeMenu();
-                            onSetProjectFolder(notebook.id, f.id);
-                          }}
-                        >
-                          <span className="truncate">{f.name}</span>
-                          {notebook.projectFolderId === f.id && (
-                            <span className="ml-auto shrink-0 text-[10px] text-foreground/40">Current</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
             {onAddToProject && (
               <div
+                ref={projectSubmenuAnchorRef}
                 className="relative"
                 onMouseEnter={() => {
+                  clearProjectHoverTimer();
                   setShowProjectList(true);
                   setShowFolderList(false);
                 }}
-                onMouseLeave={() => setShowProjectList(false)}
+                onMouseLeave={() => scheduleProjectClose()}
               >
                 <button
                   type="button"
@@ -304,45 +309,6 @@ export function NotebookCard({
                   Add to Project
                   <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
                 </button>
-
-                {showProjectList && (
-                  <div className="absolute left-full top-0 z-30 pl-1">
-                    <div className="w-44 rounded-lg border border-border bg-background py-1 shadow-lg">
-                      {activeProjects.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-foreground/40">
-                          No active projects
-                        </div>
-                      ) : (
-                        activeProjects.map((project) => (
-                          <button
-                            key={project.id}
-                            type="button"
-                            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                              notebook.projectId === project.id
-                                ? "text-primary"
-                                : "text-foreground/70"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              closeMenu();
-                              setShowProjectList(false);
-                              onAddToProject(notebook.id, project.id);
-                            }}
-                          >
-                            <div
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: project.color || "#8b5cf6" }}
-                            />
-                            <span className="truncate">{project.name}</span>
-                            {notebook.projectId === project.id && (
-                              <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                            )}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -425,12 +391,14 @@ export function NotebookCard({
               )}
               {onSetProjectFolder && (
                 <div
+                  ref={folderSubmenuAnchorRef}
                   className="relative"
                   onMouseEnter={() => {
+                    clearFolderHoverTimer();
                     setShowFolderList(true);
                     setShowProjectList(false);
                   }}
-                  onMouseLeave={() => setShowFolderList(false)}
+                  onMouseLeave={() => scheduleFolderClose()}
                 >
                   <button
                     type="button"
@@ -445,68 +413,18 @@ export function NotebookCard({
                     Add to folder
                     <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
                   </button>
-                  {showFolderList && (
-                    <div className="absolute left-full top-0 z-30 pl-1">
-                      <div className="max-h-56 w-48 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg">
-                        {notebook.projectFolderId ? (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              closeMenu();
-                              onSetProjectFolder(notebook.id, null);
-                            }}
-                          >
-                            <FolderMinus className="h-3.5 w-3.5 shrink-0" />
-                            Remove from folder
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              closeMenu();
-                              onSetProjectFolder(notebook.id, null);
-                            }}
-                          >
-                            Not in a folder
-                            <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                          </button>
-                        )}
-                        {projectFolders.map((f) => (
-                          <button
-                            key={f.id}
-                            type="button"
-                            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                              notebook.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              closeMenu();
-                              onSetProjectFolder(notebook.id, f.id);
-                            }}
-                          >
-                            <span className="truncate">{f.name}</span>
-                            {notebook.projectFolderId === f.id && (
-                              <span className="ml-auto shrink-0 text-[10px] text-foreground/40">Current</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
               {onAddToProject && (
                 <div
+                  ref={projectSubmenuAnchorRef}
                   className="relative"
                   onMouseEnter={() => {
+                    clearProjectHoverTimer();
                     setShowProjectList(true);
                     setShowFolderList(false);
                   }}
-                  onMouseLeave={() => setShowProjectList(false)}
+                  onMouseLeave={() => scheduleProjectClose()}
                 >
                   <button
                     type="button"
@@ -521,43 +439,6 @@ export function NotebookCard({
                     Add to Project
                     <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
                   </button>
-                  {showProjectList && (
-                    <div className="absolute left-full top-0 z-30 pl-1">
-                      <div className="w-44 rounded-lg border border-border bg-background py-1 shadow-lg">
-                        {activeProjects.length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-foreground/40">
-                            No active projects
-                          </div>
-                        ) : (
-                          activeProjects.map((project) => (
-                            <button
-                              key={project.id}
-                              type="button"
-                              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                                notebook.projectId === project.id
-                                  ? "text-primary"
-                                  : "text-foreground/70"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                closeMenu();
-                                onAddToProject(notebook.id, project.id);
-                              }}
-                            >
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: project.color || "#8b5cf6" }}
-                              />
-                              <span className="truncate">{project.name}</span>
-                              {notebook.projectId === project.id && (
-                                <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                              )}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
               {onTogglePin && (
@@ -634,6 +515,107 @@ export function NotebookCard({
         </span>
         <span className="ml-auto">{formatRelativeDate(notebook.updatedAt)}</span>
       </div>
+
+      {showFolderList && folderFlyoutPos && onSetProjectFolder &&
+        createPortal(
+          <div
+            ref={folderFlyoutPortalRef}
+            className="fixed z-[200] max-h-56 w-48 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+            style={{ top: folderFlyoutPos.top, left: folderFlyoutPos.left }}
+            onMouseEnter={clearFolderHoverTimer}
+            onMouseLeave={scheduleFolderClose}
+          >
+            {notebook.projectFolderId ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onSetProjectFolder(notebook.id, null);
+                }}
+              >
+                <FolderMinus className="h-3.5 w-3.5 shrink-0" />
+                Remove from folder
+              </button>
+            ) : projectFolders.length > 0 ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onSetProjectFolder(notebook.id, null);
+                }}
+              >
+                Not in a folder
+                <span className="ml-auto text-[10px] text-foreground/40">Current</span>
+              </button>
+            ) : (
+              <div className="px-3 py-2 text-xs text-foreground/40">No folders yet</div>
+            )}
+            {projectFolders.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                  notebook.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onSetProjectFolder(notebook.id, f.id);
+                }}
+              >
+                <span className="truncate">{f.name}</span>
+                {notebook.projectFolderId === f.id && (
+                  <span className="ml-auto shrink-0 text-[10px] text-foreground/40">Current</span>
+                )}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+
+      {showProjectList && projectFlyoutPos && onAddToProject &&
+        createPortal(
+          <div
+            ref={projectFlyoutPortalRef}
+            className="fixed z-[200] w-44 rounded-lg border border-border bg-background py-1 shadow-lg"
+            style={{ top: projectFlyoutPos.top, left: projectFlyoutPos.left }}
+            onMouseEnter={clearProjectHoverTimer}
+            onMouseLeave={scheduleProjectClose}
+          >
+            {activeProjects.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-foreground/40">No active projects</div>
+            ) : (
+              activeProjects.map((project) => (
+                <button
+                  key={project.id}
+                  type="button"
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                    notebook.projectId === project.id ? "text-primary" : "text-foreground/70"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeMenu();
+                    onAddToProject(notebook.id, project.id);
+                  }}
+                >
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: project.color || "#8b5cf6" }}
+                  />
+                  <span className="truncate">{project.name}</span>
+                  {notebook.projectId === project.id && (
+                    <span className="ml-auto text-[10px] text-foreground/40">Current</span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

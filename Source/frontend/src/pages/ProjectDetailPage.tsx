@@ -68,6 +68,7 @@ import {
   ProjectNamedFolderHeader,
 } from "../components/projects/ProjectNamedFolderHeader";
 import { useNudgeDropdownToViewport } from "../lib/useDropdownViewport";
+import { computeProjectAutoProgressPercent } from "../lib/projectAutoProgress";
 import {
   DraggableProjectItem,
   FolderDropSurface,
@@ -230,12 +231,34 @@ export function ProjectDetailPage() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editShowEventsOnMainCalendar, setEditShowEventsOnMainCalendar] =
     useState(false);
+  const [editAutoProgressEnabled, setEditAutoProgressEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [patchingMyCalendar, setPatchingMyCalendar] = useState(false);
+  const [autoProgressTick, setAutoProgressTick] = useState(0);
 
   const isOwner = project?.userRole === "Owner";
   const isEditor = project?.userRole === "Editor";
   const canEdit = isOwner || isEditor;
+
+  const hasProjectDateRange = Boolean(project?.startDate && project?.endDate);
+
+  const effectiveProgress = useMemo(() => {
+    if (!project) return 0;
+    if (project.autoProgressEnabled && project.startDate && project.endDate)
+      return computeProjectAutoProgressPercent(project.startDate, project.endDate);
+    return project.progress;
+  }, [project, autoProgressTick]);
+
+  /** Progress bar worth showing (non-zero manual, or auto with dates). */
+  const hasProgressDisplay = Boolean(
+    project &&
+      ((project.autoProgressEnabled && project.startDate && project.endDate) ||
+        (!project.autoProgressEnabled && project.progress > 0)),
+  );
+  /** Owner with start+end should see the bar even at 0% so the UI matches dates. */
+  const showProgressBarUi = Boolean(
+    hasProgressDisplay || (isOwner && hasProjectDateRange),
+  );
 
   const fetchProject = useCallback(async () => {
     if (!projectId) return;
@@ -253,6 +276,7 @@ export function ProjectDetailPage() {
       setEditEndDate(toInputDate(data.endDate));
       setEditDeadline(data.deadline ? toInputDate(data.deadline) : "");
       setEditShowEventsOnMainCalendar(data.showEventsOnMainCalendar ?? false);
+      setEditAutoProgressEnabled(data.autoProgressEnabled ?? false);
     } catch {
       setError("Failed to load project.");
     } finally {
@@ -263,6 +287,16 @@ export function ProjectDetailPage() {
   useEffect(() => {
     fetchProject();
   }, [fetchProject]);
+
+  useEffect(() => {
+    if (!editStartDate || !editEndDate) setEditAutoProgressEnabled(false);
+  }, [editStartDate, editEndDate]);
+
+  useEffect(() => {
+    if (!project?.autoProgressEnabled) return;
+    const id = window.setInterval(() => setAutoProgressTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [project?.autoProgressEnabled]);
 
   useEffect(() => {
     setBoardName(project?.name ?? null);
@@ -566,6 +600,7 @@ export function ProjectDetailPage() {
         deadline: editDeadline || undefined,
         status: editStatus,
         progress: editProgress,
+        autoProgressEnabled: editAutoProgressEnabled,
         showEventsOnMainCalendar: editShowEventsOnMainCalendar,
       });
       await fetchProject();
@@ -720,17 +755,21 @@ export function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Progress bar */}
-        {project.progress > 0 && (
+        {/* Progress bar (read-only summary; auto progress is configured in Settings) */}
+        {showProgressBarUi && (
           <div className="mb-6">
             <div className="flex items-center justify-between text-xs text-foreground/50">
               <span>Progress</span>
-              <span>{project.progress}%</span>
+              <span>
+                {project.autoProgressEnabled
+                  ? `${effectiveProgress}% (auto)`
+                  : `${effectiveProgress}%`}
+              </span>
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-foreground/5">
               <div
                 className={`h-full rounded-full ${projectColors.progress} transition-[width] duration-[600ms] ease-spring motion-reduce:transition-none`}
-                style={{ width: `${Math.min(project.progress, 100)}%` }}
+                style={{ width: `${Math.min(effectiveProgress, 100)}%` }}
               />
             </div>
           </div>
@@ -864,6 +903,7 @@ export function ProjectDetailPage() {
             editColor={editColor}
             editStatus={editStatus}
             editProgress={editProgress}
+            editAutoProgressEnabled={editAutoProgressEnabled}
             editStartDate={editStartDate}
             editEndDate={editEndDate}
             editDeadline={editDeadline}
@@ -874,6 +914,7 @@ export function ProjectDetailPage() {
             onColorChange={setEditColor}
             onStatusChange={setEditStatus}
             onProgressChange={setEditProgress}
+            onAutoProgressEnabledChange={setEditAutoProgressEnabled}
             onStartDateChange={setEditStartDate}
             onEndDateChange={setEditEndDate}
             onDeadlineChange={setEditDeadline}
@@ -1727,9 +1768,7 @@ function ProjectContentTab({
           })}
 
           {sortedFolders.length > 0 &&
-            (canEdit ||
-              unfiledBoards.length > 0 ||
-              unfiledNotebooks.length > 0) && (
+            (unfiledBoards.length > 0 || unfiledNotebooks.length > 0) && (
               <div className="flex items-center gap-3 py-2">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-300/60 to-border dark:via-violet-500/25" />
                 <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-foreground/45">
@@ -1905,6 +1944,7 @@ interface SettingsTabProps {
   editColor: string;
   editStatus: string;
   editProgress: number;
+  editAutoProgressEnabled: boolean;
   editStartDate: string;
   editEndDate: string;
   editDeadline: string;
@@ -1915,6 +1955,7 @@ interface SettingsTabProps {
   onColorChange: (v: string) => void;
   onStatusChange: (v: string) => void;
   onProgressChange: (v: number) => void;
+  onAutoProgressEnabledChange: (v: boolean) => void;
   onStartDateChange: (v: string) => void;
   onEndDateChange: (v: string) => void;
   onDeadlineChange: (v: string) => void;
@@ -1937,6 +1978,7 @@ function SettingsTab({
   editColor,
   editStatus,
   editProgress,
+  editAutoProgressEnabled,
   editStartDate,
   editEndDate,
   editDeadline,
@@ -1947,6 +1989,7 @@ function SettingsTab({
   onColorChange,
   onStatusChange,
   onProgressChange,
+  onAutoProgressEnabledChange,
   onStartDateChange,
   onEndDateChange,
   onDeadlineChange,
@@ -2096,6 +2139,40 @@ function SettingsTab({
           </select>
         </div>
 
+        {/* Enable auto progress — only when start & end dates are set (not indefinite) */}
+        {editStartDate && editEndDate && (
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <label className="text-xs font-medium text-foreground/60">
+                Enable Auto Progress
+              </label>
+              <p className="mt-0.5 text-xs text-foreground/50">
+                Automatically moves progress along the timeline between your start and end dates. Turn
+                off to set progress manually with the slider below.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={editAutoProgressEnabled}
+              disabled={readOnly}
+              onClick={() =>
+                !readOnly && onAutoProgressEnabledChange(!editAutoProgressEnabled)
+              }
+              className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 ${
+                readOnly ? "cursor-default" : "cursor-pointer"
+              } ${editAutoProgressEnabled ? "bg-primary" : "bg-foreground/20"}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                  editAutoProgressEnabled ? "translate-x-5" : "translate-x-0.5"
+                }`}
+                aria-hidden
+              />
+            </button>
+          </div>
+        )}
+
         {/* Progress */}
         <div>
           <label
@@ -2103,6 +2180,11 @@ function SettingsTab({
             className="mb-1.5 block text-xs font-medium text-foreground/60"
           >
             Progress ({editProgress}%)
+            {editAutoProgressEnabled && (
+              <span className="ml-2 font-normal text-foreground/45">
+                (set by start and end dates — turn off Enable Auto Progress above to edit manually)
+              </span>
+            )}
           </label>
           <input
             id="settings-progress"
@@ -2111,7 +2193,7 @@ function SettingsTab({
             max={100}
             value={editProgress}
             onChange={(e) => onProgressChange(Number(e.target.value))}
-            disabled={readOnly}
+            disabled={readOnly || editAutoProgressEnabled}
             className="w-full accent-violet-500 disabled:cursor-default disabled:opacity-70"
           />
         </div>

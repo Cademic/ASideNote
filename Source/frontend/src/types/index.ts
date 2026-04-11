@@ -449,6 +449,8 @@ export interface ProjectDetailDto {
   deadline: string | null;
   status: string;
   progress: number;
+  /** When true, progress follows start/end dates (linear by day). */
+  autoProgressEnabled?: boolean;
   color: string;
   showEventsOnMainCalendar?: boolean;
   /** Null means use showEventsOnMainCalendar (project default). */
@@ -481,6 +483,8 @@ export interface UpdateProjectRequest {
   deadline?: string;
   status: string;
   progress: number;
+  /** Omit for partial updates (e.g. rename); server keeps current value when unset. */
+  autoProgressEnabled?: boolean;
   color?: string;
   showEventsOnMainCalendar?: boolean;
 }

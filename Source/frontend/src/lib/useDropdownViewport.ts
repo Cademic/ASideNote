@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useState, type RefObject } from "react";
 import { constrainFixedElementInPlace, nudgeAbsoluteElementIntoViewport } from "./dropdown-viewport";
 
 /**
@@ -54,4 +54,42 @@ export function useFixedPortalInViewport(
       window.removeEventListener("scroll", nudge, true);
     };
   }, [isOpen, nudge]);
+}
+
+const SUBMENU_FLYOUT_GAP_PX = 4;
+
+/**
+ * Client coordinates for a fixed-position submenu flyout anchored to the right edge
+ * of `anchorRef` (e.g. "Add to folder"). Updates on resize and scroll while open.
+ */
+export function useSubmenuFlyoutPosition(
+  isOpen: boolean,
+  anchorRef: RefObject<HTMLElement | null>,
+): { top: number; left: number } | null {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const update = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el || !isOpen) return;
+    const r = el.getBoundingClientRect();
+    setPos({ top: r.top, left: r.right + SUBMENU_FLYOUT_GAP_PX });
+  }, [isOpen, anchorRef]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setPos(null);
+      return;
+    }
+    update();
+    const raf = requestAnimationFrame(update);
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [isOpen, update]);
+
+  return pos;
 }
