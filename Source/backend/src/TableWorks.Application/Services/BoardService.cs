@@ -15,6 +15,7 @@ public sealed class BoardService : IBoardService
     private readonly IRepository<BoardConnection> _connectionRepo;
     private readonly IRepository<Project> _projectRepo;
     private readonly IRepository<ProjectMember> _memberRepo;
+    private readonly IRepository<ProjectFolder> _projectFolderRepo;
     private readonly IUnitOfWork _unitOfWork;
 
     public BoardService(
@@ -24,6 +25,7 @@ public sealed class BoardService : IBoardService
         IRepository<BoardConnection> connectionRepo,
         IRepository<Project> projectRepo,
         IRepository<ProjectMember> memberRepo,
+        IRepository<ProjectFolder> projectFolderRepo,
         IUnitOfWork unitOfWork)
     {
         _boardRepo = boardRepo;
@@ -32,6 +34,7 @@ public sealed class BoardService : IBoardService
         _connectionRepo = connectionRepo;
         _projectRepo = projectRepo;
         _memberRepo = memberRepo;
+        _projectFolderRepo = projectFolderRepo;
         _unitOfWork = unitOfWork;
     }
 
@@ -66,6 +69,7 @@ public sealed class BoardService : IBoardService
                 Description = b.Description,
                 BoardType = b.BoardType,
                 ProjectId = b.ProjectId,
+                ProjectFolderId = b.ProjectFolderId,
                 IsPinned = b.IsPinned,
                 PinnedAt = b.PinnedAt,
                 CreatedAt = b.CreatedAt,
@@ -101,6 +105,7 @@ public sealed class BoardService : IBoardService
                     Description = b.Description,
                     BoardType = b.BoardType,
                     ProjectId = b.ProjectId,
+                    ProjectFolderId = b.ProjectFolderId,
                     IsPinned = b.IsPinned,
                     PinnedAt = b.PinnedAt,
                     CreatedAt = b.CreatedAt,
@@ -242,8 +247,33 @@ public sealed class BoardService : IBoardService
             ?? throw new KeyNotFoundException("Board not found in this project.");
 
         board.ProjectId = null;
+        board.ProjectFolderId = null;
         board.UpdatedAt = DateTime.UtcNow;
 
+        _boardRepo.Update(board);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetBoardProjectFolderAsync(Guid userId, Guid projectId, Guid boardId, Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var role = await GetProjectRoleAsync(userId, projectId, cancellationToken);
+        if (role is null || role == "Viewer")
+            throw new UnauthorizedAccessException("You do not have permission to move boards in this project.");
+
+        var board = await _boardRepo.Query()
+            .FirstOrDefaultAsync(b => b.Id == boardId && b.ProjectId == projectId, cancellationToken)
+            ?? throw new KeyNotFoundException("Board not found in this project.");
+
+        if (folderId.HasValue)
+        {
+            var folderOk = await _projectFolderRepo.Query()
+                .AnyAsync(f => f.Id == folderId.Value && f.ProjectId == projectId, cancellationToken);
+            if (!folderOk)
+                throw new KeyNotFoundException("Folder not found.");
+        }
+
+        board.ProjectFolderId = folderId;
+        board.UpdatedAt = DateTime.UtcNow;
         _boardRepo.Update(board);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
@@ -274,6 +304,7 @@ public sealed class BoardService : IBoardService
                 Description = b.Description,
                 BoardType = b.BoardType,
                 ProjectId = b.ProjectId,
+                ProjectFolderId = b.ProjectFolderId,
                 IsPinned = b.IsPinned,
                 PinnedAt = b.PinnedAt,
                 CreatedAt = b.CreatedAt,

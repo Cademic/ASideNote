@@ -179,6 +179,7 @@ public sealed class ProjectService : IProjectService
             .Include(p => p.Members).ThenInclude(m => m.User)
             .Include(p => p.Boards)
             .Include(p => p.Notebooks)
+            .Include(p => p.ProjectFolders)
             .Include(p => p.Notes).ThenInclude(n => n.NoteTags).ThenInclude(nt => nt.Tag)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken)
@@ -203,6 +204,9 @@ public sealed class ProjectService : IProjectService
             Progress = project.Progress,
             Color = project.Color,
             ShowEventsOnMainCalendar = project.ShowEventsOnMainCalendar,
+            MyShowOnPersonalCalendar = project.OwnerId == userId
+                ? project.OwnerShowOnPersonalCalendar
+                : project.Members.FirstOrDefault(m => m.UserId == userId)?.ShowOnPersonalCalendar,
             OwnerId = project.OwnerId,
             OwnerUsername = project.Owner?.Username ?? string.Empty,
             UserRole = userRole,
@@ -215,6 +219,18 @@ public sealed class ProjectService : IProjectService
                 Role = m.Role,
                 JoinedAt = m.JoinedAt
             }).ToList(),
+            Folders = project.ProjectFolders
+                .OrderBy(f => f.SortOrder)
+                .ThenBy(f => f.Name)
+                .Select(f => new ProjectFolderDto
+                {
+                    Id = f.Id,
+                    ProjectId = f.ProjectId,
+                    Name = f.Name,
+                    SortOrder = f.SortOrder,
+                    CreatedAt = f.CreatedAt,
+                    UpdatedAt = f.UpdatedAt
+                }).ToList(),
             Boards = project.Boards.Select(b => new BoardSummaryDto
             {
                 Id = b.Id,
@@ -222,6 +238,9 @@ public sealed class ProjectService : IProjectService
                 Description = b.Description,
                 BoardType = b.BoardType,
                 ProjectId = b.ProjectId,
+                ProjectFolderId = b.ProjectFolderId,
+                IsPinned = b.IsPinned,
+                PinnedAt = b.PinnedAt,
                 CreatedAt = b.CreatedAt,
                 UpdatedAt = b.UpdatedAt
             }).ToList(),
@@ -230,6 +249,7 @@ public sealed class ProjectService : IProjectService
                 Id = n.Id,
                 Name = n.Name,
                 ProjectId = n.ProjectId,
+                ProjectFolderId = n.ProjectFolderId,
                 IsPinned = n.IsPinned,
                 PinnedAt = n.PinnedAt,
                 CreatedAt = n.CreatedAt,
@@ -278,6 +298,36 @@ public sealed class ProjectService : IProjectService
         project.UpdatedAt = DateTime.UtcNow;
 
         _projectRepo.Update(project);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateMyProjectCalendarPreferenceAsync(
+        Guid userId,
+        Guid projectId,
+        UpdateMyProjectCalendarPreferenceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var project = await _projectRepo.Query()
+            .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken)
+            ?? throw new KeyNotFoundException("Project not found.");
+
+        if (project.OwnerId == userId)
+        {
+            project.OwnerShowOnPersonalCalendar = request.ShowOnPersonalCalendar;
+            project.UpdatedAt = DateTime.UtcNow;
+            _projectRepo.Update(project);
+        }
+        else
+        {
+            var member = await _memberRepo.Query()
+                .FirstOrDefaultAsync(m => m.ProjectId == projectId && m.UserId == userId, cancellationToken);
+            if (member is null)
+                throw new UnauthorizedAccessException("Access denied.");
+
+            member.ShowOnPersonalCalendar = request.ShowOnPersonalCalendar;
+            _memberRepo.Update(member);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

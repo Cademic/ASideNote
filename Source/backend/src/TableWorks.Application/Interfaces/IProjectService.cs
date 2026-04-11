@@ -8,6 +8,7 @@ public interface IProjectService
     Task<ProjectDetailDto> CreateProjectAsync(Guid userId, CreateProjectRequest request, CancellationToken cancellationToken = default);
     Task<ProjectDetailDto> GetProjectByIdAsync(Guid userId, Guid projectId, CancellationToken cancellationToken = default);
     Task UpdateProjectAsync(Guid userId, Guid projectId, UpdateProjectRequest request, CancellationToken cancellationToken = default);
+    Task UpdateMyProjectCalendarPreferenceAsync(Guid userId, Guid projectId, UpdateMyProjectCalendarPreferenceRequest request, CancellationToken cancellationToken = default);
     Task DeleteProjectAsync(Guid userId, Guid projectId, CancellationToken cancellationToken = default);
     Task AddMemberAsync(Guid userId, Guid projectId, AddMemberRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProjectMemberDto>> GetMembersAsync(Guid userId, Guid projectId, CancellationToken cancellationToken = default);

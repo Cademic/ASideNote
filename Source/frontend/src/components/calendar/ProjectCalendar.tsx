@@ -237,6 +237,7 @@ export function ProjectCalendar({
         onPreviousMonth={handlePreviousMonth}
         onNextMonth={handleNextMonth}
         onToday={handleToday}
+        hideTodayOnMobile
         layout={layout}
         onLayoutChange={setLayout}
       />

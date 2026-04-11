@@ -32,6 +32,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<UserPinnedProject> UserPinnedProjects => Set<UserPinnedProject>();
     public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
     public DbSet<Notebook> Notebooks => Set<Notebook>();
+    public DbSet<ProjectFolder> ProjectFolders => Set<ProjectFolder>();
     public DbSet<NotebookVersion> NotebookVersions => Set<NotebookVersion>();
     public DbSet<UserStorageItem> UserStorageItems => Set<UserStorageItem>();
 
@@ -90,6 +91,13 @@ public sealed class AppDbContext : DbContext
                 .HasForeignKey(x => x.ProjectId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            entity.HasIndex(x => x.ProjectFolderId);
+
+            entity.HasOne(x => x.ProjectFolder)
+                .WithMany(x => x.Boards)
+                .HasForeignKey(x => x.ProjectFolderId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.HasQueryFilter(b => Set<User>().Any(u => u.Id == b.UserId));
         });
 
@@ -138,6 +146,13 @@ public sealed class AppDbContext : DbContext
             entity.HasOne(x => x.Project)
                 .WithMany(x => x.Notebooks)
                 .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.ProjectFolderId);
+
+            entity.HasOne(x => x.ProjectFolder)
+                .WithMany(x => x.Notebooks)
+                .HasForeignKey(x => x.ProjectFolderId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasQueryFilter(n => Set<User>().Any(u => u.Id == n.UserId));
@@ -210,6 +225,23 @@ public sealed class AppDbContext : DbContext
                 .HasForeignKey(x => x.OwnerId);
 
             entity.HasQueryFilter(p => Set<User>().Any(u => u.Id == p.OwnerId));
+        });
+
+        // ----- ProjectFolder -----
+        modelBuilder.Entity<ProjectFolder>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+
+            entity.HasIndex(x => x.ProjectId);
+            entity.HasIndex(x => new { x.ProjectId, x.Name }).IsUnique();
+
+            entity.Property(x => x.Name).HasMaxLength(128).IsRequired();
+
+            entity.HasOne(x => x.Project)
+                .WithMany(x => x.ProjectFolders)
+                .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ----- UserPinnedProject -----

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
 import {
   Crown,
   Eye,
@@ -147,6 +148,9 @@ function MemberRow({
 }: MemberRowProps) {
   const [isRoleOpen, setIsRoleOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const roleMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  useNudgeDropdownToViewport(isRoleOpen, roleMenuPanelRef);
 
   const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.Viewer;
   const Icon = config.icon;
@@ -218,7 +222,10 @@ function MemberRow({
                 onKeyDown={() => {}}
                 role="presentation"
               />
-              <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <div
+                ref={roleMenuPanelRef}
+                className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,calc(100vh-2rem))] w-32 max-w-[min(8rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg"
+              >
                 {(["Editor", "Viewer"] as const).map((role) => {
                   const rc = ROLE_CONFIG[role];
                   const RIcon = rc.icon;

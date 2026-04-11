@@ -15,12 +15,16 @@ public sealed class ProjectDetailDto
     public string Status { get; set; } = string.Empty;
     public int Progress { get; set; }
     public string Color { get; set; } = "violet";
+    /// <summary>Default for members (and for you when MyShowOnPersonalCalendar is null).</summary>
     public bool ShowEventsOnMainCalendar { get; set; } = false;
+    /// <summary>Your personal override: null means use ShowEventsOnMainCalendar.</summary>
+    public bool? MyShowOnPersonalCalendar { get; set; }
     public Guid OwnerId { get; set; }
     public string OwnerUsername { get; set; } = string.Empty;
     public string UserRole { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public IReadOnlyList<ProjectMemberDto> Members { get; set; } = Array.Empty<ProjectMemberDto>();
+    public IReadOnlyList<ProjectFolderDto> Folders { get; set; } = Array.Empty<ProjectFolderDto>();
     public IReadOnlyList<BoardSummaryDto> Boards { get; set; } = Array.Empty<BoardSummaryDto>();
     public IReadOnlyList<NotebookSummaryDto> Notebooks { get; set; } = Array.Empty<NotebookSummaryDto>();
     public IReadOnlyList<NoteSummaryDto> Notes { get; set; } = Array.Empty<NoteSummaryDto>();

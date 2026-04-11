@@ -10,6 +10,12 @@
 ALTER TABLE "Projects"
 ADD COLUMN IF NOT EXISTS "ShowEventsOnMainCalendar" boolean NOT NULL DEFAULT false;
 
+ALTER TABLE "Projects"
+ADD COLUMN IF NOT EXISTS "OwnerShowOnPersonalCalendar" boolean NULL;
+
+ALTER TABLE "ProjectMembers"
+ADD COLUMN IF NOT EXISTS "ShowOnPersonalCalendar" boolean NULL;
+
 -- Notebooks: TipTap document JSON (replaces NotebookPages)
 ALTER TABLE "Notebooks"
 ADD COLUMN IF NOT EXISTS "ContentJson" jsonb NOT NULL DEFAULT '{"type":"doc","content":[]}'::jsonb;

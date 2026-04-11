@@ -77,3 +77,26 @@ export function fitFixedDropdownToViewport(
     el.style.overflowY = "";
   }
 }
+
+/**
+ * Adjust `left` / `top` on a `position: fixed` element so it stays in the viewport.
+ * Call after mount when using client coordinates (e.g. context menu).
+ */
+export function constrainFixedElementInPlace(
+  el: HTMLElement,
+  padding = DROPDOWN_VIEWPORT_PADDING,
+): void {
+  const r = el.getBoundingClientRect();
+  const { left, top } = constrainFixedBox(r.left, r.top, r.width, r.height, padding);
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+  const maxH = Math.max(0, vh - 2 * padding);
+  if (r.height > maxH) {
+    el.style.maxHeight = `${maxH}px`;
+    el.style.overflowY = "auto";
+  } else {
+    el.style.maxHeight = "";
+    el.style.overflowY = "";
+  }
+}

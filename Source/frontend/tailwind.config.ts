@@ -41,11 +41,16 @@ const config: Config = {
           "0%":   { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "dropdown-pop": {
+          from: { opacity: "0", transform: "scale(0.96) translateY(-4px)" },
+          to: { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
       },
       animation: {
         "dialog-enter":  "dialog-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both",
         "overlay-enter": "overlay-enter 0.18s ease-out both",
         "page-enter":    "page-enter 0.22s cubic-bezier(0.2, 0, 0, 1) both",
+        "dropdown-pop":  "dropdown-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
         "ripple-out":    "ripple-out 0.85s cubic-bezier(0.2, 0, 0, 1) infinite",
         "skel-shimmer":  "skel-shimmer 1.6s linear infinite",
       },

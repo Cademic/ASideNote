@@ -82,7 +82,7 @@ export function AddExistingNotebookDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
+        className="absolute inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none"
         onClick={onClose}
         onKeyDown={() => {}}
         role="presentation"

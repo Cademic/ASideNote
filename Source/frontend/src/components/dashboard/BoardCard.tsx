@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFixedPortalInViewport, useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
 import { createPortal } from "react-dom";
 import {
   StickyNote,
@@ -8,6 +9,8 @@ import {
   PenTool,
   MoreVertical,
   Pencil,
+  Folder,
+  FolderMinus,
   FolderOpen,
   Pin,
   PinOff,
@@ -19,9 +22,15 @@ import type { BoardSummaryDto, ProjectSummaryDto } from "../../types";
 
 interface BoardCardProps {
   board: BoardSummaryDto;
-  onDelete: (id: string) => void;
+  /** Permanent delete. Can be combined with `onRemoveFromProject` (e.g. project tab). */
+  onDelete?: (id: string) => void;
+  /** Project tab: unlink board from project without deleting it. */
+  onRemoveFromProject?: (id: string) => void;
   onRename?: (id: string, currentName: string) => void;
   onMoveToProject?: (boardId: string, projectId: string) => void;
+  /** Project tab: move board between folders within the project. */
+  projectFolders?: { id: string; name: string }[];
+  onSetProjectFolder?: (boardId: string, folderId: string | null) => void;
   onTogglePin?: (id: string, isPinned: boolean) => void;
   activeProjects?: ProjectSummaryDto[];
 }
@@ -70,24 +79,53 @@ function getBoardRoute(board: BoardSummaryDto): string {
   return `/boards/${board.id}`;
 }
 
-export function BoardCard({ board, onDelete, onRename, onMoveToProject, onTogglePin, activeProjects = [] }: BoardCardProps) {
+export function BoardCard({
+  board,
+  onDelete,
+  onRemoveFromProject,
+  onRename,
+  onMoveToProject,
+  projectFolders = [],
+  onSetProjectFolder,
+  onTogglePin,
+  activeProjects = [],
+}: BoardCardProps) {
   const navigate = useNavigate();
   const config = BOARD_TYPE_CONFIG[board.boardType] ?? BOARD_TYPE_CONFIG.NoteBoard;
   const Icon = config.icon;
   const projectName = board.projectId
     ? activeProjects.find((p) => p.id === board.projectId)?.name
     : null;
-  const showMenuActions = Boolean(onRename ?? onMoveToProject ?? onTogglePin);
+  const showMenuActions = Boolean(
+    onRename ?? onMoveToProject ?? onSetProjectFolder ?? onTogglePin,
+  );
+  const hasEllipsisMenu = Boolean(
+    onRename ??
+      onSetProjectFolder ??
+      onRemoveFromProject ??
+      onDelete ??
+      onMoveToProject ??
+      onTogglePin,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<"ellipsis" | { x: number; y: number }>("ellipsis");
   const [showProjectList, setShowProjectList] = useState(false);
+  const [showFolderList, setShowFolderList] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const ellipsisMenuPanelRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
+
+  useNudgeDropdownToViewport(
+    menuOpen && menuAnchor === "ellipsis",
+    ellipsisMenuPanelRef,
+  );
+  useFixedPortalInViewport(menuOpen && menuAnchor !== "ellipsis", portalMenuRef);
 
   const closeMenu = () => {
     setMenuOpen(false);
     setMenuAnchor("ellipsis");
     setShowProjectList(false);
+    setShowFolderList(false);
   };
 
   useEffect(() => {
@@ -100,6 +138,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
         setMenuOpen(false);
         setMenuAnchor("ellipsis");
         setShowProjectList(false);
+        setShowFolderList(false);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
@@ -107,6 +146,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
         setMenuOpen(false);
         setMenuAnchor("ellipsis");
         setShowProjectList(false);
+        setShowFolderList(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -123,6 +163,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
       tabIndex={0}
       onClick={() => navigate(getBoardRoute(board))}
       onContextMenu={(e) => {
+        if (!hasEllipsisMenu) return;
         e.preventDefault();
         e.stopPropagation();
         setMenuAnchor({ x: e.clientX, y: e.clientY });
@@ -162,6 +203,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
       )}
 
       {/* Ellipsis menu button */}
+      {hasEllipsisMenu && (
       <div
         ref={menuRef}
         className="absolute right-3 top-3 z-10"
@@ -176,12 +218,14 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
             setMenuAnchor("ellipsis");
             setMenuOpen((v) => !v);
             setShowProjectList(false);
+            setShowFolderList(false);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.stopPropagation();
               setMenuAnchor("ellipsis");
               setMenuOpen((v) => !v);
+              setShowFolderList(false);
             }
           }}
           className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
@@ -192,7 +236,10 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
 
         {/* Dropdown menu */}
         {menuOpen && menuAnchor === "ellipsis" && (
-          <div className="absolute right-0 top-7 z-20 w-48 rounded-lg border border-border bg-background py-1 shadow-lg">
+          <div
+            ref={ellipsisMenuPanelRef}
+            className="absolute right-0 top-7 z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+          >
             {onRename && (
               <button
                 type="button"
@@ -208,10 +255,91 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
               </button>
             )}
 
+            {onSetProjectFolder && (
+              <div
+                className="relative"
+                onMouseEnter={() => {
+                  setShowFolderList(true);
+                  setShowProjectList(false);
+                }}
+                onMouseLeave={() => setShowFolderList(false)}
+              >
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFolderList((v) => !v);
+                    setShowProjectList(false);
+                  }}
+                >
+                  <Folder className="h-3.5 w-3.5" />
+                  Add to folder
+                  <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
+                </button>
+
+                {showFolderList && (
+                  <div className="absolute left-full top-0 z-30 pl-1">
+                    <div className="max-h-56 w-48 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg">
+                      {board.projectFolderId ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeMenu();
+                            onSetProjectFolder(board.id, null);
+                          }}
+                        >
+                          <FolderMinus className="h-3.5 w-3.5 shrink-0" />
+                          Remove from folder
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeMenu();
+                            onSetProjectFolder(board.id, null);
+                          }}
+                        >
+                          Not in a folder
+                          <span className="ml-auto text-[10px] text-foreground/40">Current</span>
+                        </button>
+                      )}
+                      {projectFolders.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                            board.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeMenu();
+                            onSetProjectFolder(board.id, f.id);
+                          }}
+                        >
+                          <span className="truncate">{f.name}</span>
+                          {board.projectFolderId === f.id && (
+                            <span className="ml-auto shrink-0 text-[10px] text-foreground/40">Current</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {onMoveToProject && (
             <div
               className="relative"
-              onMouseEnter={() => setShowProjectList(true)}
+              onMouseEnter={() => {
+                setShowProjectList(true);
+                setShowFolderList(false);
+              }}
               onMouseLeave={() => setShowProjectList(false)}
             >
               <button
@@ -220,6 +348,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowProjectList((v) => !v);
+                  setShowFolderList(false);
                 }}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
@@ -291,28 +420,45 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
             </button>
             )}
 
-            {(showMenuActions) && <div className="my-1 border-t border-border/50" />}
+            {(showMenuActions || onRemoveFromProject || onDelete) && (
+              <div className="my-1 border-t border-border/50" />
+            )}
 
-            {/* Delete */}
-            <button
-              type="button"
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                closeMenu();
-                onDelete(board.id);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </button>
+            {onRemoveFromProject && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onRemoveFromProject(board.id);
+                }}
+              >
+                <FolderMinus className="h-3.5 w-3.5" />
+                Remove from Project
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  onDelete(board.id);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            )}
           </div>
         )}
         {menuOpen && menuAnchor !== "ellipsis" &&
           createPortal(
             <div
               ref={portalMenuRef}
-              className="fixed z-[100] w-48 rounded-lg border border-border bg-background py-1 shadow-lg"
+              className="fixed z-[100] max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
               style={{ left: menuAnchor.x, top: menuAnchor.y }}
             >
               {onRename && (
@@ -329,10 +475,89 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
                   Rename
                 </button>
               )}
+              {onSetProjectFolder && (
+                <div
+                  className="relative"
+                  onMouseEnter={() => {
+                    setShowFolderList(true);
+                    setShowProjectList(false);
+                  }}
+                  onMouseLeave={() => setShowFolderList(false)}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFolderList((v) => !v);
+                      setShowProjectList(false);
+                    }}
+                  >
+                    <Folder className="h-3.5 w-3.5" />
+                    Add to folder
+                    <ChevronRight className="ml-auto h-3 w-3 text-foreground/30" />
+                  </button>
+                  {showFolderList && (
+                    <div className="absolute left-full top-0 z-30 pl-1">
+                      <div className="max-h-56 w-48 overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg">
+                        {board.projectFolderId ? (
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              closeMenu();
+                              onSetProjectFolder(board.id, null);
+                            }}
+                          >
+                            <FolderMinus className="h-3.5 w-3.5 shrink-0" />
+                            Remove from folder
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              closeMenu();
+                              onSetProjectFolder(board.id, null);
+                            }}
+                          >
+                            Not in a folder
+                            <span className="ml-auto text-[10px] text-foreground/40">Current</span>
+                          </button>
+                        )}
+                        {projectFolders.map((f) => (
+                          <button
+                            key={f.id}
+                            type="button"
+                            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                              board.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              closeMenu();
+                              onSetProjectFolder(board.id, f.id);
+                            }}
+                          >
+                            <span className="truncate">{f.name}</span>
+                            {board.projectFolderId === f.id && (
+                              <span className="ml-auto shrink-0 text-[10px] text-foreground/40">Current</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {onMoveToProject && (
                 <div
                   className="relative"
-                  onMouseEnter={() => setShowProjectList(true)}
+                  onMouseEnter={() => {
+                    setShowProjectList(true);
+                    setShowFolderList(false);
+                  }}
                   onMouseLeave={() => setShowProjectList(false)}
                 >
                   <button
@@ -341,6 +566,7 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowProjectList((v) => !v);
+                      setShowFolderList(false);
                     }}
                   >
                     <FolderOpen className="h-3.5 w-3.5" />
@@ -409,23 +635,42 @@ export function BoardCard({ board, onDelete, onRename, onMoveToProject, onToggle
                   )}
                 </button>
               )}
-              {showMenuActions && <div className="my-1 border-t border-border/50" />}
-              <button
-                type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeMenu();
-                  onDelete(board.id);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </button>
+              {(showMenuActions || onRemoveFromProject || onDelete) && (
+                <div className="my-1 border-t border-border/50" />
+              )}
+              {onRemoveFromProject && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeMenu();
+                    onRemoveFromProject(board.id);
+                  }}
+                >
+                  <FolderMinus className="h-3.5 w-3.5" />
+                  Remove from Project
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeMenu();
+                    onDelete(board.id);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              )}
             </div>,
             document.body,
           )}
       </div>
+      )}
 
       {/* Icon */}
       <div

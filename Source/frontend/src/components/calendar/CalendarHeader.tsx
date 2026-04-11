@@ -7,6 +7,8 @@ interface CalendarHeaderProps {
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   onToday: () => void;
+  /** When true, hides the Today control below the `sm` breakpoint (narrow / mobile). */
+  hideTodayOnMobile?: boolean;
   layout?: CalendarLayout;
   onLayoutChange?: (layout: CalendarLayout) => void;
 }
@@ -21,26 +23,33 @@ export function CalendarHeader({
   onPreviousMonth,
   onNextMonth,
   onToday,
+  hideTodayOnMobile = false,
   layout,
   onLayoutChange,
 }: CalendarHeaderProps) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <div className="mb-4 flex flex-col gap-3">
+      {/* Month / year + Today */}
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-foreground">
           {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
         </h2>
         <button
           type="button"
           onClick={onToday}
-          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground/60 transition-colors hover:border-primary/40 hover:text-primary"
+          className={[
+            "shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground/60 transition-colors hover:border-primary/40 hover:text-primary",
+            hideTodayOnMobile ? "hidden sm:inline-flex" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           Today
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Layout toggle */}
+      {/* Grid / Timeline + month navigation */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {layout && onLayoutChange && (
           <div className="flex rounded-lg border border-border overflow-hidden">
             <button
@@ -72,7 +81,6 @@ export function CalendarHeader({
           </div>
         )}
 
-        {/* Month navigation */}
         <div className="flex items-center gap-1">
           <button
             type="button"

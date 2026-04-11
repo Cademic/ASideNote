@@ -37,7 +37,7 @@ public sealed class CalendarEventService : ICalendarEventService
         }
         else
         {
-            // Main/dashboard calendar: own events + project events where ShowEventsOnMainCalendar is true
+            // Main/dashboard calendar: own events + project events where the user opted in (per-user + default)
             q = _eventRepo.Query()
                 .Include(e => e.Project)
                 .ThenInclude(p => p!.Members)
@@ -45,7 +45,6 @@ public sealed class CalendarEventService : ICalendarEventService
                     e.UserId == userId
                     || (e.ProjectId != null
                         && e.Project != null
-                        && e.Project.ShowEventsOnMainCalendar
                         && (e.Project.OwnerId == userId || e.Project.Members.Any(m => m.UserId == userId))));
         }
 
@@ -71,6 +70,16 @@ public sealed class CalendarEventService : ICalendarEventService
             .ThenBy(e => e.CreatedAt)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+
+        if (!query.ProjectId.HasValue)
+        {
+            events = events.Where(e =>
+            {
+                if (e.UserId == userId) return true;
+                if (e.ProjectId is null || e.Project is null) return false;
+                return ProjectEventVisibleOnUserMainCalendar(e.Project, userId);
+            }).ToList();
+        }
 
         // Expand recurring events into materialized instances within the requested range
         var result = new List<CalendarEventDto>();
@@ -176,6 +185,16 @@ public sealed class CalendarEventService : ICalendarEventService
 
         _eventRepo.Delete(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool ProjectEventVisibleOnUserMainCalendar(Project p, Guid userId)
+    {
+        if (p.OwnerId == userId)
+            return p.OwnerShowOnPersonalCalendar ?? p.ShowEventsOnMainCalendar;
+
+        var m = p.Members.FirstOrDefault(x => x.UserId == userId);
+        if (m is null) return false;
+        return m.ShowOnPersonalCalendar ?? p.ShowEventsOnMainCalendar;
     }
 
     /* ── Recurrence expansion ──────────────────────────────── */
