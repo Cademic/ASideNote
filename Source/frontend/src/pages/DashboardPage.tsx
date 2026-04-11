@@ -15,7 +15,20 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { getBoards, createBoard, deleteBoard, updateBoard, toggleBoardPin } from "../api/boards";
-import { getProjects, createProject, addBoardToProject, addNotebookToProject, updateProject, toggleProjectPin, deleteProject, leaveProject } from "../api/projects";
+import {
+  getProjects,
+  createProject,
+  addBoardToProject,
+  addNotebookToProject,
+  removeBoardFromProject,
+  removeNotebookFromProject,
+  setBoardProjectFolder,
+  setNotebookProjectFolder,
+  updateProject,
+  toggleProjectPin,
+  deleteProject,
+  leaveProject,
+} from "../api/projects";
 import { getNotebooks, createNotebook, deleteNotebook, updateNotebook, toggleNotebookPin } from "../api/notebooks";
 import { getFriends } from "../api/users";
 import { getCalendarEvents } from "../api/calendar-events";
@@ -215,25 +228,123 @@ export function DashboardPage() {
     }
   }
 
-  async function handleMoveToProject(boardId: string, projectId: string) {
+  async function handleMoveToProject(boardId: string, projectId: string, folderId?: string) {
+    const board = boards.find((b) => b.id === boardId);
+    if (folderId !== undefined) {
+      if (board?.projectId === projectId) {
+        try {
+          await setBoardProjectFolder(projectId, boardId, { folderId });
+          setBoards((prev) =>
+            prev.map((b) =>
+              b.id === boardId ? { ...b, projectFolderId: folderId } : b,
+            ),
+          );
+        } catch {
+          console.error("Failed to set board folder");
+          fetchBoards();
+        }
+        return;
+      }
+      try {
+        await addBoardToProject(projectId, boardId);
+        await setBoardProjectFolder(projectId, boardId, { folderId });
+        setBoards((prev) =>
+          prev.map((b) =>
+            b.id === boardId ? { ...b, projectId, projectFolderId: folderId } : b,
+          ),
+        );
+      } catch {
+        console.error("Failed to move board to project folder");
+        fetchBoards();
+      }
+      return;
+    }
+    if (board?.projectId === projectId) {
+      try {
+        await removeBoardFromProject(projectId, boardId);
+        setBoards((prev) =>
+          prev.map((b) =>
+            b.id === boardId ? { ...b, projectId: null, projectFolderId: null } : b,
+          ),
+        );
+      } catch {
+        console.error("Failed to remove board from project");
+      }
+      return;
+    }
     try {
       await addBoardToProject(projectId, boardId);
+      await setBoardProjectFolder(projectId, boardId, { folderId: null });
       setBoards((prev) =>
-        prev.map((b) => (b.id === boardId ? { ...b, projectId } : b)),
+        prev.map((b) =>
+          b.id === boardId ? { ...b, projectId, projectFolderId: null } : b,
+        ),
       );
     } catch {
       console.error("Failed to move board to project");
+      fetchBoards();
     }
   }
 
-  async function handleAddNotebookToProject(notebookId: string, projectId: string) {
+  async function handleAddNotebookToProject(
+    notebookId: string,
+    projectId: string,
+    folderId?: string,
+  ) {
+    const notebook = notebooks.find((n) => n.id === notebookId);
+    if (folderId !== undefined) {
+      if (notebook?.projectId === projectId) {
+        try {
+          await setNotebookProjectFolder(projectId, notebookId, { folderId });
+          setNotebooks((prev) =>
+            prev.map((n) =>
+              n.id === notebookId ? { ...n, projectFolderId: folderId } : n,
+            ),
+          );
+        } catch {
+          console.error("Failed to set notebook folder");
+          fetchBoards();
+        }
+        return;
+      }
+      try {
+        await addNotebookToProject(projectId, notebookId);
+        await setNotebookProjectFolder(projectId, notebookId, { folderId });
+        setNotebooks((prev) =>
+          prev.map((n) =>
+            n.id === notebookId ? { ...n, projectId, projectFolderId: folderId } : n,
+          ),
+        );
+      } catch {
+        console.error("Failed to add notebook to project folder");
+        fetchBoards();
+      }
+      return;
+    }
+    if (notebook?.projectId === projectId) {
+      try {
+        await removeNotebookFromProject(projectId, notebookId);
+        setNotebooks((prev) =>
+          prev.map((n) =>
+            n.id === notebookId ? { ...n, projectId: null, projectFolderId: null } : n,
+          ),
+        );
+      } catch {
+        console.error("Failed to remove notebook from project");
+      }
+      return;
+    }
     try {
       await addNotebookToProject(projectId, notebookId);
+      await setNotebookProjectFolder(projectId, notebookId, { folderId: null });
       setNotebooks((prev) =>
-        prev.map((n) => (n.id === notebookId ? { ...n, projectId } : n)),
+        prev.map((n) =>
+          n.id === notebookId ? { ...n, projectId, projectFolderId: null } : n,
+        ),
       );
     } catch {
       console.error("Failed to add notebook to project");
+      fetchBoards();
     }
   }
 

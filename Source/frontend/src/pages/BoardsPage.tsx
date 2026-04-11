@@ -17,7 +17,12 @@ import {
   updateBoard,
   toggleBoardPin,
 } from "../api/boards";
-import { getProjects, addBoardToProject } from "../api/projects";
+import {
+  getProjects,
+  addBoardToProject,
+  removeBoardFromProject,
+  setBoardProjectFolder,
+} from "../api/projects";
 import { createNote } from "../api/notes";
 import { createIndexCard } from "../api/index-cards";
 import { createConnection } from "../api/connections";
@@ -274,14 +279,61 @@ export function BoardsPage() {
     }
   }
 
-  async function handleMoveToProject(boardId: string, projectId: string) {
+  async function handleMoveToProject(boardId: string, projectId: string, folderId?: string) {
+    const board = boards.find((b) => b.id === boardId);
+    if (folderId !== undefined) {
+      if (board?.projectId === projectId) {
+        try {
+          await setBoardProjectFolder(projectId, boardId, { folderId });
+          setBoards((prev) =>
+            prev.map((b) =>
+              b.id === boardId ? { ...b, projectFolderId: folderId } : b,
+            ),
+          );
+        } catch {
+          console.error("Failed to set board folder");
+          fetchBoards();
+        }
+        return;
+      }
+      try {
+        await addBoardToProject(projectId, boardId);
+        await setBoardProjectFolder(projectId, boardId, { folderId });
+        setBoards((prev) =>
+          prev.map((b) =>
+            b.id === boardId ? { ...b, projectId, projectFolderId: folderId } : b,
+          ),
+        );
+      } catch {
+        console.error("Failed to move board to project folder");
+        fetchBoards();
+      }
+      return;
+    }
+    if (board?.projectId === projectId) {
+      try {
+        await removeBoardFromProject(projectId, boardId);
+        setBoards((prev) =>
+          prev.map((b) =>
+            b.id === boardId ? { ...b, projectId: null, projectFolderId: null } : b,
+          ),
+        );
+      } catch {
+        console.error("Failed to remove board from project");
+      }
+      return;
+    }
     try {
       await addBoardToProject(projectId, boardId);
+      await setBoardProjectFolder(projectId, boardId, { folderId: null });
       setBoards((prev) =>
-        prev.map((b) => (b.id === boardId ? { ...b, projectId } : b)),
+        prev.map((b) =>
+          b.id === boardId ? { ...b, projectId, projectFolderId: null } : b,
+        ),
       );
     } catch {
       console.error("Failed to move board to project");
+      fetchBoards();
     }
   }
 
