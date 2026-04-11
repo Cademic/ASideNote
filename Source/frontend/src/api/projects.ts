@@ -1,9 +1,14 @@
 import type {
   AddMemberRequest,
+  CreateProjectFolderRequest,
   CreateProjectRequest,
   ProjectDetailDto,
+  ProjectFolderDto,
   ProjectSummaryDto,
+  SetProjectItemFolderRequest,
   UpdateMemberRoleRequest,
+  UpdateMyProjectCalendarPreferenceRequest,
+  UpdateProjectFolderRequest,
   UpdateProjectRequest,
 } from "../types";
 import { apiClient } from "./client";
@@ -28,7 +33,18 @@ export async function getProjectById(
   id: string,
 ): Promise<ProjectDetailDto> {
   const response = await apiClient.get<ProjectDetailDto>(`/projects/${id}`);
-  return response.data;
+  const d = response.data;
+  // Support camelCase or PascalCase payloads (older hosts / proxies).
+  const raw = d as ProjectDetailDto & {
+    Folders?: ProjectFolderDto[];
+    MyShowOnPersonalCalendar?: boolean | null;
+  };
+  return {
+    ...d,
+    folders: d.folders ?? raw.Folders ?? [],
+    myShowOnPersonalCalendar:
+      d.myShowOnPersonalCalendar ?? raw.MyShowOnPersonalCalendar ?? null,
+  };
 }
 
 export async function updateProject(
@@ -36,6 +52,13 @@ export async function updateProject(
   data: UpdateProjectRequest,
 ): Promise<void> {
   await apiClient.put(`/projects/${id}`, data);
+}
+
+export async function updateMyProjectCalendarPreference(
+  projectId: string,
+  data: UpdateMyProjectCalendarPreferenceRequest,
+): Promise<void> {
+  await apiClient.patch(`/projects/${projectId}/my-calendar`, data);
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -103,6 +126,47 @@ export async function removeNotebookFromProject(
   notebookId: string,
 ): Promise<void> {
   await apiClient.delete(`/projects/${projectId}/notebooks/${notebookId}`);
+}
+
+export async function getProjectFolders(projectId: string): Promise<ProjectFolderDto[]> {
+  const response = await apiClient.get<ProjectFolderDto[]>(`/projects/${projectId}/folders`);
+  return response.data;
+}
+
+export async function createProjectFolder(
+  projectId: string,
+  data: CreateProjectFolderRequest,
+): Promise<ProjectFolderDto> {
+  const response = await apiClient.post<ProjectFolderDto>(`/projects/${projectId}/folders`, data);
+  return response.data;
+}
+
+export async function updateProjectFolder(
+  projectId: string,
+  folderId: string,
+  data: UpdateProjectFolderRequest,
+): Promise<void> {
+  await apiClient.patch(`/projects/${projectId}/folders/${folderId}`, data);
+}
+
+export async function deleteProjectFolder(projectId: string, folderId: string): Promise<void> {
+  await apiClient.delete(`/projects/${projectId}/folders/${folderId}`);
+}
+
+export async function setBoardProjectFolder(
+  projectId: string,
+  boardId: string,
+  data: SetProjectItemFolderRequest,
+): Promise<void> {
+  await apiClient.patch(`/projects/${projectId}/boards/${boardId}/folder`, data);
+}
+
+export async function setNotebookProjectFolder(
+  projectId: string,
+  notebookId: string,
+  data: SetProjectItemFolderRequest,
+): Promise<void> {
+  await apiClient.patch(`/projects/${projectId}/notebooks/${notebookId}/folder`, data);
 }
 
 export async function getPinnedProjects(): Promise<ProjectSummaryDto[]> {

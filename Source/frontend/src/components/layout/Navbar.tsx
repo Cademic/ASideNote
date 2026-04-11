@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from "react";
+import { useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
 import { User, Settings, LogOut, ChevronDown, Menu } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -81,6 +82,9 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  useNudgeDropdownToViewport(dropdownOpen, userMenuPanelRef);
 
   const isNotebookEditorRoute = /^\/notebooks\/[^/]+$/.test(location.pathname);
   const showConnectedUsers = isNotebookEditorRoute && connectedUsers.length > 0;
@@ -215,7 +219,8 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
 
         {dropdownOpen && (
           <div
-            className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-border bg-background py-1 shadow-lg"
+            ref={userMenuPanelRef}
+            className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,calc(100vh-2rem))] min-w-[160px] max-w-[min(16rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
             role="menu"
           >
             <button

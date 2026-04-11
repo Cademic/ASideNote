@@ -127,6 +127,7 @@ export interface BoardSummaryDto {
   description: string | null;
   boardType: string;
   projectId: string | null;
+  projectFolderId?: string | null;
   isPinned: boolean;
   pinnedAt: string | null;
   createdAt: string;
@@ -153,6 +154,7 @@ export interface NotebookSummaryDto {
   id: string;
   name: string;
   projectId?: string | null;
+  projectFolderId?: string | null;
   isPinned: boolean;
   pinnedAt: string | null;
   createdAt: string;
@@ -167,6 +169,7 @@ export interface NotebookDetailDto {
   createdAt: string;
   updatedAt: string;
   projectId: string | null;
+  projectFolderId?: string | null;
   contentJson: string;
 }
 
@@ -414,6 +417,29 @@ export interface ProjectMemberDto {
   joinedAt: string;
 }
 
+export interface ProjectFolderDto {
+  id: string;
+  projectId: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectFolderRequest {
+  name: string;
+  sortOrder?: number | null;
+}
+
+export interface UpdateProjectFolderRequest {
+  name?: string;
+  sortOrder?: number | null;
+}
+
+export interface SetProjectItemFolderRequest {
+  folderId: string | null;
+}
+
 export interface ProjectDetailDto {
   id: string;
   name: string;
@@ -425,11 +451,14 @@ export interface ProjectDetailDto {
   progress: number;
   color: string;
   showEventsOnMainCalendar?: boolean;
+  /** Null means use showEventsOnMainCalendar (project default). */
+  myShowOnPersonalCalendar?: boolean | null;
   ownerId: string;
   ownerUsername: string;
   userRole: string;
   createdAt: string;
   members: ProjectMemberDto[];
+  folders: ProjectFolderDto[];
   boards: BoardSummaryDto[];
   notebooks: NotebookSummaryDto[];
   notes: NoteSummaryDto[];
@@ -464,6 +493,10 @@ export interface AddMemberRequest {
 
 export interface UpdateMemberRoleRequest {
   role: string;
+}
+
+export interface UpdateMyProjectCalendarPreferenceRequest {
+  showOnPersonalCalendar: boolean | null;
 }
 
 // --- Calendar Event DTOs ---

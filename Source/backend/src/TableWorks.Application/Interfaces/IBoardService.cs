@@ -12,6 +12,7 @@ public interface IBoardService
     Task DeleteBoardAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default);
     Task AddBoardToProjectAsync(Guid userId, Guid projectId, Guid boardId, CancellationToken cancellationToken = default);
     Task RemoveBoardFromProjectAsync(Guid userId, Guid projectId, Guid boardId, CancellationToken cancellationToken = default);
+    Task SetBoardProjectFolderAsync(Guid userId, Guid projectId, Guid boardId, Guid? folderId, CancellationToken cancellationToken = default);
     Task<string?> GetProjectRoleAsync(Guid userId, Guid projectId, CancellationToken cancellationToken = default);
     Task TogglePinAsync(Guid userId, Guid boardId, bool isPinned, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<BoardSummaryDto>> GetPinnedBoardsAsync(Guid userId, CancellationToken cancellationToken = default);

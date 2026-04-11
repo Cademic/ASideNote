@@ -17,6 +17,7 @@ public sealed class NotebookService : INotebookService
     private readonly IRepository<NotebookVersion> _versionRepo;
     private readonly IRepository<Project> _projectRepo;
     private readonly IRepository<ProjectMember> _memberRepo;
+    private readonly IRepository<ProjectFolder> _projectFolderRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IImageStorageService _imageStorage;
     private readonly IUserStorageService _userStorage;
@@ -27,6 +28,7 @@ public sealed class NotebookService : INotebookService
         IRepository<NotebookVersion> versionRepo,
         IRepository<Project> projectRepo,
         IRepository<ProjectMember> memberRepo,
+        IRepository<ProjectFolder> projectFolderRepo,
         IUnitOfWork unitOfWork,
         IImageStorageService imageStorage,
         IUserStorageService userStorage,
@@ -36,6 +38,7 @@ public sealed class NotebookService : INotebookService
         _versionRepo = versionRepo;
         _projectRepo = projectRepo;
         _memberRepo = memberRepo;
+        _projectFolderRepo = projectFolderRepo;
         _unitOfWork = unitOfWork;
         _imageStorage = imageStorage;
         _userStorage = userStorage;
@@ -95,6 +98,7 @@ public sealed class NotebookService : INotebookService
                 Id = n.Id,
                 Name = n.Name,
                 ProjectId = n.ProjectId,
+                ProjectFolderId = n.ProjectFolderId,
                 IsPinned = n.IsPinned,
                 PinnedAt = n.PinnedAt,
                 CreatedAt = n.CreatedAt,
@@ -131,6 +135,7 @@ public sealed class NotebookService : INotebookService
             CreatedAt = notebook.CreatedAt,
             UpdatedAt = notebook.UpdatedAt,
             ProjectId = notebook.ProjectId,
+            ProjectFolderId = notebook.ProjectFolderId,
             ContentJson = notebook.ContentJson ?? "{\"type\":\"doc\",\"content\":[]}"
         };
     }
@@ -160,6 +165,8 @@ public sealed class NotebookService : INotebookService
         {
             Id = notebook.Id,
             Name = notebook.Name,
+            ProjectId = notebook.ProjectId,
+            ProjectFolderId = notebook.ProjectFolderId,
             IsPinned = false,
             PinnedAt = null,
             CreatedAt = notebook.CreatedAt,
@@ -272,6 +279,7 @@ public sealed class NotebookService : INotebookService
                 Id = n.Id,
                 Name = n.Name,
                 ProjectId = n.ProjectId,
+                ProjectFolderId = n.ProjectFolderId,
                 IsPinned = true,
                 PinnedAt = n.PinnedAt,
                 CreatedAt = n.CreatedAt,
@@ -309,8 +317,33 @@ public sealed class NotebookService : INotebookService
             ?? throw new KeyNotFoundException("Notebook not found in this project.");
 
         notebook.ProjectId = null;
+        notebook.ProjectFolderId = null;
         notebook.UpdatedAt = DateTime.UtcNow;
 
+        _notebookRepo.Update(notebook);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetNotebookProjectFolderAsync(Guid userId, Guid projectId, Guid notebookId, Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var role = await GetProjectRoleAsync(userId, projectId, cancellationToken);
+        if (role is null || role == "Viewer")
+            throw new UnauthorizedAccessException("You do not have permission to move notebooks in this project.");
+
+        var notebook = await _notebookRepo.Query()
+            .FirstOrDefaultAsync(n => n.Id == notebookId && n.ProjectId == projectId, cancellationToken)
+            ?? throw new KeyNotFoundException("Notebook not found in this project.");
+
+        if (folderId.HasValue)
+        {
+            var folderOk = await _projectFolderRepo.Query()
+                .AnyAsync(f => f.Id == folderId.Value && f.ProjectId == projectId, cancellationToken);
+            if (!folderOk)
+                throw new KeyNotFoundException("Folder not found.");
+        }
+
+        notebook.ProjectFolderId = folderId;
+        notebook.UpdatedAt = DateTime.UtcNow;
         _notebookRepo.Update(notebook);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }

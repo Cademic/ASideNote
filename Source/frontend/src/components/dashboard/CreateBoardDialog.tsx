@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, ClipboardList, PenTool, FolderOpen, BookOpen } from "lucide-react";
 
 const PROJECT_COLORS = [
@@ -29,6 +29,8 @@ interface CreateBoardDialogProps {
   ) => void;
   onCreateNotebook?: (name: string) => void;
   defaultBoardType?: string;
+  /** Hide Board / Project / Notebook tabs — board form only (e.g. when already inside a project). */
+  hideProjectTab?: boolean;
 }
 
 const BOARD_TYPES = [
@@ -57,6 +59,7 @@ export function CreateBoardDialog({
   onCreateProject,
   onCreateNotebook,
   defaultBoardType = "NoteBoard",
+  hideProjectTab = false,
 }: CreateBoardDialogProps) {
   const [tab, setTab] = useState<DialogTab>("board");
 
@@ -97,6 +100,12 @@ export function CreateBoardDialog({
     onClose();
   }
 
+  useEffect(() => {
+    if (!isOpen) return;
+    setBoardType(defaultBoardType);
+    if (hideProjectTab) setTab("board");
+  }, [isOpen, defaultBoardType, hideProjectTab]);
+
   function handleSubmitBoard(e: React.FormEvent) {
     e.preventDefault();
     if (!boardName.trim()) return;
@@ -131,7 +140,7 @@ export function CreateBoardDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
+        className="absolute inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none"
         onClick={handleClose}
         onKeyDown={() => {}}
         role="presentation"
@@ -148,49 +157,53 @@ export function CreateBoardDialog({
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="text-lg font-semibold text-foreground mb-4">Get Started</h2>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">
+          {hideProjectTab ? "New board" : "Get Started"}
+        </h2>
 
         {/* Tab switcher */}
-        <div className="mb-4 flex rounded-lg border border-border overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setTab("board")}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-              tab === "board"
-                ? "bg-primary text-primary-foreground"
-                : "bg-background text-foreground/50 hover:text-foreground hover:bg-foreground/5"
-            }`}
-          >
-            <ClipboardList className="h-4 w-4 shrink-0" />
-            Board
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("project")}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-              tab === "project"
-                ? "bg-primary text-primary-foreground"
-                : "bg-background text-foreground/50 hover:text-foreground hover:bg-foreground/5"
-            }`}
-          >
-            <FolderOpen className="h-4 w-4 shrink-0" />
-            Project
-          </button>
-          {onCreateNotebook && (
+        {!hideProjectTab && (
+          <div className="mb-4 flex overflow-hidden rounded-lg border border-border">
             <button
               type="button"
-              onClick={() => setTab("notebook")}
-              className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                tab === "notebook"
+              onClick={() => setTab("board")}
+              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                tab === "board"
                   ? "bg-primary text-primary-foreground"
-                  : "bg-background text-foreground/50 hover:text-foreground hover:bg-foreground/5"
+                  : "bg-background text-foreground/50 hover:bg-foreground/5 hover:text-foreground"
               }`}
             >
-              <BookOpen className="h-4 w-4 shrink-0" />
-              Notebook
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              Board
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => setTab("project")}
+              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                tab === "project"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-foreground/50 hover:bg-foreground/5 hover:text-foreground"
+              }`}
+            >
+              <FolderOpen className="h-4 w-4 shrink-0" />
+              Project
+            </button>
+            {onCreateNotebook && (
+              <button
+                type="button"
+                onClick={() => setTab("notebook")}
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                  tab === "notebook"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-foreground/50 hover:bg-foreground/5 hover:text-foreground"
+                }`}
+              >
+                <BookOpen className="h-4 w-4 shrink-0" />
+                Notebook
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Error message */}
         {displayError && (

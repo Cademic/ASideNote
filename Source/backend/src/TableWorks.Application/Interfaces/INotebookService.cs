@@ -15,6 +15,7 @@ public interface INotebookService
     Task<IReadOnlyList<NotebookSummaryDto>> GetPinnedNotebooksAsync(Guid userId, CancellationToken cancellationToken = default);
     Task AddNotebookToProjectAsync(Guid userId, Guid projectId, Guid notebookId, CancellationToken cancellationToken = default);
     Task RemoveNotebookFromProjectAsync(Guid userId, Guid projectId, Guid notebookId, CancellationToken cancellationToken = default);
+    Task SetNotebookProjectFolderAsync(Guid userId, Guid projectId, Guid notebookId, Guid? folderId, CancellationToken cancellationToken = default);
 
     Task<NotebookVersionDto> CreateVersionAsync(Guid userId, Guid notebookId, CreateNotebookVersionRequest? request = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NotebookVersionDto>> GetVersionsAsync(Guid userId, Guid notebookId, CancellationToken cancellationToken = default);

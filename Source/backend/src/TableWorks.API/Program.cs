@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 using System.Text;
 using Asp.Versioning;
@@ -61,6 +62,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
@@ -310,6 +312,7 @@ builder.Services.AddScoped<IBoardAccessService, BoardAccessService>();
 builder.Services.AddScoped<ASideNote.Application.Interfaces.IBoardHubBroadcaster, ASideNote.API.Services.BoardHubBroadcaster>();
 builder.Services.AddSingleton<IBoardPresenceService, ASideNote.API.Services.BoardPresenceService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IProjectFolderService, ProjectFolderService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IFolderService, FolderService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();

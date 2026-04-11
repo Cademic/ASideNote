@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,16 +14,21 @@ import {
   Crown,
   Eye,
   Pencil,
-  PenTool,
   FolderOpen,
+  Folder,
   CalendarClock,
   LogOut,
   UserCog,
   X,
+  Layers,
+  ChevronDown,
+  PenTool,
+  Filter,
 } from "lucide-react";
 import {
   getProjectById,
   updateProject,
+  updateMyProjectCalendarPreference,
   deleteProject,
   leaveProject,
   transferProjectOwnership,
@@ -31,10 +36,23 @@ import {
   removeBoardFromProject,
   addNotebookToProject,
   removeNotebookFromProject,
+  createProjectFolder,
+  updateProjectFolder,
+  deleteProjectFolder,
+  setBoardProjectFolder,
+  setNotebookProjectFolder,
 } from "../api/projects";
 import axios from "axios";
-import { createBoard } from "../api/boards";
-import { createNotebook, getNotebooks } from "../api/notebooks";
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err) && err.response?.data) {
+    const data = err.response.data as { message?: string };
+    if (typeof data.message === "string" && data.message.trim()) return data.message;
+  }
+  return fallback;
+}
+import { createBoard, deleteBoard, updateBoard } from "../api/boards";
+import { createNotebook, deleteNotebook, getNotebooks, updateNotebook } from "../api/notebooks";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { NotebookCard } from "../components/notebooks/NotebookCard";
 import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
@@ -44,22 +62,33 @@ import { MemberList } from "../components/projects/MemberList";
 import { AddMemberDialog } from "../components/projects/AddMemberDialog";
 import { AddExistingBoardDialog } from "../components/projects/AddExistingBoardDialog";
 import { AddExistingNotebookDialog } from "../components/projects/AddExistingNotebookDialog";
+import { CreateProjectFolderDialog } from "../components/projects/CreateProjectFolderDialog";
+import {
+  CollapsibleFolderBody,
+  ProjectNamedFolderHeader,
+} from "../components/projects/ProjectNamedFolderHeader";
+import { useNudgeDropdownToViewport } from "../lib/useDropdownViewport";
+import {
+  DraggableProjectItem,
+  FolderDropSurface,
+  type ProjectItemDragPayload,
+} from "../components/projects/ProjectFolderDnD";
 import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
 import type {
   ProjectDetailDto,
   BoardSummaryDto,
   NotebookSummaryDto,
   ProjectMemberDto,
+  ProjectFolderDto,
 } from "../types";
 import { useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 
-type TabId = "calendar" | "boards" | "notebooks" | "members" | "settings";
+type TabId = "calendar" | "content" | "members" | "settings";
 
 const TABS: { id: TabId; label: string; icon: typeof ClipboardList }[] = [
   { id: "calendar", label: "Calendar", icon: Calendar },
-  { id: "boards", label: "Boards", icon: ClipboardList },
-  { id: "notebooks", label: "Notebooks", icon: BookOpen },
+  { id: "content", label: "Boards & notebooks", icon: Layers },
   { id: "members", label: "Members", icon: Users },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -91,15 +120,25 @@ function toInputDate(dateStr: string | null): string {
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { openNotebook, setBoardName } = useOutletContext<AppLayoutContext>();
+  const {
+    openNotebook,
+    setBoardName,
+    closeBoard,
+    refreshPinnedBoards,
+    refreshPinnedNotebooks,
+  } = useOutletContext<AppLayoutContext>();
 
   const [project, setProject] = useState<ProjectDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("calendar");
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
+  const [createBoardDefaultType, setCreateBoardDefaultType] = useState("NoteBoard");
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
   const [isAddExistingBoardOpen, setIsAddExistingBoardOpen] = useState(false);
+  const [addExistingBoardInitialTab, setAddExistingBoardInitialTab] = useState<
+    "NoteBoard" | "ChalkBoard"
+  >("NoteBoard");
   const [isCreateNotebookOpen, setIsCreateNotebookOpen] = useState(false);
   const [createNotebookError, setCreateNotebookError] = useState<string | null>(null);
   const [isAddExistingNotebookOpen, setIsAddExistingNotebookOpen] = useState(false);
@@ -111,7 +150,14 @@ export function ProjectDetailPage() {
   );
   const [removeBoardTarget, setRemoveBoardTarget] = useState<BoardSummaryDto | null>(null);
   const [removeNotebookTarget, setRemoveNotebookTarget] = useState<NotebookSummaryDto | null>(null);
+  const [deleteBoardTarget, setDeleteBoardTarget] = useState<BoardSummaryDto | null>(null);
+  const [deleteNotebookTarget, setDeleteNotebookTarget] = useState<NotebookSummaryDto | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<ProjectFolderDto | null>(null);
   const [userNotebookTotal, setUserNotebookTotal] = useState(0);
+  const [renameBoardTarget, setRenameBoardTarget] = useState<{ id: string; name: string } | null>(null);
+  const [renameBoardValue, setRenameBoardValue] = useState("");
+  const [renameNotebookTarget, setRenameNotebookTarget] = useState<{ id: string; name: string } | null>(null);
+  const [renameNotebookValue, setRenameNotebookValue] = useState("");
 
   // Tab strip scroll (arrows when tabs overflow on small screens)
   const tabsScrollRef = useRef<HTMLDivElement>(null);
@@ -185,6 +231,7 @@ export function ProjectDetailPage() {
   const [editShowEventsOnMainCalendar, setEditShowEventsOnMainCalendar] =
     useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [patchingMyCalendar, setPatchingMyCalendar] = useState(false);
 
   const isOwner = project?.userRole === "Owner";
   const isEditor = project?.userRole === "Editor";
@@ -278,6 +325,27 @@ export function ProjectDetailPage() {
     if (board) setRemoveBoardTarget(board);
   }
 
+  function handleDeleteBoard(boardId: string) {
+    const board = project?.boards.find((b) => b.id === boardId) ?? null;
+    if (board) setDeleteBoardTarget(board);
+  }
+
+  async function confirmDeleteBoard() {
+    if (!deleteBoardTarget) return;
+    const id = deleteBoardTarget.id;
+    setDeleteBoardTarget(null);
+    setProject((prev) =>
+      prev ? { ...prev, boards: prev.boards.filter((b) => b.id !== id) } : prev,
+    );
+    closeBoard(id);
+    try {
+      await deleteBoard(id);
+      refreshPinnedBoards();
+    } catch {
+      fetchProject();
+    }
+  }
+
   async function confirmRemoveBoard() {
     if (!removeBoardTarget || !projectId) return;
     const boardId = removeBoardTarget.id;
@@ -332,6 +400,31 @@ export function ProjectDetailPage() {
     if (notebook) setRemoveNotebookTarget(notebook);
   }
 
+  function handleDeleteNotebook(notebookId: string) {
+    const notebook = project?.notebooks?.find((n) => n.id === notebookId) ?? null;
+    if (notebook) setDeleteNotebookTarget(notebook);
+  }
+
+  async function confirmDeleteNotebook() {
+    if (!deleteNotebookTarget) return;
+    const id = deleteNotebookTarget.id;
+    setDeleteNotebookTarget(null);
+    setProject((prev) =>
+      prev
+        ? { ...prev, notebooks: (prev.notebooks ?? []).filter((n) => n.id !== id) }
+        : prev,
+    );
+    try {
+      await deleteNotebook(id);
+      refreshPinnedNotebooks();
+      getNotebooks({ limit: 1 })
+        .then((r) => setUserNotebookTotal(r.total))
+        .catch(() => {});
+    } catch {
+      fetchProject();
+    }
+  }
+
   async function confirmRemoveNotebook() {
     if (!removeNotebookTarget || !projectId) return;
     const notebookId = removeNotebookTarget.id;
@@ -345,6 +438,117 @@ export function ProjectDetailPage() {
       await removeNotebookFromProject(projectId, notebookId);
     } catch {
       fetchProject();
+    }
+  }
+
+  async function handleCreateFolder(name: string) {
+    if (!projectId) return;
+    await createProjectFolder(projectId, { name });
+    await fetchProject();
+  }
+
+  async function handleRenameFolder(folderId: string, name: string) {
+    if (!projectId) return;
+    await updateProjectFolder(projectId, folderId, { name });
+    await fetchProject();
+  }
+
+  async function confirmDeleteFolder() {
+    if (!deleteFolderTarget || !projectId) return;
+    const folderId = deleteFolderTarget.id;
+    setDeleteFolderTarget(null);
+    try {
+      await deleteProjectFolder(projectId, folderId);
+      await fetchProject();
+    } catch (err) {
+      console.error("Failed to delete folder:", err);
+    }
+  }
+
+  async function handleSetBoardFolder(boardId: string, folderId: string | null) {
+    if (!projectId) return;
+    try {
+      await setBoardProjectFolder(projectId, boardId, { folderId });
+      await fetchProject();
+    } catch (err) {
+      console.error("Failed to move board:", err);
+    }
+  }
+
+  async function handleSetNotebookFolder(notebookId: string, folderId: string | null) {
+    if (!projectId) return;
+    try {
+      await setNotebookProjectFolder(projectId, notebookId, { folderId });
+      await fetchProject();
+    } catch (err) {
+      console.error("Failed to move notebook:", err);
+    }
+  }
+
+  function handleRenameBoard(id: string, currentName: string) {
+    setRenameBoardTarget({ id, name: currentName });
+    setRenameBoardValue(currentName);
+  }
+
+  async function confirmRenameBoard() {
+    if (!renameBoardTarget || !renameBoardValue.trim()) return;
+    const { id } = renameBoardTarget;
+    const newName = renameBoardValue.trim();
+    setRenameBoardTarget(null);
+    setProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            boards: prev.boards.map((b) => (b.id === id ? { ...b, name: newName } : b)),
+          }
+        : prev,
+    );
+    try {
+      await updateBoard(id, { name: newName });
+    } catch {
+      fetchProject();
+    }
+  }
+
+  function handleRenameNotebook(id: string, currentName: string) {
+    setRenameNotebookTarget({ id, name: currentName });
+    setRenameNotebookValue(currentName);
+  }
+
+  async function confirmRenameNotebook() {
+    if (!renameNotebookTarget || !renameNotebookValue.trim()) return;
+    const { id } = renameNotebookTarget;
+    const newName = renameNotebookValue.trim();
+    setRenameNotebookTarget(null);
+    setProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            notebooks: (prev.notebooks ?? []).map((n) =>
+              n.id === id ? { ...n, name: newName } : n,
+            ),
+          }
+        : prev,
+    );
+    try {
+      await updateNotebook(id, { name: newName });
+    } catch {
+      fetchProject();
+    }
+  }
+
+  async function handleMyCalendarPreference(next: boolean | null) {
+    if (!projectId) return;
+    setPatchingMyCalendar(true);
+    try {
+      await updateMyProjectCalendarPreference(projectId, {
+        showOnPersonalCalendar: next,
+      });
+      await fetchProject();
+    } catch {
+      // Silently fail
+    } finally {
+      setPatchingMyCalendar(false);
     }
   }
 
@@ -578,14 +782,9 @@ export function ProjectDetailPage() {
                 >
                   <tab.icon className="h-4 w-4" />
                   {tab.label}
-                  {tab.id === "boards" && (
+                  {tab.id === "content" && (
                     <span className="ml-1 rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px]">
-                      {project.boards.length}
-                    </span>
-                  )}
-                  {tab.id === "notebooks" && (
-                    <span className="ml-1 rounded-full bg-foreground/5 px-1.5 py-0.5 text-[10px]">
-                      {(project.notebooks ?? []).length}
+                      {project.boards.length + (project.notebooks ?? []).length}
                     </span>
                   )}
                   {tab.id === "members" && (
@@ -611,25 +810,35 @@ export function ProjectDetailPage() {
           />
         )}
 
-        {activeTab === "boards" && (
-          <BoardsTab
+        {activeTab === "content" && (
+          <ProjectContentTab
             boards={project.boards}
-            canEdit={canEdit}
-            onCreateBoard={() => setIsCreateBoardOpen(true)}
-            onAddExisting={() => setIsAddExistingBoardOpen(true)}
-            onRemoveBoard={handleRemoveBoard}
-          />
-        )}
-
-        {activeTab === "notebooks" && (
-          <NotebooksTab
             notebooks={project.notebooks ?? []}
+            folders={project.folders ?? []}
             canEdit={canEdit}
             canCreateNotebook={userNotebookTotal < 5}
+            onCreateBoard={(boardType) => {
+              setCreateBoardDefaultType(boardType);
+              setIsCreateBoardOpen(true);
+            }}
+            onAddExistingBoard={(initialTab) => {
+              setAddExistingBoardInitialTab(initialTab);
+              setIsAddExistingBoardOpen(true);
+            }}
+            onRemoveBoard={handleRemoveBoard}
             onCreateNotebook={() => setIsCreateNotebookOpen(true)}
-            onAddExisting={() => setIsAddExistingNotebookOpen(true)}
+            onAddExistingNotebook={() => setIsAddExistingNotebookOpen(true)}
             onRemoveNotebook={handleRemoveNotebook}
             onOpenNotebook={openNotebook}
+            onCreateFolder={handleCreateFolder}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={(f) => setDeleteFolderTarget(f)}
+            onSetBoardFolder={handleSetBoardFolder}
+            onSetNotebookFolder={handleSetNotebookFolder}
+            onRenameBoard={canEdit ? handleRenameBoard : undefined}
+            onDeleteBoard={canEdit ? handleDeleteBoard : undefined}
+            onRenameNotebook={canEdit ? handleRenameNotebook : undefined}
+            onDeleteNotebook={canEdit ? handleDeleteNotebook : undefined}
           />
         )}
 
@@ -646,6 +855,10 @@ export function ProjectDetailPage() {
           <SettingsTab
             isOwner={isOwner}
             members={project.members}
+            projectDefaultShowOnMainCalendar={project.showEventsOnMainCalendar ?? false}
+            myShowOnPersonalCalendar={project.myShowOnPersonalCalendar ?? null}
+            patchingMyCalendar={patchingMyCalendar}
+            onMyCalendarPreferenceChange={handleMyCalendarPreference}
             editName={editName}
             editDescription={editDescription}
             editColor={editColor}
@@ -677,6 +890,8 @@ export function ProjectDetailPage() {
       <CreateBoardDialog
         isOpen={isCreateBoardOpen}
         error={createBoardError}
+        defaultBoardType={createBoardDefaultType}
+        hideProjectTab
         onClose={() => { setIsCreateBoardOpen(false); setCreateBoardError(null); }}
         onCreateBoard={handleCreateBoard}
         onCreateProject={() => { /* no-op */ }}
@@ -684,6 +899,7 @@ export function ProjectDetailPage() {
 
       <AddExistingBoardDialog
         isOpen={isAddExistingBoardOpen}
+        initialTab={addExistingBoardInitialTab}
         projectBoardIds={project.boards.map((b) => b.id)}
         onClose={() => setIsAddExistingBoardOpen(false)}
         onAdd={handleAddExistingBoard}
@@ -738,6 +954,39 @@ export function ProjectDetailPage() {
       />
 
       <ConfirmDialog
+        isOpen={deleteBoardTarget !== null}
+        title="Delete Board"
+        message={`Are you sure you want to delete "${deleteBoardTarget?.name ?? "this board"}"? All notes and index cards inside will be permanently removed.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        variant="danger"
+        onConfirm={() => void confirmDeleteBoard()}
+        onCancel={() => setDeleteBoardTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteNotebookTarget !== null}
+        title="Delete Notebook"
+        message={`Are you sure you want to delete "${deleteNotebookTarget?.name ?? "this notebook"}"? All pages will be permanently removed.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        variant="danger"
+        onConfirm={() => void confirmDeleteNotebook()}
+        onCancel={() => setDeleteNotebookTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteFolderTarget !== null}
+        title="Delete Folder"
+        message={`Delete folder "${deleteFolderTarget?.name ?? ""}"? Items in this folder will move below the folders (not in a folder).`}
+        confirmLabel="Delete Folder"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDeleteFolder}
+        onCancel={() => setDeleteFolderTarget(null)}
+      />
+
+      <ConfirmDialog
         isOpen={deleteConfirmOpen}
         title="Delete Project"
         message={`Are you sure you want to delete "${project.name}"? Boards and notebooks will be unlinked but not deleted.`}
@@ -769,219 +1018,829 @@ export function ProjectDetailPage() {
         onConfirm={confirmTransferOwnership}
         onCancel={() => setTransferTarget(null)}
       />
-    </div>
-  );
-}
 
-/* ─── Sub-components ──────────────────────────────────────── */
-
-interface BoardsTabProps {
-  boards: BoardSummaryDto[];
-  canEdit: boolean;
-  onCreateBoard: () => void;
-  onAddExisting: () => void;
-  onRemoveBoard: (id: string) => void;
-}
-
-function BoardsTab({ boards, canEdit, onCreateBoard, onAddExisting, onRemoveBoard }: BoardsTabProps) {
-  const [typeFilter, setTypeFilter] = useState("");
-
-  const filtered = typeFilter
-    ? boards.filter((b) => b.boardType === typeFilter)
-    : boards;
-
-  const boardTypes = [
-    { value: "", label: "All", icon: ClipboardList },
-    { value: "NoteBoard", label: "Note Boards", icon: ClipboardList },
-    { value: "ChalkBoard", label: "Chalk Boards", icon: PenTool },
-  ];
-
-  return (
-    <div>
-      {/* Filter + Add */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {boardTypes.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTypeFilter(t.value)}
-              className={[
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
-                typeFilter === t.value
-                  ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
-                  : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
-              ].join(" ")}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onAddExisting}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              Add Existing
-            </button>
-            <button
-              type="button"
-              onClick={onCreateBoard}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Board
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Board grid */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-            <ClipboardList className="h-5 w-5 text-foreground/30" />
-          </div>
-          <p className="mb-4 text-sm text-foreground/40">
-            {typeFilter ? "No boards match this filter" : "No boards in this project yet"}
-          </p>
-          {canEdit && !typeFilter && (
-            <div className="flex items-center gap-2">
+      {renameBoardTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={() => setRenameBoardTarget(null)}
+            aria-hidden
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Board</h2>
+            <input
+              type="text"
+              value={renameBoardValue}
+              onChange={(e) => setRenameBoardValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void confirmRenameBoard();
+              }}
+              maxLength={100}
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={onAddExisting}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
+                onClick={() => setRenameBoardTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
               >
-                <FolderOpen className="h-3.5 w-3.5" />
-                Add Existing Board
+                Cancel
               </button>
               <button
                 type="button"
-                onClick={onCreateBoard}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
+                onClick={() => void confirmRenameBoard()}
+                disabled={!renameBoardValue.trim()}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
               >
-                <Plus className="h-3.5 w-3.5" />
-                Create New Board
+                Rename
               </button>
             </div>
-          )}
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((board) => (
-            <BoardCard
-              key={board.id}
-              board={board}
-              onDelete={canEdit ? onRemoveBoard : () => {}}
+      )}
+
+      {renameNotebookTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-black/40"
+            onClick={() => setRenameNotebookTarget(null)}
+            aria-hidden
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Notebook</h2>
+            <input
+              type="text"
+              value={renameNotebookValue}
+              onChange={(e) => setRenameNotebookValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void confirmRenameNotebook();
+              }}
+              maxLength={100}
+              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              autoFocus
             />
-          ))}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRenameNotebookTarget(null)}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmRenameNotebook()}
+                disabled={!renameNotebookValue.trim()}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
+              >
+                Rename
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-interface NotebooksTabProps {
+/* ─── Sub-components ──────────────────────────────────────── */
+
+/** null = show all types */
+type LineContentFilter = "NoteBoard" | "ChalkBoard" | "Notebook" | null;
+
+interface ProjectContentTabProps {
+  boards: BoardSummaryDto[];
   notebooks: NotebookSummaryDto[];
+  folders: ProjectFolderDto[];
   canEdit: boolean;
   canCreateNotebook: boolean;
+  onCreateBoard: (defaultBoardType: string) => void;
+  onAddExistingBoard: (initialTab: "NoteBoard" | "ChalkBoard") => void;
+  onRemoveBoard: (id: string) => void;
   onCreateNotebook: () => void;
-  onAddExisting: () => void;
+  onAddExistingNotebook: () => void;
   onRemoveNotebook: (id: string) => void;
   onOpenNotebook: (id: string) => void;
+  onCreateFolder: (name: string) => void | Promise<void>;
+  onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
+  onDeleteFolder: (folder: ProjectFolderDto) => void;
+  onSetBoardFolder: (boardId: string, folderId: string | null) => void | Promise<void>;
+  onSetNotebookFolder: (notebookId: string, folderId: string | null) => void | Promise<void>;
+  onRenameBoard?: (id: string, currentName: string) => void;
+  onDeleteBoard?: (id: string) => void;
+  onRenameNotebook?: (id: string, currentName: string) => void;
+  onDeleteNotebook?: (id: string) => void;
 }
 
-function NotebooksTab({
+function ProjectContentTab({
+  boards,
   notebooks,
+  folders,
   canEdit,
   canCreateNotebook,
+  onCreateBoard,
+  onAddExistingBoard,
+  onRemoveBoard,
   onCreateNotebook,
-  onAddExisting,
+  onAddExistingNotebook,
   onRemoveNotebook,
   onOpenNotebook,
-}: NotebooksTabProps) {
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onSetBoardFolder,
+  onSetNotebookFolder,
+  onRenameBoard,
+  onDeleteBoard,
+  onRenameNotebook,
+  onDeleteNotebook,
+}: ProjectContentTabProps) {
+  const [lineFilter, setLineFilter] = useState<LineContentFilter>(null);
+  const [isNewFolderDialogOpen, setIsNewFolderDialogOpen] = useState(false);
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [newFolderError, setNewFolderError] = useState<string | null>(null);
+  const [isSavingNewFolder, setIsSavingNewFolder] = useState(false);
+  const [renameFolderError, setRenameFolderError] = useState<string | null>(null);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Record<string, boolean>>({});
+  const [openMenu, setOpenMenu] = useState<"addExisting" | "new" | null>(null);
+  const [dropHighlightKey, setDropHighlightKey] = useState<string | null>(null);
+  const addExistingMenuRef = useRef<HTMLDivElement>(null);
+  const newMenuRef = useRef<HTMLDivElement>(null);
+  const addExistingPanelRef = useRef<HTMLDivElement>(null);
+  const newMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  useNudgeDropdownToViewport(openMenu === "addExisting", addExistingPanelRef);
+  useNudgeDropdownToViewport(openMenu === "new", newMenuPanelRef);
+
+  const clearDropHighlight = useCallback(() => setDropHighlightKey(null), []);
+
+  function handleDropToFolder(
+    targetFolderId: string | null,
+    payload: ProjectItemDragPayload,
+  ) {
+    if (!canEdit) return;
+    if (payload.kind === "board") {
+      const b = boards.find((x) => x.id === payload.id);
+      if (!b) return;
+      if ((b.projectFolderId ?? null) === targetFolderId) return;
+      void onSetBoardFolder(payload.id, targetFolderId);
+    } else {
+      const n = notebooks.find((x) => x.id === payload.id);
+      if (!n) return;
+      if ((n.projectFolderId ?? null) === targetFolderId) return;
+      void onSetNotebookFolder(payload.id, targetFolderId);
+    }
+  }
+
+  useEffect(() => {
+    if (!openMenu) return;
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        addExistingMenuRef.current?.contains(target) ||
+        newMenuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpenMenu(null);
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [openMenu]);
+
+  const sortedFolders = useMemo(
+    () =>
+      [...folders].sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+      ),
+    [folders],
+  );
+
+  const filteredBoards = useMemo(() => {
+    if (lineFilter === "Notebook") return [];
+    if (lineFilter === "NoteBoard") {
+      return boards.filter(
+        (b) => b.boardType === "NoteBoard" || b.boardType === "Calendar",
+      );
+    }
+    if (lineFilter === "ChalkBoard") {
+      return boards.filter((b) => b.boardType === "ChalkBoard");
+    }
+    return boards;
+  }, [boards, lineFilter]);
+
+  const visibleNotebooks = useMemo(() => {
+    if (lineFilter === "NoteBoard" || lineFilter === "ChalkBoard") return [];
+    if (lineFilter === "Notebook") return notebooks;
+    return notebooks;
+  }, [notebooks, lineFilter]);
+
+  const unfiledBoards = useMemo(
+    () => filteredBoards.filter((b) => !b.projectFolderId),
+    [filteredBoards],
+  );
+
+  const unfiledNotebooks = useMemo(
+    () => visibleNotebooks.filter((n) => !n.projectFolderId),
+    [visibleNotebooks],
+  );
+
+  function toggleFolderCollapsed(folderId: string) {
+    setCollapsedFolderIds((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
+  }
+
+  const hasVisibleContent = useMemo(() => {
+    if (unfiledBoards.length > 0 || unfiledNotebooks.length > 0) return true;
+    return sortedFolders.some((f) => {
+      const b = filteredBoards.filter((x) => x.projectFolderId === f.id).length;
+      const n = visibleNotebooks.filter((x) => x.projectFolderId === f.id).length;
+      return b + n > 0;
+    });
+  }, [unfiledBoards, unfiledNotebooks, sortedFolders, filteredBoards, visibleNotebooks]);
+
+  const boardFilterMismatch =
+    (lineFilter === "NoteBoard" || lineFilter === "ChalkBoard") &&
+    boards.length > 0 &&
+    filteredBoards.length === 0;
+
+  const LINE_FILTER_CHIPS: { id: LineContentFilter; label: string }[] = [
+    { id: null, label: "All" },
+    { id: "NoteBoard", label: "NoteBoard" },
+    { id: "ChalkBoard", label: "Chalkboard" },
+    { id: "Notebook", label: "Notebook" },
+  ];
+
+  async function createFolderFromDialog(name: string) {
+    if (isSavingNewFolder) return;
+    setNewFolderError(null);
+    setIsSavingNewFolder(true);
+    try {
+      await onCreateFolder(name);
+      setIsNewFolderDialogOpen(false);
+    } catch (err) {
+      setNewFolderError(getApiErrorMessage(err, "Could not create folder."));
+    } finally {
+      setIsSavingNewFolder(false);
+    }
+  }
+
+  async function submitRename(folderId: string) {
+    const name = renameDraft.trim();
+    if (!name) return;
+    setRenameFolderError(null);
+    try {
+      await onRenameFolder(folderId, name);
+      setRenamingFolderId(null);
+    } catch (err) {
+      setRenameFolderError(getApiErrorMessage(err, "Could not rename folder."));
+    }
+  }
+
+  function emptyFolderHint(): string {
+    if (lineFilter === null) return "No boards or notebooks in this folder";
+    if (lineFilter === "Notebook") return "No notebooks in this folder";
+    return "No boards in this folder";
+  }
+
+  const totalLinked = boards.length + notebooks.length;
+  const emptyProject = totalLinked === 0 && sortedFolders.length === 0;
+
+  function renderNotebookCell(notebook: NotebookSummaryDto) {
+    return (
+      <DraggableProjectItem
+        key={notebook.id}
+        kind="notebook"
+        id={notebook.id}
+        canEdit={canEdit}
+        onDragEnd={clearDropHighlight}
+      >
+        <NotebookCard
+          notebook={notebook}
+          onOpen={onOpenNotebook}
+          onRename={onRenameNotebook}
+          onRemoveFromProject={canEdit ? onRemoveNotebook : undefined}
+          onDelete={onDeleteNotebook}
+          projectFolders={sortedFolders}
+          onSetProjectFolder={canEdit ? onSetNotebookFolder : undefined}
+        />
+      </DraggableProjectItem>
+    );
+  }
+
   return (
     <div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span
+          className="flex items-center gap-1.5 text-foreground/45"
+          title="Filter by type"
+        >
+          <Filter className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="sr-only">Filter by type</span>
+        </span>
+        {LINE_FILTER_CHIPS.map((chip) => (
+          <button
+            key={chip.id ?? "all"}
+            type="button"
+            onClick={() => setLineFilter(chip.id)}
+            className={[
+              "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
+              lineFilter === chip.id
+                ? "bg-violet-100 text-violet-700 ring-1 ring-violet-400/50 dark:bg-violet-900/40 dark:text-violet-300 dark:ring-violet-500/40"
+                : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
+            ].join(" ")}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-foreground">
-          Notebooks ({notebooks.length})
-        </h3>
+        <p className="text-sm text-foreground/60">
+          {lineFilter === null && (
+            <>
+              {boards.length} board{boards.length === 1 ? "" : "s"},{" "}
+              {notebooks.length} notebook{notebooks.length === 1 ? "" : "s"}
+            </>
+          )}
+          {lineFilter === "NoteBoard" && (
+            <>
+              {filteredBoards.length} note board{filteredBoards.length === 1 ? "" : "s"}
+            </>
+          )}
+          {lineFilter === "ChalkBoard" && (
+            <>
+              {filteredBoards.length} chalk board{filteredBoards.length === 1 ? "" : "s"}
+            </>
+          )}
+          {lineFilter === "Notebook" && (
+            <>
+              {notebooks.length} notebook{notebooks.length === 1 ? "" : "s"}
+            </>
+          )}
+        </p>
         {canEdit && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {!canCreateNotebook && (
-              <span className="text-xs text-foreground/50">
+              <span className="w-full text-right text-xs text-foreground/50 sm:w-auto">
                 Maximum 5 notebooks. Delete one to create another.
               </span>
             )}
-            <button
-              type="button"
-              onClick={onAddExisting}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400 motion-reduce:transition-none"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              Add Existing
-            </button>
-            <button
-              type="button"
-              onClick={onCreateNotebook}
-              disabled={!canCreateNotebook}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Notebook
-            </button>
+            <CreateProjectFolderDialog
+              isOpen={isNewFolderDialogOpen}
+              error={newFolderError}
+              isSaving={isSavingNewFolder}
+              accent="violet"
+              onClose={() => {
+                setIsNewFolderDialogOpen(false);
+                setNewFolderError(null);
+              }}
+              onCreate={(name) => createFolderFromDialog(name)}
+            />
+            <div className="relative" ref={addExistingMenuRef}>
+              <button
+                type="button"
+                onClick={() => setOpenMenu((m) => (m === "addExisting" ? null : "addExisting"))}
+                className="flex items-center gap-1 rounded-lg border border-border/80 bg-background px-3 py-2 text-xs font-semibold text-foreground/80 shadow-sm transition-[colors,box-shadow] duration-150 hover:border-violet-400/60 hover:text-violet-700 dark:hover:text-violet-300 motion-reduce:transition-none"
+              >
+                Add existing
+                <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+              </button>
+              {openMenu === "addExisting" && (
+                <div
+                  ref={addExistingPanelRef}
+                  className="absolute right-0 top-full z-30 mt-1 max-h-[min(70vh,calc(100vh-2rem))] min-w-[13.5rem] max-w-[min(13.5rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-md dark:shadow-black/40"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onAddExistingBoard("NoteBoard");
+                    }}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Note board
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onAddExistingBoard("ChalkBoard");
+                    }}
+                  >
+                    <PenTool className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Chalk board
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onAddExistingNotebook();
+                    }}
+                  >
+                    <BookOpen className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Notebook
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={newMenuRef}>
+              <button
+                type="button"
+                onClick={() => setOpenMenu((m) => (m === "new" ? null : "new"))}
+                className="flex items-center gap-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New
+                <ChevronDown className="h-3.5 w-3.5 opacity-90" />
+              </button>
+              {openMenu === "new" && (
+                <div
+                  ref={newMenuPanelRef}
+                  className="absolute right-0 top-full z-30 mt-1 max-h-[min(70vh,calc(100vh-2rem))] min-w-[13.5rem] max-w-[min(13.5rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-md dark:shadow-black/40"
+                  role="menu"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onCreateBoard("NoteBoard");
+                    }}
+                  >
+                    <ClipboardList className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Note board
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onCreateBoard("ChalkBoard");
+                    }}
+                  >
+                    <PenTool className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Chalk board
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={!canCreateNotebook}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      onCreateNotebook();
+                    }}
+                  >
+                    <BookOpen className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Notebook
+                  </button>
+                  <div className="my-1 h-px bg-border/60" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground/90 transition-colors hover:bg-foreground/5"
+                    onClick={() => {
+                      setOpenMenu(null);
+                      setNewFolderError(null);
+                      setIsNewFolderDialogOpen(true);
+                    }}
+                  >
+                    <Folder className="h-3.5 w-3.5 shrink-0 text-foreground/50" />
+                    Folder
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {notebooks.length === 0 ? (
+      {emptyProject ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
+            <Layers className="h-5 w-5 text-foreground/30" />
+          </div>
+          <p className="mb-4 text-center text-sm text-foreground/40">
+            No boards or notebooks in this project yet
+          </p>
+          {canEdit && (
+            <p className="max-w-sm text-center text-xs text-foreground/45">
+              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
+              <strong className="font-medium text-foreground/65">+ New</strong> in the bar above.
+            </p>
+          )}
+        </div>
+      ) : lineFilter === "Notebook" && notebooks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
             <BookOpen className="h-5 w-5 text-foreground/30" />
           </div>
-          <p className="mb-4 text-sm text-foreground/40">
-            No notebooks in this project yet
-          </p>
+          <p className="mb-4 text-sm text-foreground/40">No notebooks in this project yet</p>
           {canEdit && (
-            <div className="flex flex-wrap items-center gap-2">
+            <p className="max-w-sm text-center text-xs text-foreground/45">
               {!canCreateNotebook && (
-                <span className="w-full text-xs text-foreground/50">
+                <span className="mb-2 block text-foreground/50">
                   Maximum 5 notebooks. Delete one to create another.
                 </span>
               )}
-              <button
-                type="button"
-                onClick={onAddExisting}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-amber-400 hover:text-amber-600 hover:shadow-sm dark:hover:text-amber-400 motion-reduce:transition-none"
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                Add Existing Notebook
-              </button>
-              <button
-                type="button"
-                onClick={onCreateNotebook}
-                disabled={!canCreateNotebook}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create New Notebook
-              </button>
-            </div>
+              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
+              <strong className="font-medium text-foreground/65">+ New</strong> above.
+            </p>
           )}
         </div>
+      ) : (lineFilter === "NoteBoard" || lineFilter === "ChalkBoard") && boards.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
+            <ClipboardList className="h-5 w-5 text-foreground/30" />
+          </div>
+          <p className="mb-4 text-sm text-foreground/40">No boards in this project yet</p>
+          {canEdit && (
+            <p className="max-w-sm text-center text-xs text-foreground/45">
+              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
+              <strong className="font-medium text-foreground/65">+ New</strong> above.
+            </p>
+          )}
+        </div>
+      ) : boardFilterMismatch && !hasVisibleContent ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
+          <p className="text-sm text-foreground/40">No boards match this filter</p>
+        </div>
+      ) : !hasVisibleContent ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
+          <p className="text-sm text-foreground/40">Nothing to show for this filter</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {notebooks.map((notebook) => (
-            <NotebookCard
-              key={notebook.id}
-              notebook={notebook}
-              onOpen={onOpenNotebook}
-              onRemoveFromProject={canEdit ? onRemoveNotebook : undefined}
-            />
-          ))}
+        <div className="space-y-10">
+          {boardFilterMismatch && hasVisibleContent && (
+            <div className="rounded-lg border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100/90">
+              No boards match this filter — other items below are unchanged.
+            </div>
+          )}
+
+          {lineFilter !== "Notebook" &&
+            boards.length === 0 &&
+            sortedFolders.length > 0 &&
+            notebooks.length > 0 && (
+            <div className="rounded-xl border border-dashed border-violet-300/40 bg-violet-50/40 px-4 py-6 text-center dark:border-violet-500/20 dark:bg-violet-950/20">
+              <p className="mb-1 text-sm text-foreground/70">
+                No boards yet — use <strong className="font-medium">Add existing</strong> or{" "}
+                <strong className="font-medium">+ New</strong> above, or your folders below.
+              </p>
+            </div>
+          )}
+
+          {(lineFilter === null || lineFilter === "Notebook") &&
+            notebooks.length === 0 &&
+            sortedFolders.length > 0 &&
+            filteredBoards.length > 0 && (
+            <div className="rounded-xl border border-dashed border-amber-300/50 bg-amber-50/50 px-4 py-6 text-center dark:border-amber-500/20 dark:bg-amber-950/20">
+              <p className="mb-1 text-sm text-foreground/70">
+                No notebooks yet — use <strong className="font-medium">Add existing</strong> or{" "}
+                <strong className="font-medium">+ New</strong> above. Folders below are ready when you
+                add some.
+              </p>
+              {canEdit && !canCreateNotebook && (
+                <p className="mt-2 text-xs text-foreground/50">
+                  Maximum 5 notebooks. Delete one to create another.
+                </p>
+              )}
+            </div>
+          )}
+
+          {sortedFolders.map((folder) => {
+            const boardsInFolder = filteredBoards.filter((b) => b.projectFolderId === folder.id);
+            const notebooksInFolder = visibleNotebooks.filter(
+              (n) => n.projectFolderId === folder.id,
+            );
+            const isCollapsed = Boolean(collapsedFolderIds[folder.id]);
+            const count = boardsInFolder.length + notebooksInFolder.length;
+            return (
+              <section key={folder.id}>
+                <ProjectNamedFolderHeader
+                  folder={folder}
+                  accent="violet"
+                  isCollapsed={isCollapsed}
+                  onToggleCollapse={() => toggleFolderCollapsed(folder.id)}
+                  itemCount={count}
+                  canEdit={canEdit}
+                  isRenaming={renamingFolderId === folder.id}
+                  renameDraft={renameDraft}
+                  onRenameDraftChange={(value) => {
+                    setRenameDraft(value);
+                    setRenameFolderError(null);
+                  }}
+                  onRenameSubmit={() => void submitRename(folder.id)}
+                  onRenameCancel={() => {
+                    setRenamingFolderId(null);
+                    setRenameFolderError(null);
+                  }}
+                  onRenameStart={() => {
+                    setRenamingFolderId(folder.id);
+                    setRenameDraft(folder.name);
+                    setRenameFolderError(null);
+                  }}
+                  onDelete={() => onDeleteFolder(folder)}
+                  renameError={renameFolderError}
+                />
+                <CollapsibleFolderBody isCollapsed={isCollapsed}>
+                  {canEdit ? (
+                    <FolderDropSurface
+                      dropKey={`folder-${folder.id}`}
+                      highlightKey={dropHighlightKey}
+                      onHighlight={setDropHighlightKey}
+                      onDropPayload={(p) => handleDropToFolder(folder.id, p)}
+                      className={
+                        count === 0
+                          ? "min-h-[5rem] px-1 py-2 sm:px-2"
+                          : "px-1 pb-0 sm:px-2"
+                      }
+                    >
+                      {count === 0 ? (
+                        <p className="text-xs text-foreground/40">{emptyFolderHint()}</p>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                          {boardsInFolder.map((board) => (
+                            <DraggableProjectItem
+                              key={board.id}
+                              kind="board"
+                              id={board.id}
+                              canEdit={canEdit}
+                              onDragEnd={clearDropHighlight}
+                            >
+                              <BoardCard
+                                board={board}
+                                onRename={onRenameBoard}
+                                onRemoveFromProject={onRemoveBoard}
+                                onDelete={onDeleteBoard}
+                                projectFolders={sortedFolders}
+                                onSetProjectFolder={onSetBoardFolder}
+                              />
+                            </DraggableProjectItem>
+                          ))}
+                          {notebooksInFolder.map((notebook) => renderNotebookCell(notebook))}
+                        </div>
+                      )}
+                    </FolderDropSurface>
+                  ) : count === 0 ? (
+                    <p className="text-xs text-foreground/40">{emptyFolderHint()}</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {boardsInFolder.map((board) => (
+                        <BoardCard
+                          key={board.id}
+                          board={board}
+                          onRename={onRenameBoard}
+                          onRemoveFromProject={undefined}
+                          onDelete={onDeleteBoard}
+                          projectFolders={sortedFolders}
+                          onSetProjectFolder={undefined}
+                        />
+                      ))}
+                      {notebooksInFolder.map((notebook) => (
+                        <NotebookCard
+                          key={notebook.id}
+                          notebook={notebook}
+                          onOpen={onOpenNotebook}
+                          onRename={onRenameNotebook}
+                          onRemoveFromProject={undefined}
+                          onDelete={onDeleteNotebook}
+                          projectFolders={sortedFolders}
+                          onSetProjectFolder={undefined}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </CollapsibleFolderBody>
+              </section>
+            );
+          })}
+
+          {sortedFolders.length > 0 &&
+            (canEdit ||
+              unfiledBoards.length > 0 ||
+              unfiledNotebooks.length > 0) && (
+              <div className="flex items-center gap-3 py-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-300/60 to-border dark:via-violet-500/25" />
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-foreground/45">
+                  Not in a folder
+                </span>
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-violet-300/60 to-border dark:via-violet-500/25" />
+              </div>
+            )}
+
+          {sortedFolders.length > 0 && canEdit && (
+            <FolderDropSurface
+              dropKey="unfiled"
+              highlightKey={dropHighlightKey}
+              onHighlight={setDropHighlightKey}
+              onDropPayload={(p) => handleDropToFolder(null, p)}
+              className={
+                unfiledBoards.length > 0 || unfiledNotebooks.length > 0
+                  ? ""
+                  : "min-h-[5rem]"
+              }
+            >
+              {unfiledBoards.length > 0 || unfiledNotebooks.length > 0 ? (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {unfiledBoards.map((board) => (
+                    <DraggableProjectItem
+                      key={board.id}
+                      kind="board"
+                      id={board.id}
+                      canEdit={canEdit}
+                      onDragEnd={clearDropHighlight}
+                    >
+                      <BoardCard
+                        board={board}
+                        onRename={onRenameBoard}
+                        onRemoveFromProject={onRemoveBoard}
+                        onDelete={onDeleteBoard}
+                        projectFolders={sortedFolders}
+                        onSetProjectFolder={onSetBoardFolder}
+                      />
+                    </DraggableProjectItem>
+                  ))}
+                  {unfiledNotebooks.map((notebook) => renderNotebookCell(notebook))}
+                </div>
+              ) : (
+                <div className="flex min-h-[4rem] items-center justify-center rounded-lg border border-dashed border-border/60 px-3 py-4 text-center">
+                  <p className="text-xs text-foreground/45">
+                    Drop here to move items out of folders
+                  </p>
+                </div>
+              )}
+            </FolderDropSurface>
+          )}
+
+          {sortedFolders.length > 0 &&
+            !canEdit &&
+            (unfiledBoards.length > 0 || unfiledNotebooks.length > 0) && (
+              <section>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {unfiledBoards.map((board) => (
+                    <BoardCard
+                      key={board.id}
+                      board={board}
+                      onRename={onRenameBoard}
+                      onRemoveFromProject={undefined}
+                      onDelete={onDeleteBoard}
+                      projectFolders={sortedFolders}
+                      onSetProjectFolder={undefined}
+                    />
+                  ))}
+                  {unfiledNotebooks.map((notebook) => (
+                    <NotebookCard
+                      key={notebook.id}
+                      notebook={notebook}
+                      onOpen={onOpenNotebook}
+                      onRename={onRenameNotebook}
+                      onRemoveFromProject={undefined}
+                      onDelete={onDeleteNotebook}
+                      projectFolders={sortedFolders}
+                      onSetProjectFolder={undefined}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+          {sortedFolders.length === 0 &&
+            (unfiledBoards.length > 0 || unfiledNotebooks.length > 0) && (
+              <section>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {unfiledBoards.map((board) => (
+                    <DraggableProjectItem
+                      key={board.id}
+                      kind="board"
+                      id={board.id}
+                      canEdit={canEdit}
+                      onDragEnd={clearDropHighlight}
+                    >
+                      <BoardCard
+                        board={board}
+                        onRename={onRenameBoard}
+                        onRemoveFromProject={canEdit ? onRemoveBoard : undefined}
+                        onDelete={onDeleteBoard}
+                        projectFolders={sortedFolders}
+                        onSetProjectFolder={canEdit ? onSetBoardFolder : undefined}
+                      />
+                    </DraggableProjectItem>
+                  ))}
+                  {unfiledNotebooks.map((notebook) => renderNotebookCell(notebook))}
+                </div>
+              </section>
+            )}
         </div>
       )}
     </div>
@@ -1037,6 +1896,10 @@ const PROJECT_COLORS = [
 interface SettingsTabProps {
   isOwner: boolean;
   members: ProjectMemberDto[];
+  projectDefaultShowOnMainCalendar: boolean;
+  myShowOnPersonalCalendar: boolean | null;
+  patchingMyCalendar: boolean;
+  onMyCalendarPreferenceChange: (next: boolean | null) => void;
   editName: string;
   editDescription: string;
   editColor: string;
@@ -1065,6 +1928,10 @@ interface SettingsTabProps {
 function SettingsTab({
   isOwner,
   members,
+  projectDefaultShowOnMainCalendar,
+  myShowOnPersonalCalendar,
+  patchingMyCalendar,
+  onMyCalendarPreferenceChange,
   editName,
   editDescription,
   editColor,
@@ -1092,11 +1959,54 @@ function SettingsTab({
   const readOnly = !isOwner;
   const [transferPopupOpen, setTransferPopupOpen] = useState(false);
 
+  const effectivePersonalCalendar =
+    myShowOnPersonalCalendar ?? projectDefaultShowOnMainCalendar;
+
+  function handlePersonalCalendarToggle() {
+    const nextEffective = !effectivePersonalCalendar;
+    const nextStored =
+      nextEffective === projectDefaultShowOnMainCalendar
+        ? null
+        : nextEffective;
+    onMyCalendarPreferenceChange(nextStored);
+  }
+
   return (
     <div className="max-w-lg">
+      <div className="mb-6 rounded-lg border border-border bg-foreground/[0.02] px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <label className="text-xs font-medium text-foreground/60">
+              Your personal calendar
+            </label>
+            <p className="mt-0.5 text-xs text-foreground/50">
+              Show this project&apos;s events on your main and dashboard calendars. If you
+              haven&apos;t set your own choice, the owner&apos;s default below applies.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={effectivePersonalCalendar}
+            disabled={patchingMyCalendar}
+            onClick={() => !patchingMyCalendar && handlePersonalCalendarToggle()}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-wait disabled:opacity-60 ${
+              patchingMyCalendar ? "cursor-wait" : "cursor-pointer"
+            } ${effectivePersonalCalendar ? "bg-primary" : "bg-foreground/20"}`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                effectivePersonalCalendar ? "translate-x-5" : "translate-x-0.5"
+              }`}
+              aria-hidden
+            />
+          </button>
+        </div>
+      </div>
+
       {readOnly && (
         <p className="mb-4 rounded-lg border border-foreground/10 bg-foreground/5 px-4 py-2 text-xs text-foreground/60">
-          Only the project owner can change these settings.
+          Only the project owner can change project details below.
         </p>
       )}
       <form onSubmit={onSave} className="flex flex-col gap-4">
@@ -1217,34 +2127,36 @@ function SettingsTab({
           readOnly={readOnly}
         />
 
-        {/* Show events on main calendar */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <label className="text-xs font-medium text-foreground/60">
-              Calendar visibility
-            </label>
-            <p className="mt-0.5 text-xs text-foreground/50">
-              Show project events on members&apos; main and dashboard calendars
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={editShowEventsOnMainCalendar}
-            disabled={readOnly}
-            onClick={() => !readOnly && onShowEventsOnMainCalendarChange(!editShowEventsOnMainCalendar)}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-default disabled:opacity-70 ${
-              readOnly ? "cursor-default" : "cursor-pointer"
-            } ${editShowEventsOnMainCalendar ? "bg-primary" : "bg-foreground/20"}`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                editShowEventsOnMainCalendar ? "translate-x-5" : "translate-x-0.5"
+        {/* Default for members' personal calendars (owner only) */}
+        {isOwner && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <label className="text-xs font-medium text-foreground/60">
+                Default for members
+              </label>
+              <p className="mt-0.5 text-xs text-foreground/50">
+                Default &quot;on&quot; or &quot;off&quot; for members who have not set their own
+                personal calendar choice. Each member can override this for themselves above.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={editShowEventsOnMainCalendar}
+              onClick={() => onShowEventsOnMainCalendarChange(!editShowEventsOnMainCalendar)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${
+                editShowEventsOnMainCalendar ? "bg-primary" : "bg-foreground/20"
               }`}
-              aria-hidden
-            />
-          </button>
-        </div>
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                  editShowEventsOnMainCalendar ? "translate-x-5" : "translate-x-0.5"
+                }`}
+                aria-hidden
+              />
+            </button>
+          </div>
+        )}
 
         {/* Save - owners only */}
         {isOwner && (

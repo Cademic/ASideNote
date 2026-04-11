@@ -5,6 +5,7 @@ import {
   Plus,
   ClipboardList,
   Calendar,
+  CalendarDays,
   FolderOpen,
   BookOpen,
   Clock,
@@ -34,6 +35,10 @@ function getGreeting(): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function formatTodaySticky(): string {
+  return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function formatShortDate(dateStr: string): string {
@@ -529,10 +534,11 @@ export function DashboardPage() {
         <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatSticky
             color="yellow"
-            icon={BookOpen}
-            label="Boards"
-            value={boards.length.toString()}
+            icon={CalendarDays}
+            label="Today's Date"
+            value={formatTodaySticky()}
             rotation={-2}
+            onClick={() => navigate("/calendar")}
           />
           <StatSticky
             color="rose"

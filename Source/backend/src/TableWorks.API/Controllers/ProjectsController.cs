@@ -13,13 +13,20 @@ namespace ASideNote.API.Controllers;
 public sealed class ProjectsController : ControllerBase
 {
     private readonly IProjectService _projectService;
+    private readonly IProjectFolderService _projectFolderService;
     private readonly IBoardService _boardService;
     private readonly INotebookService _notebookService;
     private readonly ICurrentUserService _currentUserService;
 
-    public ProjectsController(IProjectService projectService, IBoardService boardService, INotebookService notebookService, ICurrentUserService currentUserService)
+    public ProjectsController(
+        IProjectService projectService,
+        IProjectFolderService projectFolderService,
+        IBoardService boardService,
+        INotebookService notebookService,
+        ICurrentUserService currentUserService)
     {
         _projectService = projectService;
+        _projectFolderService = projectFolderService;
         _boardService = boardService;
         _notebookService = notebookService;
         _currentUserService = currentUserService;
@@ -66,6 +73,16 @@ public sealed class ProjectsController : ControllerBase
     public async Task<IActionResult> UpdateProject(Guid id, [FromBody] UpdateProjectRequest request, CancellationToken cancellationToken)
     {
         await _projectService.UpdateProjectAsync(_currentUserService.UserId, id, request, cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>Sets whether this project's events appear on the current user's personal (main/dashboard) calendar.</summary>
+    [HttpPatch("{id:guid}/my-calendar")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMyCalendarPreference(Guid id, [FromBody] UpdateMyProjectCalendarPreferenceRequest request, CancellationToken cancellationToken)
+    {
+        await _projectService.UpdateMyProjectCalendarPreferenceAsync(_currentUserService.UserId, id, request, cancellationToken);
         return Ok();
     }
 
@@ -130,6 +147,59 @@ public sealed class ProjectsController : ControllerBase
     public async Task<IActionResult> TransferOwnership(Guid id, [FromBody] TransferOwnershipRequest request, CancellationToken cancellationToken)
     {
         await _projectService.TransferOwnershipAsync(_currentUserService.UserId, id, request, cancellationToken);
+        return Ok();
+    }
+
+    [HttpGet("{id:guid}/folders")]
+    [ProducesResponseType(typeof(IReadOnlyList<ProjectFolderDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFolders(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _projectFolderService.GetFoldersAsync(_currentUserService.UserId, id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/folders")]
+    [ProducesResponseType(typeof(ProjectFolderDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateFolder(Guid id, [FromBody] CreateProjectFolderRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _projectFolderService.CreateFolderAsync(_currentUserService.UserId, id, request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpPatch("{id:guid}/folders/{folderId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateFolder(Guid id, Guid folderId, [FromBody] UpdateProjectFolderRequest request, CancellationToken cancellationToken)
+    {
+        await _projectFolderService.UpdateFolderAsync(_currentUserService.UserId, id, folderId, request, cancellationToken);
+        return Ok();
+    }
+
+    [HttpDelete("{id:guid}/folders/{folderId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteFolder(Guid id, Guid folderId, CancellationToken cancellationToken)
+    {
+        await _projectFolderService.DeleteFolderAsync(_currentUserService.UserId, id, folderId, cancellationToken);
+        return Ok();
+    }
+
+    [HttpPatch("{id:guid}/boards/{boardId:guid}/folder")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetBoardFolder(Guid id, Guid boardId, [FromBody] SetProjectItemFolderRequest request, CancellationToken cancellationToken)
+    {
+        await _boardService.SetBoardProjectFolderAsync(_currentUserService.UserId, id, boardId, request.FolderId, cancellationToken);
+        return Ok();
+    }
+
+    [HttpPatch("{id:guid}/notebooks/{notebookId:guid}/folder")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetNotebookFolder(Guid id, Guid notebookId, [FromBody] SetProjectItemFolderRequest request, CancellationToken cancellationToken)
+    {
+        await _notebookService.SetNotebookProjectFolderAsync(_currentUserService.UserId, id, notebookId, request.FolderId, cancellationToken);
         return Ok();
     }
 
