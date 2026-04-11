@@ -118,6 +118,14 @@ function toInputDate(dateStr: string | null): string {
   return new Date(dateStr).toISOString().split("T")[0];
 }
 
+/** `YYYY-MM-DD` in local time for `<input type="date">` */
+function localDateInputStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -2289,10 +2297,34 @@ function TimeConstraintsBlock({
   const hasConstraints = !!(editStartDate || editEndDate);
 
   function handleToggle(checked: boolean) {
-    if (!readOnly && !checked) {
+    if (readOnly) return;
+    if (!checked) {
       onStartDateChange("");
       onEndDateChange("");
       onDeadlineChange("");
+      return;
+    }
+    // From indefinite → constrained: seed dates or the checkbox never stays on (no date fields).
+    if (!editStartDate && !editEndDate) {
+      const start = new Date();
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+      onStartDateChange(localDateInputStr(start));
+      onEndDateChange(localDateInputStr(end));
+      return;
+    }
+    if (!editStartDate && editEndDate) {
+      const end = new Date(`${editEndDate}T12:00:00`);
+      const start = new Date(end);
+      start.setMonth(start.getMonth() - 1);
+      onStartDateChange(localDateInputStr(start));
+      return;
+    }
+    if (editStartDate && !editEndDate) {
+      const start = new Date(`${editStartDate}T12:00:00`);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+      onEndDateChange(localDateInputStr(end));
     }
   }
 
@@ -2315,6 +2347,11 @@ function TimeConstraintsBlock({
           {hasConstraints ? "Time constraints enabled" : "No time constraints (indefinite)"}
         </span>
       </label>
+      {!hasConstraints && !readOnly && (
+        <p className="mb-1 text-xs text-foreground/45">
+          Check the box to add start and end dates. You can adjust them below.
+        </p>
+      )}
 
       {hasConstraints && (
         <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-foreground/[0.01] p-4">
