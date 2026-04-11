@@ -44,6 +44,10 @@ export async function getProjectById(
     folders: d.folders ?? raw.Folders ?? [],
     myShowOnPersonalCalendar:
       d.myShowOnPersonalCalendar ?? raw.MyShowOnPersonalCalendar ?? null,
+    autoProgressEnabled:
+      d.autoProgressEnabled ??
+      (raw as { AutoProgressEnabled?: boolean }).AutoProgressEnabled ??
+      false,
   };
 }
 

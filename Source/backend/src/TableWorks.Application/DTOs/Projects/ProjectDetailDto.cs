@@ -14,6 +14,7 @@ public sealed class ProjectDetailDto
     public DateTime? Deadline { get; set; }
     public string Status { get; set; } = string.Empty;
     public int Progress { get; set; }
+    public bool AutoProgressEnabled { get; set; }
     public string Color { get; set; } = "violet";
     /// <summary>Default for members (and for you when MyShowOnPersonalCalendar is null).</summary>
     public bool ShowEventsOnMainCalendar { get; set; } = false;

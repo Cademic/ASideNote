@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ASideNote.Application.Projects;
 using ASideNote.Application.DTOs.Boards;
 using ASideNote.Application.DTOs.Notebooks;
 using ASideNote.Application.DTOs.Notes;
@@ -113,6 +114,13 @@ public sealed class ProjectService : IProjectService
         return projects.Select(p => MapToSummary(p, userId, false, null)).ToList();
     }
 
+    private static int ResolveDisplayProgress(Project p)
+    {
+        if (p.AutoProgressEnabled && p.StartDate.HasValue && p.EndDate.HasValue)
+            return ProjectAutoProgress.ComputePercent(p.StartDate, p.EndDate, DateTime.UtcNow);
+        return p.Progress;
+    }
+
     private static ProjectSummaryDto MapToSummary(Project p, Guid userId, bool isPinned, DateTime? pinnedAt)
     {
         return new ProjectSummaryDto
@@ -124,7 +132,7 @@ public sealed class ProjectService : IProjectService
             EndDate = p.EndDate,
             Deadline = p.Deadline,
             Status = p.Status,
-            Progress = p.Progress,
+            Progress = ResolveDisplayProgress(p),
             Color = p.Color,
             OwnerId = p.OwnerId,
             OwnerUsername = p.Owner?.Username ?? string.Empty,
@@ -201,7 +209,8 @@ public sealed class ProjectService : IProjectService
             EndDate = project.EndDate,
             Deadline = project.Deadline,
             Status = project.Status,
-            Progress = project.Progress,
+            Progress = ResolveDisplayProgress(project),
+            AutoProgressEnabled = project.AutoProgressEnabled,
             Color = project.Color,
             ShowEventsOnMainCalendar = project.ShowEventsOnMainCalendar,
             MyShowOnPersonalCalendar = project.OwnerId == userId
@@ -291,10 +300,38 @@ public sealed class ProjectService : IProjectService
             ? DateTime.SpecifyKind(request.Deadline.Value, DateTimeKind.Utc)
             : null;
         project.Status = request.Status;
-        project.Progress = request.Progress;
         project.Color = request.Color ?? project.Color;
         if (request.ShowEventsOnMainCalendar.HasValue)
             project.ShowEventsOnMainCalendar = request.ShowEventsOnMainCalendar.Value;
+
+        if (request.AutoProgressEnabled == true)
+        {
+            if (!project.StartDate.HasValue || !project.EndDate.HasValue)
+                throw new InvalidOperationException(
+                    "Auto progress requires both a start date and an end date. Set time constraints first.");
+
+            project.AutoProgressEnabled = true;
+            project.Progress = ProjectAutoProgress.ComputePercent(
+                project.StartDate,
+                project.EndDate,
+                DateTime.UtcNow);
+        }
+        else if (request.AutoProgressEnabled == false)
+        {
+            project.AutoProgressEnabled = false;
+            project.Progress = request.Progress;
+        }
+        else
+        {
+            if (project.AutoProgressEnabled && project.StartDate.HasValue && project.EndDate.HasValue)
+                project.Progress = ProjectAutoProgress.ComputePercent(
+                    project.StartDate,
+                    project.EndDate,
+                    DateTime.UtcNow);
+            else
+                project.Progress = request.Progress;
+        }
+
         project.UpdatedAt = DateTime.UtcNow;
 
         _projectRepo.Update(project);

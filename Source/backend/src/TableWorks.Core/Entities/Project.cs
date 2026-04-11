@@ -11,6 +11,10 @@ public sealed class Project
     public DateTime? Deadline { get; set; }
     public string Status { get; set; } = string.Empty;
     public int Progress { get; set; }
+    /// <summary>
+    /// When true, <see cref="Progress"/> is derived from <see cref="StartDate"/> and <see cref="EndDate"/> (linear by calendar day, UTC).
+    /// </summary>
+    public bool AutoProgressEnabled { get; set; }
     public string Color { get; set; } = "violet";
     /// <summary>
     /// Default for members (and owner when <see cref="OwnerShowOnPersonalCalendar"/> is null):
