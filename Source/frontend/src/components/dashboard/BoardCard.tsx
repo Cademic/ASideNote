@@ -4,6 +4,7 @@ import {
   useNudgeDropdownToViewport,
   useSubmenuFlyoutPosition,
 } from "../../lib/useDropdownViewport";
+import { ProjectMoveFlyout } from "./ProjectMoveFlyout";
 import { createPortal } from "react-dom";
 import {
   StickyNote,
@@ -31,7 +32,7 @@ interface BoardCardProps {
   /** Project tab: unlink board from project without deleting it. */
   onRemoveFromProject?: (id: string) => void;
   onRename?: (id: string, currentName: string) => void;
-  onMoveToProject?: (boardId: string, projectId: string) => void;
+  onMoveToProject?: (boardId: string, projectId: string, folderId?: string) => void;
   /** Project tab: move board between folders within the project. */
   projectFolders?: { id: string; name: string }[];
   onSetProjectFolder?: (boardId: string, folderId: string | null) => void;
@@ -122,6 +123,7 @@ export function BoardCard({
   const folderFlyoutPortalRef = useRef<HTMLDivElement>(null);
   const projectSubmenuAnchorRef = useRef<HTMLDivElement>(null);
   const projectFlyoutPortalRef = useRef<HTMLDivElement>(null);
+  const projectNestedFlyoutPortalRef = useRef<HTMLDivElement>(null);
   const folderHoverTimerRef = useRef<number | null>(null);
   const projectHoverTimerRef = useRef<number | null>(null);
 
@@ -159,9 +161,7 @@ export function BoardCard({
   useFixedPortalInViewport(menuOpen && menuAnchor !== "ellipsis", portalMenuRef);
 
   const folderFlyoutPos = useSubmenuFlyoutPosition(showFolderList, folderSubmenuAnchorRef);
-  const projectFlyoutPos = useSubmenuFlyoutPosition(showProjectList, projectSubmenuAnchorRef);
   useFixedPortalInViewport(showFolderList, folderFlyoutPortalRef);
-  useFixedPortalInViewport(showProjectList, projectFlyoutPortalRef);
 
   const closeMenu = () => {
     clearFolderHoverTimer();
@@ -180,7 +180,9 @@ export function BoardCard({
       const inPortal = portalMenuRef.current?.contains(target) ?? false;
       const inFolderFlyout = folderFlyoutPortalRef.current?.contains(target) ?? false;
       const inProjectFlyout = projectFlyoutPortalRef.current?.contains(target) ?? false;
-      if (!inMenu && !inPortal && !inFolderFlyout && !inProjectFlyout) {
+      const inProjectNestedFlyout =
+        projectNestedFlyoutPortalRef.current?.contains(target) ?? false;
+      if (!inMenu && !inPortal && !inFolderFlyout && !inProjectFlyout && !inProjectNestedFlyout) {
         setMenuOpen(false);
         setMenuAnchor("ellipsis");
         setShowProjectList(false);
@@ -324,7 +326,8 @@ export function BoardCard({
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowFolderList((v) => !v);
+                    clearFolderHoverTimer();
+                    setShowFolderList(true);
                     setShowProjectList(false);
                   }}
                 >
@@ -351,7 +354,8 @@ export function BoardCard({
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowProjectList((v) => !v);
+                  clearProjectHoverTimer();
+                  setShowProjectList(true);
                   setShowFolderList(false);
                 }}
               >
@@ -457,7 +461,8 @@ export function BoardCard({
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowFolderList((v) => !v);
+                      clearFolderHoverTimer();
+                      setShowFolderList(true);
                       setShowProjectList(false);
                     }}
                   >
@@ -483,7 +488,8 @@ export function BoardCard({
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowProjectList((v) => !v);
+                      clearProjectHoverTimer();
+                      setShowProjectList(true);
                       setShowFolderList(false);
                     }}
                   >
@@ -646,45 +652,21 @@ export function BoardCard({
           document.body,
         )}
 
-      {showProjectList && projectFlyoutPos && onMoveToProject &&
-        createPortal(
-          <div
-            ref={projectFlyoutPortalRef}
-            className="fixed z-[200] w-44 rounded-lg border border-border bg-background py-1 shadow-lg"
-            style={{ top: projectFlyoutPos.top, left: projectFlyoutPos.left }}
-            onMouseEnter={clearProjectHoverTimer}
-            onMouseLeave={scheduleProjectClose}
-          >
-            {activeProjects.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-foreground/40">No active projects</div>
-            ) : (
-              activeProjects.map((project) => (
-                <button
-                  key={project.id}
-                  type="button"
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                    board.projectId === project.id ? "text-primary" : "text-foreground/70"
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onMoveToProject(board.id, project.id);
-                  }}
-                >
-                  <div
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: project.color || "#8b5cf6" }}
-                  />
-                  <span className="truncate">{project.name}</span>
-                  {board.projectId === project.id && (
-                    <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>,
-          document.body,
-        )}
+      {showProjectList && onMoveToProject && (
+        <ProjectMoveFlyout
+          show={showProjectList}
+          anchorRef={projectSubmenuAnchorRef}
+          flyoutPortalRef={projectFlyoutPortalRef}
+          nestedFlyoutPortalRef={projectNestedFlyoutPortalRef}
+          activeProjects={activeProjects}
+          currentProjectId={board.projectId}
+          currentFolderId={board.projectFolderId}
+          onPick={(projectId, folderId) => onMoveToProject(board.id, projectId, folderId)}
+          onClose={closeMenu}
+          clearParentHoverTimer={clearProjectHoverTimer}
+          scheduleParentClose={scheduleProjectClose}
+        />
+      )}
     </div>
   );
 }

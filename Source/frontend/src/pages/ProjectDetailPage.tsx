@@ -1293,13 +1293,10 @@ function ProjectContentTab({
   }
 
   const hasVisibleContent = useMemo(() => {
+    if (sortedFolders.length > 0) return true;
     if (unfiledBoards.length > 0 || unfiledNotebooks.length > 0) return true;
-    return sortedFolders.some((f) => {
-      const b = filteredBoards.filter((x) => x.projectFolderId === f.id).length;
-      const n = visibleNotebooks.filter((x) => x.projectFolderId === f.id).length;
-      return b + n > 0;
-    });
-  }, [unfiledBoards, unfiledNotebooks, sortedFolders, filteredBoards, visibleNotebooks]);
+    return false;
+  }, [sortedFolders.length, unfiledBoards.length, unfiledNotebooks.length]);
 
   const boardFilterMismatch =
     (lineFilter === "NoteBoard" || lineFilter === "ChalkBoard") &&
@@ -1345,8 +1342,8 @@ function ProjectContentTab({
     return "No boards in this folder";
   }
 
-  const totalLinked = boards.length + notebooks.length;
-  const emptyProject = totalLinked === 0 && sortedFolders.length === 0;
+  const isCompletelyEmpty =
+    boards.length === 0 && notebooks.length === 0 && sortedFolders.length === 0;
 
   function renderNotebookCell(notebook: NotebookSummaryDto) {
     return (
@@ -1397,30 +1394,7 @@ function ProjectContentTab({
         ))}
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-foreground/60">
-          {lineFilter === null && (
-            <>
-              {boards.length} board{boards.length === 1 ? "" : "s"},{" "}
-              {notebooks.length} notebook{notebooks.length === 1 ? "" : "s"}
-            </>
-          )}
-          {lineFilter === "NoteBoard" && (
-            <>
-              {filteredBoards.length} note board{filteredBoards.length === 1 ? "" : "s"}
-            </>
-          )}
-          {lineFilter === "ChalkBoard" && (
-            <>
-              {filteredBoards.length} chalk board{filteredBoards.length === 1 ? "" : "s"}
-            </>
-          )}
-          {lineFilter === "Notebook" && (
-            <>
-              {notebooks.length} notebook{notebooks.length === 1 ? "" : "s"}
-            </>
-          )}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
         {canEdit && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             {!canCreateNotebook && (
@@ -1567,95 +1541,38 @@ function ProjectContentTab({
         )}
       </div>
 
-      {emptyProject ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-            <Layers className="h-5 w-5 text-foreground/30" />
-          </div>
-          <p className="mb-4 text-center text-sm text-foreground/40">
-            No boards or notebooks in this project yet
-          </p>
-          {canEdit && (
-            <p className="max-w-sm text-center text-xs text-foreground/45">
-              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
-              <strong className="font-medium text-foreground/65">+ New</strong> in the bar above.
-            </p>
-          )}
-        </div>
-      ) : lineFilter === "Notebook" && notebooks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-            <BookOpen className="h-5 w-5 text-foreground/30" />
-          </div>
-          <p className="mb-4 text-sm text-foreground/40">No notebooks in this project yet</p>
-          {canEdit && (
-            <p className="max-w-sm text-center text-xs text-foreground/45">
-              {!canCreateNotebook && (
-                <span className="mb-2 block text-foreground/50">
-                  Maximum 5 notebooks. Delete one to create another.
-                </span>
-              )}
-              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
-              <strong className="font-medium text-foreground/65">+ New</strong> above.
-            </p>
-          )}
-        </div>
-      ) : (lineFilter === "NoteBoard" || lineFilter === "ChalkBoard") && boards.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-            <ClipboardList className="h-5 w-5 text-foreground/30" />
-          </div>
-          <p className="mb-4 text-sm text-foreground/40">No boards in this project yet</p>
-          {canEdit && (
-            <p className="max-w-sm text-center text-xs text-foreground/45">
-              Use <strong className="font-medium text-foreground/65">Add existing</strong> or{" "}
-              <strong className="font-medium text-foreground/65">+ New</strong> above.
-            </p>
-          )}
-        </div>
-      ) : boardFilterMismatch && !hasVisibleContent ? (
+      {boardFilterMismatch && !hasVisibleContent ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
           <p className="text-sm text-foreground/40">No boards match this filter</p>
         </div>
-      ) : !hasVisibleContent ? (
+      ) : !hasVisibleContent && !isCompletelyEmpty ? (
         <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
           <p className="text-sm text-foreground/40">Nothing to show for this filter</p>
         </div>
       ) : (
         <div className="space-y-10">
+          {isCompletelyEmpty && (
+            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-10">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
+                <Layers className="h-5 w-5 text-foreground/30" />
+              </div>
+              <p className="mb-4 text-center text-sm text-foreground/40">
+                No boards or notebooks in this project yet
+              </p>
+              {canEdit && (
+                <p className="max-w-sm text-center text-xs text-foreground/45">
+                  Choose <strong className="font-medium text-foreground/65">+ New</strong> above to
+                  add a board, notebook, or folder. You can also use{" "}
+                  <strong className="font-medium text-foreground/65">Add existing</strong> to link
+                  items you already have.
+                </p>
+              )}
+            </div>
+          )}
+
           {boardFilterMismatch && hasVisibleContent && (
             <div className="rounded-lg border border-amber-200/90 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100/90">
               No boards match this filter — other items below are unchanged.
-            </div>
-          )}
-
-          {lineFilter !== "Notebook" &&
-            boards.length === 0 &&
-            sortedFolders.length > 0 &&
-            notebooks.length > 0 && (
-            <div className="rounded-xl border border-dashed border-violet-300/40 bg-violet-50/40 px-4 py-6 text-center dark:border-violet-500/20 dark:bg-violet-950/20">
-              <p className="mb-1 text-sm text-foreground/70">
-                No boards yet — use <strong className="font-medium">Add existing</strong> or{" "}
-                <strong className="font-medium">+ New</strong> above, or your folders below.
-              </p>
-            </div>
-          )}
-
-          {(lineFilter === null || lineFilter === "Notebook") &&
-            notebooks.length === 0 &&
-            sortedFolders.length > 0 &&
-            filteredBoards.length > 0 && (
-            <div className="rounded-xl border border-dashed border-amber-300/50 bg-amber-50/50 px-4 py-6 text-center dark:border-amber-500/20 dark:bg-amber-950/20">
-              <p className="mb-1 text-sm text-foreground/70">
-                No notebooks yet — use <strong className="font-medium">Add existing</strong> or{" "}
-                <strong className="font-medium">+ New</strong> above. Folders below are ready when you
-                add some.
-              </p>
-              {canEdit && !canCreateNotebook && (
-                <p className="mt-2 text-xs text-foreground/50">
-                  Maximum 5 notebooks. Delete one to create another.
-                </p>
-              )}
             </div>
           )}
 

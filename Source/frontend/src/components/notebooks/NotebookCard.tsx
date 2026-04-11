@@ -4,6 +4,7 @@ import {
   useNudgeDropdownToViewport,
   useSubmenuFlyoutPosition,
 } from "../../lib/useDropdownViewport";
+import { ProjectMoveFlyout } from "../dashboard/ProjectMoveFlyout";
 import { createPortal } from "react-dom";
 import { BookOpen, ChevronRight, Folder, FolderMinus, FolderOpen, MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import type { NotebookSummaryDto, ProjectSummaryDto } from "../../types";
@@ -17,7 +18,7 @@ interface NotebookCardProps {
   /** When in project context: removes notebook from project instead of deleting */
   onRemoveFromProject?: (id: string) => void;
   /** Add notebook to a project (dashboard context). */
-  onAddToProject?: (notebookId: string, projectId: string) => void;
+  onAddToProject?: (notebookId: string, projectId: string, folderId?: string) => void;
   /** Projects available for "Add to Project" (when onAddToProject is set). */
   activeProjects?: ProjectSummaryDto[];
   /** Project detail: move notebook between folders within the project. */
@@ -63,6 +64,7 @@ export function NotebookCard({
   const folderFlyoutPortalRef = useRef<HTMLDivElement>(null);
   const projectSubmenuAnchorRef = useRef<HTMLDivElement>(null);
   const projectFlyoutPortalRef = useRef<HTMLDivElement>(null);
+  const projectNestedFlyoutPortalRef = useRef<HTMLDivElement>(null);
   const folderHoverTimerRef = useRef<number | null>(null);
   const projectHoverTimerRef = useRef<number | null>(null);
 
@@ -112,9 +114,7 @@ export function NotebookCard({
   );
 
   const folderFlyoutPos = useSubmenuFlyoutPosition(showFolderList, folderSubmenuAnchorRef);
-  const projectFlyoutPos = useSubmenuFlyoutPosition(showProjectList, projectSubmenuAnchorRef);
   useFixedPortalInViewport(showFolderList, folderFlyoutPortalRef);
-  useFixedPortalInViewport(showProjectList, projectFlyoutPortalRef);
 
   const projectName = notebook.projectId
     ? activeProjects.find((p) => p.id === notebook.projectId)?.name
@@ -137,7 +137,9 @@ export function NotebookCard({
       const inPortal = portalMenuRef.current?.contains(target) ?? false;
       const inFolderFlyout = folderFlyoutPortalRef.current?.contains(target) ?? false;
       const inProjectFlyout = projectFlyoutPortalRef.current?.contains(target) ?? false;
-      if (!inMenu && !inPortal && !inFolderFlyout && !inProjectFlyout) {
+      const inProjectNestedFlyout =
+        projectNestedFlyoutPortalRef.current?.contains(target) ?? false;
+      if (!inMenu && !inPortal && !inFolderFlyout && !inProjectFlyout && !inProjectNestedFlyout) {
         setMenuOpen(false);
         setMenuAnchor("ellipsis");
         setShowProjectList(false);
@@ -274,7 +276,8 @@ export function NotebookCard({
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowFolderList((v) => !v);
+                    clearFolderHoverTimer();
+                    setShowFolderList(true);
                     setShowProjectList(false);
                   }}
                 >
@@ -301,7 +304,8 @@ export function NotebookCard({
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowProjectList((v) => !v);
+                    clearProjectHoverTimer();
+                    setShowProjectList(true);
                     setShowFolderList(false);
                   }}
                 >
@@ -405,7 +409,8 @@ export function NotebookCard({
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowFolderList((v) => !v);
+                      clearFolderHoverTimer();
+                      setShowFolderList(true);
                       setShowProjectList(false);
                     }}
                   >
@@ -431,7 +436,8 @@ export function NotebookCard({
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowProjectList((v) => !v);
+                      clearProjectHoverTimer();
+                      setShowProjectList(true);
                       setShowFolderList(false);
                     }}
                   >
@@ -577,45 +583,21 @@ export function NotebookCard({
           document.body,
         )}
 
-      {showProjectList && projectFlyoutPos && onAddToProject &&
-        createPortal(
-          <div
-            ref={projectFlyoutPortalRef}
-            className="fixed z-[200] w-44 rounded-lg border border-border bg-background py-1 shadow-lg"
-            style={{ top: projectFlyoutPos.top, left: projectFlyoutPos.left }}
-            onMouseEnter={clearProjectHoverTimer}
-            onMouseLeave={scheduleProjectClose}
-          >
-            {activeProjects.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-foreground/40">No active projects</div>
-            ) : (
-              activeProjects.map((project) => (
-                <button
-                  key={project.id}
-                  type="button"
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
-                    notebook.projectId === project.id ? "text-primary" : "text-foreground/70"
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onAddToProject(notebook.id, project.id);
-                  }}
-                >
-                  <div
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: project.color || "#8b5cf6" }}
-                  />
-                  <span className="truncate">{project.name}</span>
-                  {notebook.projectId === project.id && (
-                    <span className="ml-auto text-[10px] text-foreground/40">Current</span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>,
-          document.body,
-        )}
+      {showProjectList && onAddToProject && (
+        <ProjectMoveFlyout
+          show={showProjectList}
+          anchorRef={projectSubmenuAnchorRef}
+          flyoutPortalRef={projectFlyoutPortalRef}
+          nestedFlyoutPortalRef={projectNestedFlyoutPortalRef}
+          activeProjects={activeProjects}
+          currentProjectId={notebook.projectId ?? null}
+          currentFolderId={notebook.projectFolderId}
+          onPick={(projectId, folderId) => onAddToProject(notebook.id, projectId, folderId)}
+          onClose={closeMenu}
+          clearParentHoverTimer={clearProjectHoverTimer}
+          scheduleParentClose={scheduleProjectClose}
+        />
+      )}
     </div>
   );
 }
