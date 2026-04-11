@@ -4,6 +4,8 @@ public sealed class CalendarEventDto
 {
     public Guid Id { get; set; }
     public Guid? ProjectId { get; set; }
+    /// <summary>When <see cref="ProjectId"/> is set, the linked project name for display (e.g. on calendars).</summary>
+    public string? ProjectName { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime StartDate { get; set; }

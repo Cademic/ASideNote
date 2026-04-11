@@ -42,6 +42,8 @@ import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
 import { EventDetailsPopup } from "../components/calendar/EventDetailsPopup";
 import { useAuth } from "../context/AuthContext";
 import type { BoardSummaryDto, CalendarEventDto, FriendDto, NotebookSummaryDto, ProjectSummaryDto } from "../types";
+import { resolveEventProjectName } from "../utils/calendar-event-project-name";
+import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -525,6 +527,11 @@ export function DashboardPage() {
     [activeProjects],
   );
 
+  const projectsOnCalendar = useMemo(
+    () => activeProjectsSorted.filter(isProjectVisibleOnUserCalendar),
+    [activeProjectsSorted],
+  );
+
   /** Notebooks sorted by last updated */
   const notebooksSorted = useMemo(
     () => [...notebooks].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
@@ -546,6 +553,7 @@ export function DashboardPage() {
       }
     }
     for (const proj of activeProjects) {
+      if (!isProjectVisibleOnUserCalendar(proj)) continue;
       if (proj.startDate) {
         const start = new Date(proj.startDate).getTime();
         if (start >= todayMs) {
@@ -689,7 +697,7 @@ export function DashboardPage() {
           count={0}
           accentColor="sky"
         >
-          <MiniCalendar projects={activeProjectsSorted} />
+          <MiniCalendar projects={projectsOnCalendar} />
         </NotebookSection>
 
         {/* ── Active Projects ────────────────────────────── */}
@@ -899,7 +907,7 @@ export function DashboardPage() {
       {detailsEvent && (
         <EventDetailsPopup
           event={detailsEvent}
-          projectName={detailsEvent.projectId ? projectNameMap[detailsEvent.projectId] ?? null : null}
+          projectName={resolveEventProjectName(detailsEvent, projectNameMap)}
           isOpen={!!detailsEvent}
           onClose={() => setDetailsEvent(null)}
           onEdit={() => {

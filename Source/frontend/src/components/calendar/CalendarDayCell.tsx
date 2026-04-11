@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import type { CalendarEventDto, ProjectSummaryDto } from "../../types";
+import { resolveEventProjectName } from "../../utils/calendar-event-project-name";
 import { CalendarEventItem } from "./CalendarEventItem";
 import { CalendarProjectBar } from "./CalendarProjectBar";
 
@@ -121,7 +122,7 @@ export function CalendarDayCell({
             <CalendarEventItem
               event={event}
               onClick={onClickEvent}
-              projectName={event.projectId && projectNameMap ? projectNameMap[event.projectId] ?? null : null}
+              projectName={resolveEventProjectName(event, projectNameMap)}
             />
           </div>
         ))}

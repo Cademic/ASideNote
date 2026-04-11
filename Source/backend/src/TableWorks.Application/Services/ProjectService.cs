@@ -141,7 +141,11 @@ public sealed class ProjectService : IProjectService
             BoardCount = p.Boards.Count,
             CreatedAt = p.CreatedAt,
             IsPinned = isPinned,
-            PinnedAt = pinnedAt
+            PinnedAt = pinnedAt,
+            ShowEventsOnMainCalendar = p.ShowEventsOnMainCalendar,
+            MyShowOnPersonalCalendar = p.OwnerId == userId
+                ? p.OwnerShowOnPersonalCalendar
+                : p.Members.FirstOrDefault(m => m.UserId == userId)?.ShowOnPersonalCalendar
         };
     }
 
@@ -170,6 +174,7 @@ public sealed class ProjectService : IProjectService
             Status = "Active",
             Progress = 0,
             Color = request.Color ?? "violet",
+            ShowEventsOnMainCalendar = true,
             CreatedAt = now,
             UpdatedAt = now
         };

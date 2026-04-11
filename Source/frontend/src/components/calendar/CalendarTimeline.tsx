@@ -8,6 +8,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import type { CalendarEventDto, ProjectSummaryDto } from "../../types";
+import { resolveEventProjectName } from "../../utils/calendar-event-project-name";
 
 /* ─── Constants ────────────────────────────────────────── */
 
@@ -26,7 +27,7 @@ const BAR_COLORS: Record<string, { bg: string; border: string; text: string }> =
 
 function parseServerDate(isoStr: string): Date {
   const d = new Date(isoStr);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function toLocalMidnight(d: Date): Date {
@@ -356,19 +357,20 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
             >
               {laneItems.map((item) => {
                 const colors = BAR_COLORS[item.color] ?? BAR_COLORS.sky;
+                const resolvedProjectName =
+                  item.kind !== "project" && item.eventDto
+                    ? resolveEventProjectName(item.eventDto, projectNameMap)
+                    : null;
                 // Show truncated project name as badge when event/note belongs to a project
-                const projectLabel = item.kind !== "project" && item.projectId && projectNameMap?.[item.projectId]
-                  ? projectNameMap[item.projectId].length > 10
-                    ? projectNameMap[item.projectId].slice(0, 10) + "…"
-                    : projectNameMap[item.projectId]
-                  : null;
-                const badge = item.kind === "project"
-                  ? "Project"
-                  : projectLabel ?? (item.isUpcoming
-                      ? "Upcoming"
-                      : item.kind === "note"
-                        ? "Note"
-                        : "Event");
+                const projectLabel =
+                  resolvedProjectName && resolvedProjectName.length > 10
+                    ? resolvedProjectName.slice(0, 10) + "…"
+                    : resolvedProjectName;
+                const badge =
+                  item.kind === "project"
+                    ? "Project"
+                    : (projectLabel ??
+                        (item.isUpcoming ? "Upcoming" : item.kind === "note" ? "Note" : "Event"));
                 const roundLeft = !item.continuesLeft;
                 const roundRight = !item.continuesRight;
 
@@ -395,8 +397,8 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
                       <Calendar className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
                     )}
                     <span className={`min-w-0 truncate text-xs font-medium ${colors.text}`}>
-                      {item.kind !== "project" && item.projectId && projectNameMap?.[item.projectId] && (
-                        <span className="opacity-60">{projectNameMap[item.projectId]}: </span>
+                      {resolvedProjectName && (
+                        <span className="opacity-60">{resolvedProjectName}: </span>
                       )}
                       {item.title}
                     </span>

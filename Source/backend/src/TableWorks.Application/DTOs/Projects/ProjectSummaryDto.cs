@@ -19,4 +19,10 @@ public class ProjectSummaryDto
     public DateTime CreatedAt { get; set; }
     public bool IsPinned { get; set; }
     public DateTime? PinnedAt { get; set; }
+
+    /// <summary>Legacy column; always true. Visibility is per-user via <see cref="MyShowOnPersonalCalendar"/>.</summary>
+    public bool ShowEventsOnMainCalendar { get; set; } = true;
+
+    /// <summary>Per-user timeline override; null means show (project column is on).</summary>
+    public bool? MyShowOnPersonalCalendar { get; set; }
 }

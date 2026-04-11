@@ -17,10 +17,11 @@ public sealed class Project
     public bool AutoProgressEnabled { get; set; }
     public string Color { get; set; } = "violet";
     /// <summary>
-    /// Default for members (and owner when <see cref="OwnerShowOnPersonalCalendar"/> is null):
-    /// whether project events appear on each member main/dashboard calendar when they have no personal override.
+    /// Legacy column: events are shown by default; per-user visibility is controlled by
+    /// <see cref="OwnerShowOnPersonalCalendar"/> and member <see cref="ProjectMember.ShowOnPersonalCalendar"/>.
+    /// Kept true for all projects (no UI to change).
     /// </summary>
-    public bool ShowEventsOnMainCalendar { get; set; } = false;
+    public bool ShowEventsOnMainCalendar { get; set; } = true;
     /// <summary>
     /// Owner-only override for their own main/dashboard calendar. When null, <see cref="ShowEventsOnMainCalendar"/> applies.
     /// </summary>
