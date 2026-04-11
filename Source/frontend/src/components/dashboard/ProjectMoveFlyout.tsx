@@ -12,8 +12,8 @@ interface ProjectMoveFlyoutProps {
   show: boolean;
   /** Anchor for the main project list panel (same as existing Move to Project flyout). */
   anchorRef: React.RefObject<HTMLElement | null>;
-  flyoutPortalRef: React.RefObject<HTMLDivElement | null>;
-  nestedFlyoutPortalRef: React.RefObject<HTMLDivElement | null>;
+  flyoutPortalRef: React.RefObject<HTMLDivElement>;
+  nestedFlyoutPortalRef: React.RefObject<HTMLDivElement>;
   activeProjects: ProjectSummaryDto[];
   /** Current project id of the board/notebook (for "Current" labels). */
   currentProjectId: string | null | undefined;
@@ -46,7 +46,7 @@ export function ProjectMoveFlyout({
   const [folderCache, setFolderCache] = useState<
     Record<string, { id: string; name: string }[]>
   >({});
-  const nestedRowRef = useRef<HTMLDivElement | null>(null);
+  const nestedRowRef = useRef<HTMLDivElement>(null);
   const nestedHoverTimerRef = useRef<number | null>(null);
   const folderCacheRef = useRef(folderCache);
   folderCacheRef.current = folderCache;
