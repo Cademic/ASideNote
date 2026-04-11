@@ -407,6 +407,10 @@ export interface ProjectSummaryDto {
   createdAt: string;
   isPinned?: boolean;
   pinnedAt?: string | null;
+  /** Legacy; treated as on. Use myShowOnPersonalCalendar to opt out. */
+  showEventsOnMainCalendar?: boolean;
+  /** Per-user timeline; null means show. */
+  myShowOnPersonalCalendar?: boolean | null;
 }
 
 export interface ProjectMemberDto {
@@ -453,7 +457,7 @@ export interface ProjectDetailDto {
   autoProgressEnabled?: boolean;
   color: string;
   showEventsOnMainCalendar?: boolean;
-  /** Null means use showEventsOnMainCalendar (project default). */
+  /** Per-user timeline; null means show (default on). */
   myShowOnPersonalCalendar?: boolean | null;
   ownerId: string;
   ownerUsername: string;
@@ -510,6 +514,8 @@ export interface CalendarEventDto {
   title: string;
   description: string | null;
   projectId: string | null;
+  /** Set by API when the event is linked to a project (for display when the project list map misses). */
+  projectName?: string | null;
   startDate: string;
   endDate: string | null;
   isAllDay: boolean;

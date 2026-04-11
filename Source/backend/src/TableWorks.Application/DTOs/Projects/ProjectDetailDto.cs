@@ -16,9 +16,9 @@ public sealed class ProjectDetailDto
     public int Progress { get; set; }
     public bool AutoProgressEnabled { get; set; }
     public string Color { get; set; } = "violet";
-    /// <summary>Default for members (and for you when MyShowOnPersonalCalendar is null).</summary>
-    public bool ShowEventsOnMainCalendar { get; set; } = false;
-    /// <summary>Your personal override: null means use ShowEventsOnMainCalendar.</summary>
+    /// <summary>Always true in current product; per-user visibility uses personal overrides.</summary>
+    public bool ShowEventsOnMainCalendar { get; set; } = true;
+    /// <summary>Your personal override for this project timeline; null means show (default on).</summary>
     public bool? MyShowOnPersonalCalendar { get; set; }
     public Guid OwnerId { get; set; }
     public string OwnerUsername { get; set; } = string.Empty;

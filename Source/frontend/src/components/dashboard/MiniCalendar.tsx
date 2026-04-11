@@ -17,6 +17,7 @@ import {
 import { CreateEventDialog } from "../calendar/CreateEventDialog";
 import { EventDetailsPopup } from "../calendar/EventDetailsPopup";
 import type { CalendarEventDto, ProjectSummaryDto } from "../../types";
+import { resolveEventProjectName } from "../../utils/calendar-event-project-name";
 
 /* ─── Constants ────────────────────────────────────────── */
 
@@ -42,7 +43,7 @@ function toLocalDateStr(date: Date): string {
 
 function parseServerDate(isoStr: string): Date {
   const d = new Date(isoStr);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function toLocalMidnight(d: Date): Date {
@@ -412,7 +413,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
       {detailsEvent && (
         <EventDetailsPopup
           event={detailsEvent}
-          projectName={detailsEvent.projectId ? projectNameMap[detailsEvent.projectId] : null}
+          projectName={resolveEventProjectName(detailsEvent, projectNameMap)}
           isOpen={!!detailsEvent}
           onClose={() => setDetailsEvent(null)}
           onEdit={handleEditFromDetails}
@@ -510,19 +511,19 @@ function WeekSection({
             >
               {laneItems.map((item) => {
                 const colors = BAR_COLORS[item.color] ?? BAR_COLORS.sky;
-                // Show truncated project name as badge when event/note belongs to a project
-                const projectLabel = item.kind !== "project" && item.projectId && projectNameMap[item.projectId]
-                  ? projectNameMap[item.projectId].length > 10
-                    ? projectNameMap[item.projectId].slice(0, 10) + "…"
-                    : projectNameMap[item.projectId]
-                  : null;
-                const badge = item.kind === "project"
-                  ? "Project"
-                  : projectLabel ?? (item.isUpcoming
-                      ? "Upcoming"
-                      : item.kind === "note"
-                        ? "Note"
-                        : "Event");
+                const resolvedProjectName =
+                  item.kind !== "project" && item.eventDto
+                    ? resolveEventProjectName(item.eventDto, projectNameMap)
+                    : null;
+                const projectLabel =
+                  resolvedProjectName && resolvedProjectName.length > 10
+                    ? resolvedProjectName.slice(0, 10) + "…"
+                    : resolvedProjectName;
+                const badge =
+                  item.kind === "project"
+                    ? "Project"
+                    : (projectLabel ??
+                        (item.isUpcoming ? "Upcoming" : item.kind === "note" ? "Note" : "Event"));
                 const roundLeft = !item.continuesLeft;
                 const roundRight = !item.continuesRight;
 
@@ -549,6 +550,9 @@ function WeekSection({
                       <Calendar className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
                     )}
                     <span className={`min-w-0 truncate text-xs font-medium ${colors.text}`}>
+                      {resolvedProjectName && (
+                        <span className="opacity-60">{resolvedProjectName}: </span>
+                      )}
                       {item.title}
                     </span>
                     <span className="ml-auto flex min-w-0 items-center justify-end gap-1 flex-shrink-0">

@@ -226,7 +226,9 @@ public sealed class AdminService : IAdminService
                 Progress = p.Progress,
                 OwnerId = p.OwnerId,
                 MemberCount = p.Members.Count,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+                ShowEventsOnMainCalendar = p.ShowEventsOnMainCalendar,
+                MyShowOnPersonalCalendar = null
             }).ToList(),
             Boards = user.Boards.Take(20).Select(b => new AdminBoardSummaryDto
             {

@@ -33,7 +33,9 @@ public sealed class CalendarEventService : ICalendarEventService
             if (!hasAccess)
                 return Array.Empty<CalendarEventDto>();
 
-            q = _eventRepo.Query().Where(e => e.ProjectId == query.ProjectId.Value);
+            q = _eventRepo.Query()
+                .Include(e => e.Project)
+                .Where(e => e.ProjectId == query.ProjectId.Value);
         }
         else
         {
@@ -71,12 +73,36 @@ public sealed class CalendarEventService : ICalendarEventService
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
+        // Rare: Include did not hydrate Project; load so visibility and mapping still work.
+        var missingProjectIds = events
+            .Where(e => e.ProjectId is not null && e.Project is null)
+            .Select(e => e.ProjectId!.Value)
+            .Distinct()
+            .ToList();
+        if (missingProjectIds.Count > 0)
+        {
+            var projects = await _projectRepo.Query()
+                .Include(p => p.Members)
+                .Where(p => missingProjectIds.Contains(p.Id))
+                .AsNoTracking()
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
+            foreach (var e in events)
+            {
+                if (e.ProjectId is not null && e.Project is null && projects.TryGetValue(e.ProjectId.Value, out var proj))
+                    e.Project = proj;
+            }
+        }
+
         if (!query.ProjectId.HasValue)
         {
+            // Personal events (no project) always visible to creator. Project-linked events must
+            // respect per-user calendar preference even when UserId is the current user (own events).
             events = events.Where(e =>
             {
-                if (e.UserId == userId) return true;
-                if (e.ProjectId is null || e.Project is null) return false;
+                if (e.ProjectId is null)
+                    return e.UserId == userId;
+                if (e.Project is null)
+                    return false;
                 return ProjectEventVisibleOnUserMainCalendar(e.Project, userId);
             }).ToList();
         }
@@ -122,7 +148,13 @@ public sealed class CalendarEventService : ICalendarEventService
         await _eventRepo.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return MapToDto(entity);
+        var created = await _eventRepo.Query()
+            .Include(e => e.Project)
+            .Where(e => e.Id == entity.Id)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return MapToDto(created ?? entity);
     }
 
     public async Task<CalendarEventDto> GetEventByIdAsync(Guid userId, Guid eventId, CancellationToken cancellationToken = default)
@@ -189,12 +221,13 @@ public sealed class CalendarEventService : ICalendarEventService
 
     private static bool ProjectEventVisibleOnUserMainCalendar(Project p, Guid userId)
     {
+        // Per-user opt-out only; legacy ShowEventsOnMainCalendar is no longer used for visibility (default on).
         if (p.OwnerId == userId)
-            return p.OwnerShowOnPersonalCalendar ?? p.ShowEventsOnMainCalendar;
+            return p.OwnerShowOnPersonalCalendar ?? true;
 
         var m = p.Members.FirstOrDefault(x => x.UserId == userId);
         if (m is null) return false;
-        return m.ShowOnPersonalCalendar ?? p.ShowEventsOnMainCalendar;
+        return m.ShowOnPersonalCalendar ?? true;
     }
 
     /* ── Recurrence expansion ──────────────────────────────── */
@@ -226,6 +259,7 @@ public sealed class CalendarEventService : ICalendarEventService
                 {
                     Id = instanceId,
                     ProjectId = e.ProjectId,
+                    ProjectName = e.Project?.Name,
                     Title = e.Title,
                     Description = e.Description,
                     StartDate = instanceStart,
@@ -282,6 +316,7 @@ public sealed class CalendarEventService : ICalendarEventService
         {
             Id = e.Id,
             ProjectId = e.ProjectId,
+            ProjectName = e.Project?.Name,
             Title = e.Title,
             Description = e.Description,
             StartDate = e.StartDate,

@@ -17,6 +17,8 @@ import type {
   CalendarEventDto,
   ProjectSummaryDto,
 } from "../types";
+import { resolveEventProjectName } from "../utils/calendar-event-project-name";
+import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
 
 function toLocalDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -213,6 +215,11 @@ export function CalendarsPage() {
     }
   }
 
+  const projectsOnCalendar = useMemo(
+    () => projects.filter(isProjectVisibleOnUserCalendar),
+    [projects],
+  );
+
   // Build a projectId -> projectName map for displaying project names on events
   const projectNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -280,7 +287,7 @@ export function CalendarsPage() {
           <CalendarGrid
             currentDate={currentDate}
             events={events}
-            projects={projects}
+            projects={projectsOnCalendar}
             onClickDay={handleClickDay}
             onClickEvent={handleClickEvent}
             onClickProject={handleClickProject}
@@ -290,7 +297,7 @@ export function CalendarsPage() {
           <CalendarTimeline
             currentDate={currentDate}
             events={events}
-            projects={projects}
+            projects={projectsOnCalendar}
             onClickDay={handleClickDay}
             onClickEvent={handleClickEvent}
             onClickProject={handleClickProject}
@@ -319,7 +326,7 @@ export function CalendarsPage() {
       {detailsEvent && (
         <EventDetailsPopup
           event={detailsEvent}
-          projectName={detailsEvent.projectId ? projectNameMap[detailsEvent.projectId] : null}
+          projectName={resolveEventProjectName(detailsEvent, projectNameMap)}
           isOpen={!!detailsEvent}
           onClose={() => setDetailsEvent(null)}
           onEdit={handleEditFromDetails}

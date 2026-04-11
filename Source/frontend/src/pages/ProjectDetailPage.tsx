@@ -229,8 +229,6 @@ export function ProjectDetailPage() {
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
-  const [editShowEventsOnMainCalendar, setEditShowEventsOnMainCalendar] =
-    useState(false);
   const [editAutoProgressEnabled, setEditAutoProgressEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [patchingMyCalendar, setPatchingMyCalendar] = useState(false);
@@ -275,7 +273,6 @@ export function ProjectDetailPage() {
       setEditStartDate(toInputDate(data.startDate));
       setEditEndDate(toInputDate(data.endDate));
       setEditDeadline(data.deadline ? toInputDate(data.deadline) : "");
-      setEditShowEventsOnMainCalendar(data.showEventsOnMainCalendar ?? false);
       setEditAutoProgressEnabled(data.autoProgressEnabled ?? false);
     } catch {
       setError("Failed to load project.");
@@ -601,7 +598,6 @@ export function ProjectDetailPage() {
         status: editStatus,
         progress: editProgress,
         autoProgressEnabled: editAutoProgressEnabled,
-        showEventsOnMainCalendar: editShowEventsOnMainCalendar,
       });
       await fetchProject();
     } catch {
@@ -894,7 +890,6 @@ export function ProjectDetailPage() {
           <SettingsTab
             isOwner={isOwner}
             members={project.members}
-            projectDefaultShowOnMainCalendar={project.showEventsOnMainCalendar ?? false}
             myShowOnPersonalCalendar={project.myShowOnPersonalCalendar ?? null}
             patchingMyCalendar={patchingMyCalendar}
             onMyCalendarPreferenceChange={handleMyCalendarPreference}
@@ -907,7 +902,6 @@ export function ProjectDetailPage() {
             editStartDate={editStartDate}
             editEndDate={editEndDate}
             editDeadline={editDeadline}
-            editShowEventsOnMainCalendar={editShowEventsOnMainCalendar}
             isSaving={isSaving}
             onNameChange={setEditName}
             onDescriptionChange={setEditDescription}
@@ -918,7 +912,6 @@ export function ProjectDetailPage() {
             onStartDateChange={setEditStartDate}
             onEndDateChange={setEditEndDate}
             onDeadlineChange={setEditDeadline}
-            onShowEventsOnMainCalendarChange={setEditShowEventsOnMainCalendar}
             onSave={handleSaveSettings}
             onDelete={() => setDeleteConfirmOpen(true)}
             onLeave={handleLeaveProject}
@@ -1852,7 +1845,6 @@ const PROJECT_COLORS = [
 interface SettingsTabProps {
   isOwner: boolean;
   members: ProjectMemberDto[];
-  projectDefaultShowOnMainCalendar: boolean;
   myShowOnPersonalCalendar: boolean | null;
   patchingMyCalendar: boolean;
   onMyCalendarPreferenceChange: (next: boolean | null) => void;
@@ -1865,7 +1857,6 @@ interface SettingsTabProps {
   editStartDate: string;
   editEndDate: string;
   editDeadline: string;
-  editShowEventsOnMainCalendar: boolean;
   isSaving: boolean;
   onNameChange: (v: string) => void;
   onDescriptionChange: (v: string) => void;
@@ -1876,7 +1867,6 @@ interface SettingsTabProps {
   onStartDateChange: (v: string) => void;
   onEndDateChange: (v: string) => void;
   onDeadlineChange: (v: string) => void;
-  onShowEventsOnMainCalendarChange: (v: boolean) => void;
   onSave: (e: React.FormEvent) => void;
   onDelete: () => void;
   onLeave: () => void;
@@ -1886,7 +1876,6 @@ interface SettingsTabProps {
 function SettingsTab({
   isOwner,
   members,
-  projectDefaultShowOnMainCalendar,
   myShowOnPersonalCalendar,
   patchingMyCalendar,
   onMyCalendarPreferenceChange,
@@ -1899,7 +1888,6 @@ function SettingsTab({
   editStartDate,
   editEndDate,
   editDeadline,
-  editShowEventsOnMainCalendar,
   isSaving,
   onNameChange,
   onDescriptionChange,
@@ -1910,7 +1898,6 @@ function SettingsTab({
   onStartDateChange,
   onEndDateChange,
   onDeadlineChange,
-  onShowEventsOnMainCalendarChange,
   onSave,
   onDelete,
   onLeave,
@@ -1919,51 +1906,17 @@ function SettingsTab({
   const readOnly = !isOwner;
   const [transferPopupOpen, setTransferPopupOpen] = useState(false);
 
-  const effectivePersonalCalendar =
-    myShowOnPersonalCalendar ?? projectDefaultShowOnMainCalendar;
+  /** Timeline is on by default; only explicit opt-out is stored. */
+  const effectivePersonalCalendar = myShowOnPersonalCalendar ?? true;
 
   function handlePersonalCalendarToggle() {
     const nextEffective = !effectivePersonalCalendar;
-    const nextStored =
-      nextEffective === projectDefaultShowOnMainCalendar
-        ? null
-        : nextEffective;
+    const nextStored = nextEffective === true ? null : nextEffective;
     onMyCalendarPreferenceChange(nextStored);
   }
 
   return (
-    <div className="max-w-lg">
-      <div className="mb-6 rounded-lg border border-border bg-foreground/[0.02] px-4 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <label className="text-xs font-medium text-foreground/60">
-              Your personal calendar
-            </label>
-            <p className="mt-0.5 text-xs text-foreground/50">
-              Show this project&apos;s events on your main and dashboard calendars. If you
-              haven&apos;t set your own choice, the owner&apos;s default below applies.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={effectivePersonalCalendar}
-            disabled={patchingMyCalendar}
-            onClick={() => !patchingMyCalendar && handlePersonalCalendarToggle()}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-wait disabled:opacity-60 ${
-              patchingMyCalendar ? "cursor-wait" : "cursor-pointer"
-            } ${effectivePersonalCalendar ? "bg-primary" : "bg-foreground/20"}`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                effectivePersonalCalendar ? "translate-x-5" : "translate-x-0.5"
-              }`}
-              aria-hidden
-            />
-          </button>
-        </div>
-      </div>
-
+    <div className="max-w-2xl">
       {readOnly && (
         <p className="mb-4 rounded-lg border border-foreground/10 bg-foreground/5 px-4 py-2 text-xs text-foreground/60">
           Only the project owner can change project details below.
@@ -2030,6 +1983,37 @@ function SettingsTab({
                 } disabled:cursor-default disabled:opacity-70`}
               />
             ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-foreground/[0.02] px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <label className="text-xs font-medium text-foreground/60">
+                Your personal calendar
+              </label>
+              <p className="mt-0.5 text-xs text-foreground/50">
+                Timeline on your main and dashboard calendars. Turn off to hide this
+                project&apos;s timeline for you only.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={effectivePersonalCalendar}
+              disabled={patchingMyCalendar}
+              onClick={() => !patchingMyCalendar && handlePersonalCalendarToggle()}
+              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:cursor-wait disabled:opacity-60 ${
+                patchingMyCalendar ? "cursor-wait" : "cursor-pointer"
+              } ${effectivePersonalCalendar ? "bg-primary" : "bg-foreground/20"}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
+                  effectivePersonalCalendar ? "translate-x-5" : "translate-x-0.5"
+                }`}
+                aria-hidden
+              />
+            </button>
           </div>
         </div>
 
@@ -2125,37 +2109,6 @@ function SettingsTab({
           onDeadlineChange={onDeadlineChange}
           readOnly={readOnly}
         />
-
-        {/* Default for members' personal calendars (owner only) */}
-        {isOwner && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <label className="text-xs font-medium text-foreground/60">
-                Default for members
-              </label>
-              <p className="mt-0.5 text-xs text-foreground/50">
-                Default &quot;on&quot; or &quot;off&quot; for members who have not set their own
-                personal calendar choice. Each member can override this for themselves above.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={editShowEventsOnMainCalendar}
-              onClick={() => onShowEventsOnMainCalendarChange(!editShowEventsOnMainCalendar)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${
-                editShowEventsOnMainCalendar ? "bg-primary" : "bg-foreground/20"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition ${
-                  editShowEventsOnMainCalendar ? "translate-x-5" : "translate-x-0.5"
-                }`}
-                aria-hidden
-              />
-            </button>
-          </div>
-        )}
 
         {/* Save - owners only */}
         {isOwner && (

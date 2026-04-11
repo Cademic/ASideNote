@@ -23,10 +23,10 @@ function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Parse a server date (UTC) into a local Date representing the same calendar day */
+/** Same calendar day as project timelines: local date from the ISO instant (not UTC day). */
 function parseServerDate(isoStr: string): Date {
   const d = new Date(isoStr);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 /** Normalize a Date to local midnight (strips time component) */
