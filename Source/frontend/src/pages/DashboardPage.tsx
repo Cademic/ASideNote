@@ -30,7 +30,7 @@ import {
   leaveProject,
 } from "../api/projects";
 import { getNotebooks, createNotebook, deleteNotebook, updateNotebook, toggleNotebookPin } from "../api/notebooks";
-import { getFriends } from "../api/users";
+import { getFriends, getProfile } from "../api/users";
 import { getCalendarEvents } from "../api/calendar-events";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { MiniCalendar } from "../components/dashboard/MiniCalendar";
@@ -56,19 +56,24 @@ function formatTodaySticky(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatShortDate(dateStr: string): string {
-  const date = new Date(dateStr);
+/**
+ * Time from when the previous session ended (server UTC) to the current moment.
+ * Recomputed whenever `tick` changes (interval + visibility) so the sticky stays current.
+ */
+function formatElapsedSincePreviousSessionEnd(sessionEndedAtIso: string): string {
+  const endedAt = new Date(sessionEndedAtIso);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = now.getTime() - endedAt.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   const diffHr = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHr / 24);
 
+  if (diffMs < 0) return "Just now";
   if (diffMin < 1) return "Just now";
   if (diffMin < 60) return `${diffMin}m ago`;
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return endedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function DashboardPage() {
@@ -96,6 +101,9 @@ export function DashboardPage() {
   const [notebookRenameValue, setNotebookRenameValue] = useState("");
   const [notebookDeleteTarget, setNotebookDeleteTarget] = useState<NotebookSummaryDto | null>(null);
   const [friends, setFriends] = useState<FriendDto[]>([]);
+  const [lastSessionEndedAt, setLastSessionEndedAt] = useState<string | null>(null);
+  /** Bumps on an interval and when the tab becomes visible so elapsed time is always relative to "now". */
+  const [lastActiveTick, setLastActiveTick] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
 
@@ -124,6 +132,26 @@ export function DashboardPage() {
 
   useEffect(() => {
     getFriends().then(setFriends).catch(() => setFriends([]));
+    getProfile()
+      .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
+      .catch(() => setLastSessionEndedAt(null));
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setLastActiveTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      void getProfile()
+        .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
+        .catch(() => {});
+      setLastActiveTick((t) => t + 1);
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   useEffect(() => {
@@ -565,25 +593,13 @@ export function DashboardPage() {
     if (candidates.length === 0) return { display: "No upcoming events", event: undefined, project: undefined };
     candidates.sort((a, b) => a.startMs - b.startMs);
     const first = candidates[0];
-    const maxLen = 18;
-    const display = first.title.length > maxLen ? first.title.slice(0, maxLen).trim() + "…" : first.title;
-    return { display, event: first.event, project: first.project };
+    return { display: first.title, event: first.event, project: first.project };
   }, [calendarEvents, activeProjects]);
 
-  const friendsOnline = useMemo(() => {
-    const ONLINE_MINS = 15;
-    const now = Date.now();
-    return friends.filter(
-      (f) => f.lastLoginAt && now - new Date(f.lastLoginAt).getTime() < ONLINE_MINS * 60 * 1000,
-    ).length;
-  }, [friends]);
-
-  const mostRecentBoard = useMemo(() => {
-    if (boards.length === 0) return null;
-    return boards.reduce((latest, b) =>
-      new Date(b.updatedAt) > new Date(latest.updatedAt) ? b : latest,
-    );
-  }, [boards]);
+  const friendsOnline = useMemo(
+    () => friends.filter((f) => f.presenceStatus === "active" || f.presenceStatus === "idle").length,
+    [friends],
+  );
 
   const projectNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -592,6 +608,11 @@ export function DashboardPage() {
     }
     return map;
   }, [activeProjects]);
+
+  const lastActiveDisplay = useMemo(() => {
+    if (!lastSessionEndedAt) return "—";
+    return formatElapsedSincePreviousSessionEnd(lastSessionEndedAt);
+  }, [lastSessionEndedAt, lastActiveTick]);
 
   if (isLoading) {
     return (
@@ -684,8 +705,13 @@ export function DashboardPage() {
           <StatSticky
             color="green"
             icon={Clock}
-            label="Last Activity"
-            value={mostRecentBoard ? formatShortDate(mostRecentBoard.updatedAt) : "—"}
+            label="Last Active"
+            value={lastActiveDisplay}
+            valueTooltip={
+              lastSessionEndedAt
+                ? `Previous session ended: ${new Date(lastSessionEndedAt).toLocaleString()}`
+                : undefined
+            }
             rotation={2}
           />
         </div>
@@ -1065,18 +1091,25 @@ interface StatStickyProps {
   value: string;
   rotation: number;
   onClick?: () => void;
+  /** Shown on hover when the value is visually clipped */
+  valueTooltip?: string;
 }
 
-function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: StatStickyProps) {
-  const baseClassName = `stat-sticky flex flex-col items-center justify-center px-4 py-5 ${STICKY_BG[color]}`;
+function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueTooltip }: StatStickyProps) {
+  const baseClassName = `stat-sticky flex min-h-[7.5rem] w-full min-w-0 flex-col items-center justify-center overflow-hidden px-3 py-5 sm:px-4 ${STICKY_BG[color]}`;
   const style = { transform: `rotate(${rotation}deg)` };
+  const tip = valueTooltip ?? value;
   const content = (
     <>
-      <Icon className={`mb-1.5 h-4 w-4 ${STICKY_ACCENT[color]}`} />
-      <span className={`text-2xl font-bold leading-none ${STICKY_ACCENT[color]}`}>
+      <Icon className={`mb-1.5 h-4 w-4 shrink-0 ${STICKY_ACCENT[color]}`} />
+      <span
+        className={`line-clamp-2 w-full min-w-0 max-w-full break-all px-0.5 text-center text-lg font-bold leading-tight sm:text-xl md:text-2xl ${STICKY_ACCENT[color]}`}
+      >
         {value}
       </span>
-      <span className="mt-1 text-[11px] font-medium text-foreground/45">{label}</span>
+      <span className="mt-1 max-w-full truncate px-0.5 text-center text-[11px] font-medium text-foreground/45">
+        {label}
+      </span>
     </>
   );
 
@@ -1085,6 +1118,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: Stat
       <button
         type="button"
         onClick={onClick}
+        title={tip.length > 0 ? tip : undefined}
         className={`${baseClassName} cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2`}
         style={style}
       >
@@ -1094,7 +1128,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick }: Stat
   }
 
   return (
-    <div className={baseClassName} style={style}>
+    <div className={baseClassName} style={style} title={tip.length > 0 ? tip : undefined}>
       {content}
     </div>
   );

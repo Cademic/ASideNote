@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using ASideNote.Application.DTOs.Users;
 using ASideNote.Application.Interfaces;
+using ASideNote.Application.Utilities;
 using ASideNote.Core.Entities;
 using ASideNote.Core.Interfaces;
 
@@ -60,6 +61,8 @@ public sealed class UserService : IUserService
             Role = effectiveRole,
             CreatedAt = user.CreatedAt,
             LastLoginAt = user.LastLoginAt,
+            LastActivityAt = user.LastActivityAt,
+            LastSessionEndAt = user.LastSessionEndAt,
             ProfilePictureKey = user.ProfilePictureKey,
             Bio = user.Bio,
             UsernameChangedAt = user.UsernameChangedAt
@@ -300,23 +303,59 @@ public sealed class UserService : IUserService
             .ToListAsync(cancellationToken);
 
         var friends = new List<FriendDto>();
+        var now = DateTime.UtcNow;
         foreach (var f in accepted)
         {
             var other = f.RequesterId == userId ? f.Receiver : f.Requester;
             if (other is null) continue;
+            var status = UserPresenceHelper.ComputePresenceStatus(other.LastPresenceAt, other.LastActivityAt, now);
             friends.Add(new FriendDto
             {
                 Id = other.Id,
                 Username = other.Username,
                 ProfilePictureKey = other.ProfilePictureKey,
-                LastLoginAt = other.LastLoginAt
+                LastLoginAt = other.LastLoginAt,
+                LastActivityAt = other.LastActivityAt,
+                PresenceStatus = status
             });
         }
-        var cutoff = DateTime.UtcNow.AddMinutes(-15);
         return friends
-            .OrderByDescending(x => x.LastLoginAt.HasValue && x.LastLoginAt.Value >= cutoff)
-            .ThenByDescending(x => x.LastLoginAt)
+            .OrderBy(x => UserPresenceHelper.PresenceSortOrder(x.PresenceStatus))
+            .ThenByDescending(x => x.LastActivityAt ?? DateTime.MinValue)
             .ToList();
+    }
+
+    public async Task RecordPresenceAsync(Guid userId, UpdatePresenceRequest request, CancellationToken cancellationToken = default)
+    {
+        if (!request.Leave && !request.Interaction && !request.Heartbeat)
+            throw new ArgumentException("At least one of leave, interaction, or heartbeat must be true.");
+
+        var user = await _userRepo.GetByIdAsync(userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found.");
+
+        if (request.Leave)
+        {
+            var endedAt = DateTime.UtcNow;
+            user.LastPresenceAt = null;
+            user.LastSessionEndAt = endedAt;
+            _userRepo.Update(user);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (request.Interaction)
+        {
+            user.LastActivityAt = now;
+            user.LastPresenceAt = now;
+        }
+        else
+        {
+            user.LastPresenceAt = now;
+        }
+
+        _userRepo.Update(user);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<FriendRequestDto>> GetPendingReceivedRequestsAsync(Guid userId, CancellationToken cancellationToken = default)

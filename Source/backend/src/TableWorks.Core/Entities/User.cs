@@ -11,6 +11,16 @@ public sealed class User
     public string Role { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+
+    /// <summary>Last throttled user interaction or app-open bump (UTC).</summary>
+    public DateTime? LastActivityAt { get; set; }
+
+    /// <summary>Last presence heartbeat while the client session is on the app (UTC).</summary>
+    public DateTime? LastPresenceAt { get; set; }
+
+    /// <summary>When the previous browser/app session ended (leave or logout), UTC.</summary>
+    public DateTime? LastSessionEndAt { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     // Email verification

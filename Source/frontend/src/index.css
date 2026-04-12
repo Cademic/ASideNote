@@ -1025,6 +1025,7 @@ body {
 /* ---- Stat sticky notes ---- */
 .stat-sticky {
   position: relative;
+  min-width: 0; /* allow grid/flex children to shrink so long text can clip */
   border-radius: 3px;
   box-shadow:
     1px 2px 4px rgba(0, 0, 0, 0.06),

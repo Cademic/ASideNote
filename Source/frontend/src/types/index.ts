@@ -44,6 +44,10 @@ export interface UserProfileDto {
   role: string;
   createdAt: string;
   lastLoginAt: string | null;
+  /** Last throttled interaction or app-open (ISO UTC). */
+  lastActivityAt?: string | null;
+  /** When the previous app session ended (leave/logout), ISO UTC. */
+  lastSessionEndAt?: string | null;
   profilePictureKey: string | null;
   bio: string | null;
   usernameChangedAt: string | null;
@@ -87,11 +91,21 @@ export interface UserPublicDto {
   role?: string | null;
 }
 
+export type FriendPresenceStatus = "active" | "idle" | "inactive";
+
 export interface FriendDto {
   id: string;
   username: string;
   profilePictureKey: string | null;
   lastLoginAt: string | null;
+  lastActivityAt?: string | null;
+  presenceStatus?: FriendPresenceStatus;
+}
+
+export interface UpdatePresenceRequest {
+  heartbeat?: boolean;
+  interaction?: boolean;
+  leave?: boolean;
 }
 
 export interface FriendRequestDto {
