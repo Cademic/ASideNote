@@ -254,6 +254,7 @@ public sealed class UserService : IUserService
             Bio = user.Bio,
             CreatedAt = user.CreatedAt,
             LastLoginAt = user.LastLoginAt,
+            LastSessionEndAt = user.LastSessionEndAt,
             FriendCount = friendCount,
             Role = user.Role
         };

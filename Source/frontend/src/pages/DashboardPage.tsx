@@ -44,6 +44,7 @@ import { useAuth } from "../context/AuthContext";
 import type { BoardSummaryDto, CalendarEventDto, FriendDto, NotebookSummaryDto, ProjectSummaryDto } from "../types";
 import { resolveEventProjectName } from "../utils/calendar-event-project-name";
 import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
+import { formatElapsedSincePreviousSessionEnd } from "../utils/format-last-active";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -54,26 +55,6 @@ function getGreeting(): string {
 
 function formatTodaySticky(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-/**
- * Time from when the previous session ended (server UTC) to the current moment.
- * Recomputed whenever `tick` changes (interval + visibility) so the sticky stays current.
- */
-function formatElapsedSincePreviousSessionEnd(sessionEndedAtIso: string): string {
-  const endedAt = new Date(sessionEndedAtIso);
-  const now = new Date();
-  const diffMs = now.getTime() - endedAt.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHr / 24);
-
-  if (diffMs < 0) return "Just now";
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return endedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function DashboardPage() {
