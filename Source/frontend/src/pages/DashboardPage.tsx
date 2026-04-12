@@ -56,19 +56,24 @@ function formatTodaySticky(): string {
   return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatShortDate(dateStr: string): string {
-  const date = new Date(dateStr);
+/**
+ * Time from when the previous session ended (server UTC) to the current moment.
+ * Recomputed whenever `tick` changes (interval + visibility) so the sticky stays current.
+ */
+function formatElapsedSincePreviousSessionEnd(sessionEndedAtIso: string): string {
+  const endedAt = new Date(sessionEndedAtIso);
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = now.getTime() - endedAt.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   const diffHr = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHr / 24);
 
+  if (diffMs < 0) return "Just now";
   if (diffMin < 1) return "Just now";
   if (diffMin < 60) return `${diffMin}m ago`;
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return endedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function DashboardPage() {
@@ -96,7 +101,9 @@ export function DashboardPage() {
   const [notebookRenameValue, setNotebookRenameValue] = useState("");
   const [notebookDeleteTarget, setNotebookDeleteTarget] = useState<NotebookSummaryDto | null>(null);
   const [friends, setFriends] = useState<FriendDto[]>([]);
-  const [myLastActivityAt, setMyLastActivityAt] = useState<string | null>(null);
+  const [lastSessionEndedAt, setLastSessionEndedAt] = useState<string | null>(null);
+  /** Bumps on an interval and when the tab becomes visible so elapsed time is always relative to "now". */
+  const [lastActiveTick, setLastActiveTick] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
 
@@ -126,8 +133,25 @@ export function DashboardPage() {
   useEffect(() => {
     getFriends().then(setFriends).catch(() => setFriends([]));
     getProfile()
-      .then((p) => setMyLastActivityAt(p.lastActivityAt ?? null))
-      .catch(() => setMyLastActivityAt(null));
+      .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
+      .catch(() => setLastSessionEndedAt(null));
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setLastActiveTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      void getProfile()
+        .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
+        .catch(() => {});
+      setLastActiveTick((t) => t + 1);
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   useEffect(() => {
@@ -585,6 +609,11 @@ export function DashboardPage() {
     return map;
   }, [activeProjects]);
 
+  const lastActiveDisplay = useMemo(() => {
+    if (!lastSessionEndedAt) return "—";
+    return formatElapsedSincePreviousSessionEnd(lastSessionEndedAt);
+  }, [lastSessionEndedAt, lastActiveTick]);
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -676,8 +705,13 @@ export function DashboardPage() {
           <StatSticky
             color="green"
             icon={Clock}
-            label="Last Activity"
-            value={myLastActivityAt ? formatShortDate(myLastActivityAt) : "—"}
+            label="Last Active"
+            value={lastActiveDisplay}
+            valueTooltip={
+              lastSessionEndedAt
+                ? `Previous session ended: ${new Date(lastSessionEndedAt).toLocaleString()}`
+                : undefined
+            }
             rotation={2}
           />
         </div>

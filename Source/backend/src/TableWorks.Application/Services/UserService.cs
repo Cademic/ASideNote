@@ -62,6 +62,7 @@ public sealed class UserService : IUserService
             CreatedAt = user.CreatedAt,
             LastLoginAt = user.LastLoginAt,
             LastActivityAt = user.LastActivityAt,
+            LastSessionEndAt = user.LastSessionEndAt,
             ProfilePictureKey = user.ProfilePictureKey,
             Bio = user.Bio,
             UsernameChangedAt = user.UsernameChangedAt
@@ -334,7 +335,9 @@ public sealed class UserService : IUserService
 
         if (request.Leave)
         {
+            var endedAt = DateTime.UtcNow;
             user.LastPresenceAt = null;
+            user.LastSessionEndAt = endedAt;
             _userRepo.Update(user);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return;

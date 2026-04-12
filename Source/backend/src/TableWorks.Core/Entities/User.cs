@@ -18,6 +18,9 @@ public sealed class User
     /// <summary>Last presence heartbeat while the client session is on the app (UTC).</summary>
     public DateTime? LastPresenceAt { get; set; }
 
+    /// <summary>When the previous browser/app session ended (leave or logout), UTC.</summary>
+    public DateTime? LastSessionEndAt { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     // Email verification

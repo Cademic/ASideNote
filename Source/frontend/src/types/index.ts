@@ -46,6 +46,8 @@ export interface UserProfileDto {
   lastLoginAt: string | null;
   /** Last throttled interaction or app-open (ISO UTC). */
   lastActivityAt?: string | null;
+  /** When the previous app session ended (leave/logout), ISO UTC. */
+  lastSessionEndAt?: string | null;
   profilePictureKey: string | null;
   bio: string | null;
   usernameChangedAt: string | null;
