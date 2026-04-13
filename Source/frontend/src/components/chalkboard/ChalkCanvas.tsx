@@ -76,10 +76,12 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
     const isEraserRef = useRef(false);
     const currentColorRef = useRef(brushColor);
     const currentSizeRef = useRef(brushSize);
+    const backgroundColorRef = useRef(backgroundColor);
 
     // Keep refs in sync
     currentColorRef.current = brushColor;
     currentSizeRef.current = brushSize;
+    backgroundColorRef.current = backgroundColor;
 
     // Initialize fabric canvas
     useEffect(() => {
@@ -234,7 +236,7 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
       isEraserRef.current = enabled;
       if (enabled) {
         canvas.isDrawingMode = true;
-        canvas.freeDrawingBrush.color = CHALKBOARD_BG;
+        canvas.freeDrawingBrush.color = backgroundColorRef.current;
         canvas.freeDrawingBrush.width = Math.max(currentSizeRef.current * 3, 20);
       } else {
         canvas.freeDrawingBrush.color = currentColorRef.current;
@@ -299,8 +301,9 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
       const canvas = fabricRef.current;
       if (!canvas) return;
 
+      const bg = backgroundColorRef.current;
       canvas.clear();
-      canvas.backgroundColor = CHALKBOARD_BG;
+      canvas.backgroundColor = bg;
       canvas.renderAll();
 
       const obj = canvas.toJSON() as Record<string, unknown>;
@@ -327,7 +330,7 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
         const parsed = JSON.parse(json) as Record<string, unknown>;
         await loadParsedJSON(parsed);
         parsed._chalkVersion = CHALK_JSON_VERSION;
-        canvas.backgroundColor = CHALKBOARD_BG;
+        canvas.backgroundColor = backgroundColorRef.current;
         canvas.renderAll();
         undoStackRef.current = [JSON.stringify(parsed)];
         redoStackRef.current = [];
@@ -361,7 +364,7 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
         className="absolute inset-0 overflow-hidden"
         style={{
           pointerEvents: isActive ? "auto" : "none",
-          backgroundColor: CHALKBOARD_BG,
+          backgroundColor,
         }}
       >
         <canvas
