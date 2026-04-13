@@ -610,7 +610,7 @@ export function NoteBoardPage() {
       for (const uid of toRemove) next.delete(uid);
       return next;
     });
-  }, []);
+  }, [setBoardPresence]);
 
   useEffect(() => {
     imageIdsRef.current = new Set(imageCards.map((img) => img.id));

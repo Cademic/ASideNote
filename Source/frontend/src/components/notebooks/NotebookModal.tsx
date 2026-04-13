@@ -199,7 +199,7 @@ export function NotebookModal({ notebookId, onClose }: NotebookModalProps) {
           }
         }
       }, SAVE_DEBOUNCE_MS),
-    [editor, notebookId, notebook?.updatedAt],
+    [editor, notebookId, notebook],
   );
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { User, Calendar, Clock, PencilLine, UserPlus, Users, UserCheck, X, MoreVertical } from "lucide-react";
 import {
@@ -26,6 +26,7 @@ import type {
   SentFriendRequestDto,
   UserPublicDto,
 } from "../types";
+import { formatElapsedSincePreviousSessionEnd } from "../utils/format-last-active";
 
 const STICKY_BG: Record<string, string> = {
   yellow: "bg-amber-100 dark:bg-amber-950/40",
@@ -77,6 +78,20 @@ function formatRelative(dateStr: string): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
   return formatDateTime(dateStr);
+}
+
+/** Friend "Last active" line: short relative time, then 1d, 2d, … (no full datetime). */
+function formatFriendLastActive(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d`;
 }
 
 function PendingSentRequestRow({
@@ -220,13 +235,11 @@ function PendingRequestRow({
 function FriendCard({
   friend: f,
   onUnadd,
-  formatRelative,
   getAvatarUrl,
   showActions = true,
 }: {
   friend: FriendDto;
   onUnadd: () => void;
-  formatRelative: (dateStr: string) => string;
   getAvatarUrl: (key: string | null) => string | null;
   showActions?: boolean;
 }) {
@@ -307,9 +320,9 @@ function FriendCard({
               : presence === "idle"
                 ? "Idle"
                 : f.lastActivityAt
-                  ? `Last active ${formatRelative(f.lastActivityAt)}`
+                  ? `Last active ${formatFriendLastActive(f.lastActivityAt)}`
                   : f.lastLoginAt
-                    ? `Last active ${formatRelative(f.lastLoginAt)}`
+                    ? `Last active ${formatFriendLastActive(f.lastLoginAt)}`
                     : "Never logged in"}
           </span>
         </div>
@@ -542,6 +555,8 @@ export function ProfilePage() {
   const [addFriendLoading, setAddFriendLoading] = useState(false);
   const [pendingRequestIdFromThem, setPendingRequestIdFromThem] = useState<string | null>(null);
   const [otherUserFriends, setOtherUserFriends] = useState<FriendDto[]>([]);
+  /** Bumps on an interval and when the tab becomes visible so elapsed time matches the dashboard. */
+  const [lastActiveTick, setLastActiveTick] = useState(0);
 
   const isOwnProfile = !routeUsername || (routeUsername && authUser?.username && routeUsername.toLowerCase() === authUser.username.toLowerCase());
 
@@ -608,7 +623,7 @@ export function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [isOwnProfile, routeUsername]);
+  }, [isOwnProfile, routeUsername, navigate]);
 
   useEffect(() => {
     if (!profile && !publicProfile) return;
@@ -630,6 +645,40 @@ export function ProfilePage() {
       cancelled = true;
     };
   }, [routeUsername, publicProfile, profile]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setLastActiveTick((t) => t + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      setLastActiveTick((t) => t + 1);
+      if (isOwnProfile) {
+        void getProfile().then(setProfile).catch(() => {});
+      } else if (routeUsername) {
+        const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(routeUsername);
+        const fetchProfile = isGuid
+          ? getPublicProfile(routeUsername)
+          : getPublicProfileByUsername(routeUsername);
+        void fetchProfile
+          .then((pub) => {
+            if (pub) setPublicProfile(pub);
+          })
+          .catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [isOwnProfile, routeUsername]);
+
+  const lastSessionEndIso = profile?.lastSessionEndAt ?? publicProfile?.lastSessionEndAt ?? null;
+  const lastActiveDisplay = useMemo(() => {
+    void lastActiveTick;
+    if (!lastSessionEndIso) return "—";
+    return formatElapsedSincePreviousSessionEnd(lastSessionEndIso);
+  }, [lastSessionEndIso, lastActiveTick]);
 
   function handleEditProfile() {
     navigate("/settings#profile");
@@ -821,10 +870,8 @@ export function ProfilePage() {
           <StatSticky
             color="rose"
             icon={Clock}
-            label="Last login"
-            value={profile
-              ? (profile.lastLoginAt ? formatDateTime(profile.lastLoginAt) : "—")
-              : (publicProfile?.lastLoginAt ? formatDateTime(publicProfile.lastLoginAt) : "—")}
+            label="Last Active"
+            value={lastActiveDisplay}
             rotation={1.5}
           />
           <StatSticky
@@ -876,7 +923,6 @@ export function ProfilePage() {
                       key={f.id}
                       friend={f}
                       onUnadd={() => {}}
-                      formatRelative={formatRelative}
                       getAvatarUrl={getAvatarUrl}
                       showActions={false}
                     />
@@ -1017,7 +1063,6 @@ export function ProfilePage() {
                       key={f.id}
                       friend={f}
                       onUnadd={() => loadFriendsAndRequests()}
-                      formatRelative={formatRelative}
                       getAvatarUrl={getAvatarUrl}
                     />
                   ))}

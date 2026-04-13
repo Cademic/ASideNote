@@ -104,18 +104,29 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
     return null;
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center rounded-lg border border-border py-2.5">
-        <div className="h-5 w-5 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
-        <span className="ml-2 text-sm text-foreground/60">Signing in with Google...</span>
-      </div>
-    );
-  }
-
   return (
     <div className="flex justify-center">
-      <div ref={containerRef} />
+      {/*
+        Keep Google's rendered button mounted while loading. Swapping the whole subtree for a
+        loading row caused the iframe/button to composite with the spinner's transform and appear
+        to rotate. The overlay isolates the spinner animation to a small element only.
+      */}
+      <div className="relative w-full max-w-[400px]">
+        <div ref={containerRef} className={isLoading ? "pointer-events-none opacity-50" : undefined} />
+        {isLoading && (
+          <div
+            className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/90 backdrop-blur-[1px]"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground"
+              aria-hidden
+            />
+            <span className="text-sm text-foreground/60">Signing in with Google...</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

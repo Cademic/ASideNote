@@ -4,7 +4,8 @@ import { Printer, Upload, ChevronRight, Search, Link as LinkIcon } from "lucide-
 import type { NotebookVersionDto } from "../../types";
 import { nudgeAbsoluteElementIntoViewport } from "../../lib/dropdown-viewport";
 import { FontFamilySearchMenu } from "../dashboard/FontFamilySearch";
-import { FontSizeSearchMenu, parseFontSizeAttr } from "../dashboard/FontSizeSearch";
+import { FontSizeSearchMenu } from "../dashboard/FontSizeSearch";
+import { parseFontSizeAttr } from "../dashboard/noteToolbarConstants";
 
 const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 const NOTEBOOK_MIN_FONT = 8;

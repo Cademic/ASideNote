@@ -4,6 +4,12 @@ export { FONT_FAMILIES } from "../../lib/fontFamilies";
 
 export const MIN_FONT_SIZE = 8;
 export const MAX_FONT_SIZE = 48;
+
+export function parseFontSizeAttr(raw: string | undefined | null, fallback: number): number {
+  if (!raw) return fallback;
+  const n = parseInt(String(raw).replace(/px$/i, "").trim(), 10);
+  return Number.isNaN(n) ? fallback : n;
+}
 export const FONT_SIZE_PRESETS = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
 
 export const TEXT_COLORS = [

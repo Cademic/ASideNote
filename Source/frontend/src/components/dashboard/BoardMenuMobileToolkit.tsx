@@ -21,7 +21,8 @@ import {
   TEXT_COLORS,
 } from "./noteToolbarConstants";
 import { FontFamilySearchMenu } from "./FontFamilySearch";
-import { FontSizeSearchMenu, parseFontSizeAttr } from "./FontSizeSearch";
+import { FontSizeSearchMenu } from "./FontSizeSearch";
+import { parseFontSizeAttr } from "./noteToolbarConstants";
 import { dividerClass, HoverSubmenu, menuItemClass } from "./boardMenuShared";
 
 function itemActiveClass(active: boolean) {

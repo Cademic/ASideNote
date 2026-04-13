@@ -6,14 +6,9 @@ import {
   FONT_SIZE_PRESETS as DEFAULT_PRESETS,
   MAX_FONT_SIZE as DEFAULT_MAX,
   MIN_FONT_SIZE as DEFAULT_MIN,
+  parseFontSizeAttr,
 } from "./noteToolbarConstants";
 import { fitFixedDropdownToViewport } from "../../lib/dropdown-viewport";
-
-export function parseFontSizeAttr(raw: string | undefined | null, fallback: number): number {
-  if (!raw) return fallback;
-  const n = parseInt(String(raw).replace(/px$/i, "").trim(), 10);
-  return Number.isNaN(n) ? fallback : n;
-}
 
 function mergePresetsWithCurrent(presets: number[], current: number, minSize: number, maxSize: number): number[] {
   const arr = [...presets];

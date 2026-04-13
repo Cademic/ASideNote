@@ -114,6 +114,8 @@ export const ChalkCanvas = forwardRef<ChalkCanvasHandle, ChalkCanvasProps>(
         canvas.dispose();
         fabricRef.current = null;
       };
+    // Init once; backgroundColor is synced without recreating the canvas (see effect below).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Listen for path:created to push undo state

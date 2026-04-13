@@ -87,6 +87,7 @@ export interface UserPublicDto {
   bio: string | null;
   createdAt?: string | null;
   lastLoginAt?: string | null;
+  lastSessionEndAt?: string | null;
   friendCount?: number;
   role?: string | null;
 }

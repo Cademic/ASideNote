@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -69,11 +69,8 @@ import {
 } from "../components/projects/ProjectNamedFolderHeader";
 import { useNudgeDropdownToViewport } from "../lib/useDropdownViewport";
 import { computeProjectAutoProgressPercent } from "../lib/projectAutoProgress";
-import {
-  DraggableProjectItem,
-  FolderDropSurface,
-  type ProjectItemDragPayload,
-} from "../components/projects/ProjectFolderDnD";
+import { DraggableProjectItem, FolderDropSurface } from "../components/projects/ProjectFolderDnD";
+import type { ProjectItemDragPayload } from "../components/projects/projectItemDrag";
 import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
 import type {
   ProjectDetailDto,
@@ -82,7 +79,6 @@ import type {
   ProjectMemberDto,
   ProjectFolderDto,
 } from "../types";
-import { useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 
 type TabId = "calendar" | "content" | "members" | "settings";
@@ -126,9 +122,16 @@ function localDateInputStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function tabFromSearchParams(params: URLSearchParams): TabId | null {
+  const t = params.get("tab");
+  if (t === "calendar" || t === "content" || t === "members" || t === "settings") return t;
+  return null;
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     openNotebook,
     setBoardName,
@@ -140,7 +143,14 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("calendar");
+  const [activeTab, setActiveTab] = useState<TabId>(
+    () => tabFromSearchParams(searchParams) ?? "calendar",
+  );
+
+  useEffect(() => {
+    const t = tabFromSearchParams(searchParams);
+    setActiveTab(t ?? "calendar");
+  }, [searchParams]);
   const [isCreateBoardOpen, setIsCreateBoardOpen] = useState(false);
   const [createBoardDefaultType, setCreateBoardDefaultType] = useState("NoteBoard");
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
@@ -225,6 +235,14 @@ export function ProjectDetailPage() {
 
   function handleTabClick(tabId: TabId) {
     setActiveTab(tabId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tabId);
+        return next;
+      },
+      { replace: true },
+    );
     requestAnimationFrame(() => scrollTabIntoCenter(tabId));
   }
 
@@ -249,6 +267,7 @@ export function ProjectDetailPage() {
   const hasProjectDateRange = Boolean(project?.startDate && project?.endDate);
 
   const effectiveProgress = useMemo(() => {
+    void autoProgressTick;
     if (!project) return 0;
     if (project.autoProgressEnabled && project.startDate && project.endDate)
       return computeProjectAutoProgressPercent(project.startDate, project.endDate);
