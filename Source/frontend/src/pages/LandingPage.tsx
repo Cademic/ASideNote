@@ -8,7 +8,6 @@ import {
   ArrowRight,
   ClipboardList,
   LayoutDashboard,
-  CreditCard,
   Sparkles,
   CheckCircle2,
   Pin,
@@ -71,9 +70,9 @@ const HIGHLIGHTS = [
     rotation: -2.5,
   },
   {
-    icon: CreditCard,
-    label: "Index Cards",
-    value: "Rich editing",
+    icon: CalendarDays,
+    label: "Calendar",
+    value: "Plan ahead",
     color: "sky" as const,
     rotation: 1.5,
   },
@@ -396,7 +395,7 @@ export function LandingPage() {
                   to="/register"
                   className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
-                  Get Started &mdash; It&apos;s Free
+                  Create Free Account
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link

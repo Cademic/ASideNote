@@ -142,6 +142,9 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
     return map;
   }, [projects]);
 
+  /** Projects passed in are already filtered to “show on personal calendar”; hide events tied to other projects. */
+  const visibleProjectIds = useMemo(() => new Set(projects.map((p) => p.id)), [projects]);
+
   // Build 14-day range starting from Sunday of the current week
   const days = useMemo(() => {
     const startOfWeek = new Date(today);
@@ -168,8 +171,8 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
   }, [days]);
 
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+    void fetchEvents();
+  }, [fetchEvents, projects]);
 
   function getItemsForWeek(weekDays: Date[]): WeekItem[] {
     const weekStart = weekDays[0];
@@ -180,6 +183,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
 
     for (const event of events) {
       if (seen.has(event.id)) continue;
+      if (event.projectId && !visibleProjectIds.has(event.projectId)) continue;
       const evStart = parseServerDate(event.startDate);
       const evEnd = event.endDate ? parseServerDate(event.endDate) : evStart;
 

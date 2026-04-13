@@ -31,7 +31,12 @@ import {
 } from "../api/projects";
 import { getNotebooks, createNotebook, deleteNotebook, updateNotebook, toggleNotebookPin } from "../api/notebooks";
 import { getFriends, getProfile } from "../api/users";
-import { getCalendarEvents } from "../api/calendar-events";
+import {
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getCalendarEvents,
+  updateCalendarEvent,
+} from "../api/calendar-events";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { MiniCalendar } from "../components/dashboard/MiniCalendar";
 import { ProjectCard } from "../components/projects/ProjectCard";
@@ -39,6 +44,7 @@ import { NotebookCard } from "../components/notebooks/NotebookCard";
 import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
 import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
+import { CreateEventDialog } from "../components/calendar/CreateEventDialog";
 import { EventDetailsPopup } from "../components/calendar/EventDetailsPopup";
 import { useAuth } from "../context/AuthContext";
 import type { BoardSummaryDto, CalendarEventDto, FriendDto, NotebookSummaryDto, ProjectSummaryDto } from "../types";
@@ -87,6 +93,25 @@ export function DashboardPage() {
   const [lastActiveTick, setLastActiveTick] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
+  const [calendarEventDialogOpen, setCalendarEventDialogOpen] = useState(false);
+  const [calendarEventDialogDate, setCalendarEventDialogDate] = useState("");
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEventDto | null>(null);
+
+  const refreshCalendarEvents = useCallback(async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const future = new Date(today);
+    future.setDate(future.getDate() + 90);
+    try {
+      const result = await getCalendarEvents({
+        from: today.toISOString(),
+        to: future.toISOString(),
+      });
+      setCalendarEvents(result);
+    } catch {
+      setCalendarEvents([]);
+    }
+  }, []);
 
   const fetchBoards = useCallback(async () => {
     try {
@@ -106,6 +131,12 @@ export function DashboardPage() {
       setIsLoading(false);
     }
   }, []);
+
+  /** After project prefs change (e.g. personal calendar visibility), reload projects and calendar events so the dashboard mini-calendar updates immediately. */
+  const refreshProjectsAndCalendar = useCallback(async () => {
+    await fetchBoards();
+    await refreshCalendarEvents();
+  }, [fetchBoards, refreshCalendarEvents]);
 
   useEffect(() => {
     fetchBoards();
@@ -136,17 +167,99 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const future = new Date(today);
-    future.setDate(future.getDate() + 90);
-    getCalendarEvents({
-      from: today.toISOString(),
-      to: future.toISOString(),
-    })
-      .then(setCalendarEvents)
-      .catch(() => setCalendarEvents([]));
-  }, []);
+    void refreshCalendarEvents();
+  }, [refreshCalendarEvents]);
+
+  function handleEditFromEventDetails() {
+    if (!detailsEvent) return;
+    setEditingCalendarEvent(detailsEvent);
+    setDetailsEvent(null);
+    setCalendarEventDialogDate("");
+    setCalendarEventDialogOpen(true);
+  }
+
+  async function handleCalendarEventSave(data: {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    isAllDay: boolean;
+    color: string;
+    eventType: string;
+    startHour: string;
+    endHour: string;
+    recurrenceFrequency: string;
+    recurrenceInterval: number;
+    recurrenceEndDate: string;
+  }) {
+    try {
+      const toDateUtc = (dateStr: string, hour: string, allDay: boolean) =>
+        allDay ? `${dateStr}T12:00:00.000Z` : `${dateStr}T${hour}:00:00.000Z`;
+
+      const startIso = toDateUtc(data.startDate, data.startHour, data.isAllDay);
+      const endIso = data.endDate
+        ? toDateUtc(data.endDate, data.endHour, data.isAllDay)
+        : undefined;
+
+      const recurrence = data.recurrenceFrequency
+        ? {
+            recurrenceFrequency: data.recurrenceFrequency,
+            recurrenceInterval: data.recurrenceInterval,
+            recurrenceEndDate: data.recurrenceEndDate
+              ? `${data.recurrenceEndDate}T12:00:00.000Z`
+              : undefined,
+          }
+        : {
+            recurrenceFrequency: undefined,
+            recurrenceInterval: 1,
+            recurrenceEndDate: undefined,
+          };
+
+      const eventId = editingCalendarEvent?.recurrenceSourceId ?? editingCalendarEvent?.id;
+
+      if (editingCalendarEvent && eventId) {
+        await updateCalendarEvent(eventId, {
+          title: data.title,
+          description: data.description || undefined,
+          startDate: startIso,
+          endDate: endIso,
+          isAllDay: data.isAllDay,
+          color: data.color,
+          eventType: data.eventType,
+          ...recurrence,
+        });
+      } else {
+        await createCalendarEvent({
+          title: data.title,
+          description: data.description || undefined,
+          startDate: startIso,
+          endDate: endIso,
+          isAllDay: data.isAllDay,
+          color: data.color,
+          eventType: data.eventType,
+          ...recurrence,
+        });
+      }
+      setCalendarEventDialogOpen(false);
+      setEditingCalendarEvent(null);
+      await refreshCalendarEvents();
+    } catch {
+      console.error("Failed to save calendar event");
+    }
+  }
+
+  async function handleCalendarEventDelete() {
+    if (!editingCalendarEvent) return;
+    try {
+      const eventId = editingCalendarEvent.recurrenceSourceId ?? editingCalendarEvent.id;
+      await deleteCalendarEvent(eventId);
+      setCalendarEventDialogOpen(false);
+      setEditingCalendarEvent(null);
+      await refreshCalendarEvents();
+    } catch {
+      console.error("Failed to delete calendar event");
+    }
+  }
 
   async function handleCreateBoard(name: string, description: string, boardType: string) {
     try {
@@ -742,6 +855,7 @@ export function DashboardPage() {
                     onTogglePin={handleToggleProjectPin}
                     onDelete={handleDeleteProject}
                     onLeave={handleLeaveProject}
+                    onProjectUpdated={refreshProjectsAndCalendar}
                   />
                 ))}
               </div>
@@ -917,12 +1031,21 @@ export function DashboardPage() {
           projectName={resolveEventProjectName(detailsEvent, projectNameMap)}
           isOpen={!!detailsEvent}
           onClose={() => setDetailsEvent(null)}
-          onEdit={() => {
-            setDetailsEvent(null);
-            navigate(`/calendar?eventId=${detailsEvent.id}`);
-          }}
+          onEdit={handleEditFromEventDetails}
         />
       )}
+
+      <CreateEventDialog
+        isOpen={calendarEventDialogOpen}
+        onClose={() => {
+          setCalendarEventDialogOpen(false);
+          setEditingCalendarEvent(null);
+        }}
+        onSave={handleCalendarEventSave}
+        onDelete={editingCalendarEvent ? handleCalendarEventDelete : undefined}
+        initialDate={calendarEventDialogDate}
+        editEvent={editingCalendarEvent}
+      />
 
       {/* Rename Board Dialog */}
       {renameTarget && (
@@ -1084,7 +1207,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueT
     <>
       <Icon className={`mb-1.5 h-4 w-4 shrink-0 ${STICKY_ACCENT[color]}`} />
       <span
-        className={`line-clamp-2 w-full min-w-0 max-w-full break-all px-0.5 text-center text-lg font-bold leading-tight sm:text-xl md:text-2xl ${STICKY_ACCENT[color]}`}
+        className={`line-clamp-2 w-full min-w-0 max-w-full break-words px-0.5 text-center text-lg font-bold leading-tight sm:text-xl md:text-2xl ${STICKY_ACCENT[color]}`}
       >
         {value}
       </span>

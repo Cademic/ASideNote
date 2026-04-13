@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FolderOpen,
@@ -13,9 +13,18 @@ import {
   Pin,
   PinOff,
   LogOut,
+  ChevronRight,
+  Settings,
+  ListChecks,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { ProjectSummaryDto } from "../../types";
+import { updateProject, updateMyProjectCalendarPreference } from "../../api/projects";
+import {
+  useFixedPortalInViewport,
+  useNudgeDropdownToViewport,
+} from "../../lib/useDropdownViewport";
+import { constrainFixedElementInPlace } from "../../lib/dropdown-viewport";
 
 interface ProjectCardProps {
   project: ProjectSummaryDto;
@@ -23,6 +32,8 @@ interface ProjectCardProps {
   onRename?: (id: string, currentName: string) => void;
   onTogglePin?: (id: string, isPinned: boolean) => void;
   onLeave?: (id: string) => void;
+  /** Called after status or personal-calendar preference is updated (refetch lists). */
+  onProjectUpdated?: () => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -61,6 +72,8 @@ const ROLE_CONFIG: Record<string, { icon: typeof Crown; label: string; className
   },
 };
 
+const STATUS_OPTIONS = ["Active", "Completed", "Archived"] as const;
+
 const COLOR_MAP: Record<string, { strip: string; iconBg: string; progress: string }> = {
   violet:  { strip: "bg-violet-400/60 dark:bg-violet-500/40",  iconBg: "bg-violet-100/80 dark:bg-violet-900/30",  progress: "bg-violet-500 dark:bg-violet-400" },
   sky:     { strip: "bg-sky-400/60 dark:bg-sky-500/40",        iconBg: "bg-sky-100/80 dark:bg-sky-900/30",        progress: "bg-sky-500 dark:bg-sky-400" },
@@ -78,7 +91,14 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave }: ProjectCardProps) {
+export function ProjectCard({
+  project,
+  onDelete,
+  onRename,
+  onTogglePin,
+  onLeave,
+  onProjectUpdated,
+}: ProjectCardProps) {
   const navigate = useNavigate();
   const status = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.Active;
   const roleConfig = ROLE_CONFIG[project.userRole] ?? ROLE_CONFIG.Viewer;
@@ -87,8 +107,108 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
   const colors = COLOR_MAP[project.color] ?? COLOR_MAP.violet;
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<"ellipsis" | { x: number; y: number }>("ellipsis");
+  const [statusSubOpen, setStatusSubOpen] = useState(false);
+  const [patchingCalendar, setPatchingCalendar] = useState(false);
+  const [patchingStatus, setPatchingStatus] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const ellipsisMenuPanelRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
+  const statusSubmenuAnchorRef = useRef<HTMLDivElement>(null);
+  const statusSubmenuPortalRef = useRef<HTMLDivElement>(null);
+  const statusHoverTimerRef = useRef<number | null>(null);
+
+  const effectivePersonalCalendar = project.myShowOnPersonalCalendar ?? true;
+
+  useNudgeDropdownToViewport(menuOpen && menuAnchor === "ellipsis", ellipsisMenuPanelRef);
+  useFixedPortalInViewport(menuOpen && menuAnchor !== "ellipsis", portalMenuRef);
+
+  function clearStatusHoverTimer() {
+    if (statusHoverTimerRef.current != null) {
+      window.clearTimeout(statusHoverTimerRef.current);
+      statusHoverTimerRef.current = null;
+    }
+  }
+
+  function onStatusPointerEnter() {
+    clearStatusHoverTimer();
+    setStatusSubOpen(true);
+  }
+
+  function onStatusPointerLeave() {
+    clearStatusHoverTimer();
+    statusHoverTimerRef.current = window.setTimeout(() => {
+      setStatusSubOpen(false);
+      statusHoverTimerRef.current = null;
+    }, 200);
+  }
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !statusSubOpen || !isOwner) return;
+    const anchor = statusSubmenuAnchorRef.current;
+    const panel = statusSubmenuPortalRef.current;
+    if (!anchor || !panel) return;
+
+    function place() {
+      if (!anchor || !panel) return;
+      const ar = anchor.getBoundingClientRect();
+      const menuPanel = ellipsisMenuPanelRef.current ?? portalMenuRef.current;
+      const gap = 4;
+      const padding = 8;
+      const vw = window.innerWidth;
+      /** Tailwind `md` — wide layouts: open status flyout to the right of the main menu. */
+      const preferRight = vw >= 768;
+      let pw = panel.offsetWidth;
+      if (pw < 8) pw = 160;
+      let left: number;
+      let top = ar.top;
+
+      if (preferRight && menuPanel) {
+        const mr = menuPanel.getBoundingClientRect();
+        left = mr.right + gap;
+        if (left + pw > vw - padding) {
+          left = Math.max(padding, vw - padding - pw);
+        }
+      } else if (preferRight) {
+        left = ar.right + gap;
+        if (left + pw > vw - padding) {
+          left = Math.max(padding, vw - padding - pw);
+        }
+      } else {
+        left = ar.left - pw - gap;
+        if (left < padding) {
+          if (menuPanel) {
+            const mr = menuPanel.getBoundingClientRect();
+            left = mr.right + gap;
+          } else {
+            left = ar.right + gap;
+          }
+        }
+        if (left + pw > vw - padding) {
+          left = Math.max(padding, vw - padding - pw);
+        }
+      }
+
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      constrainFixedElementInPlace(panel);
+    }
+
+    place();
+    const raf = requestAnimationFrame(() => {
+      place();
+      requestAnimationFrame(place);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [menuOpen, statusSubOpen, isOwner, menuAnchor]);
+
+  useFixedPortalInViewport(menuOpen && statusSubOpen && isOwner, statusSubmenuPortalRef);
+
+  const closeMenu = useCallback(() => {
+    clearStatusHoverTimer();
+    setMenuOpen(false);
+    setMenuAnchor("ellipsis");
+    setStatusSubOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -96,15 +216,14 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
       const target = e.target as Node;
       const inMenu = menuRef.current?.contains(target) ?? false;
       const inPortal = portalMenuRef.current?.contains(target) ?? false;
-      if (!inMenu && !inPortal) {
-        setMenuOpen(false);
-        setMenuAnchor("ellipsis");
+      const inStatusFlyout = statusSubmenuPortalRef.current?.contains(target) ?? false;
+      if (!inMenu && !inPortal && !inStatusFlyout) {
+        closeMenu();
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        setMenuOpen(false);
-        setMenuAnchor("ellipsis");
+        closeMenu();
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -113,12 +232,176 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
 
-  const closeMenu = () => {
-    setMenuOpen(false);
-    setMenuAnchor("ellipsis");
-  };
+  useEffect(() => {
+    return () => clearStatusHoverTimer();
+  }, []);
+
+  async function handleSetProjectStatus(nextStatus: string) {
+    if (!isOwner || nextStatus === project.status) {
+      closeMenu();
+      return;
+    }
+    setPatchingStatus(true);
+    try {
+      await updateProject(project.id, {
+        name: project.name,
+        description: project.description ?? undefined,
+        status: nextStatus,
+        progress: project.progress,
+      });
+      onProjectUpdated?.();
+    } catch {
+      // keep menu closed; list unchanged
+    } finally {
+      setPatchingStatus(false);
+      closeMenu();
+    }
+  }
+
+  async function handlePersonalCalendarAction() {
+    setPatchingCalendar(true);
+    try {
+      const nextStored = effectivePersonalCalendar ? false : null;
+      await updateMyProjectCalendarPreference(project.id, {
+        showOnPersonalCalendar: nextStored,
+      });
+      onProjectUpdated?.();
+    } catch {
+      // preference unchanged
+    } finally {
+      setPatchingCalendar(false);
+      closeMenu();
+    }
+  }
+
+  function renderMenuItems() {
+    return (
+      <>
+        {onRename && (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeMenu();
+              onRename(project.id, project.name);
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Rename
+          </button>
+        )}
+        {onTogglePin && (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeMenu();
+              onTogglePin(project.id, !project.isPinned);
+            }}
+          >
+            {project.isPinned ? (
+              <>
+                <PinOff className="h-3.5 w-3.5" />
+                Unpin from Sidebar
+              </>
+            ) : (
+              <>
+                <Pin className="h-3.5 w-3.5" />
+                Pin to Sidebar
+              </>
+            )}
+          </button>
+        )}
+        {isOwner && (
+          <div
+            ref={statusSubmenuAnchorRef}
+            className="relative"
+            onMouseEnter={onStatusPointerEnter}
+            onMouseLeave={onStatusPointerLeave}
+          >
+            <button
+              type="button"
+              disabled={patchingStatus}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5 disabled:opacity-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearStatusHoverTimer();
+                // Always open on click — do not toggle: mouseenter already opens on hover,
+                // and toggle would immediately close on the same click (double-click to open).
+                setStatusSubOpen(true);
+              }}
+            >
+              <ListChecks className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1">Set status</span>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" />
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          disabled={patchingCalendar}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5 disabled:opacity-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            void handlePersonalCalendarAction();
+          }}
+        >
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          {effectivePersonalCalendar ? "Hide from Personal Calendar" : "Enable Personal Calendar"}
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            navigate(`/projects/${project.id}?tab=settings`);
+          }}
+        >
+          <Settings className="h-3.5 w-3.5 shrink-0" />
+          Settings
+        </button>
+        {!isOwner && onLeave && (
+          <>
+            <div className="my-1 border-t border-border/50" />
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeMenu();
+                onLeave(project.id);
+              }}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Leave Project
+            </button>
+          </>
+        )}
+        {isOwner && onDelete && (
+          <>
+            <div className="my-1 border-t border-border/50" />
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeMenu();
+                onDelete(project.id);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </button>
+          </>
+        )}
+      </>
+    );
+  }
 
   return (
     <div
@@ -181,162 +464,61 @@ export function ProjectCard({ project, onDelete, onRename, onTogglePin, onLeave 
         </div>
 
         {menuOpen && menuAnchor === "ellipsis" && (
-          <div className="absolute right-0 top-7 z-20 w-48 rounded-lg border border-border bg-background py-1 shadow-lg">
-            {onRename && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeMenu();
-                  onRename(project.id, project.name);
-                }}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Rename
-              </button>
-            )}
-            {onTogglePin && (
-              <button
-                type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeMenu();
-                  onTogglePin(project.id, !project.isPinned);
-                }}
-              >
-                {project.isPinned ? (
-                  <>
-                    <PinOff className="h-3.5 w-3.5" />
-                    Unpin from Sidebar
-                  </>
-                ) : (
-                  <>
-                    <Pin className="h-3.5 w-3.5" />
-                    Pin to Sidebar
-                  </>
-                )}
-              </button>
-            )}
-            {!isOwner && onLeave && (
-              <>
-                <div className="my-1 border-t border-border/50" />
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onLeave(project.id);
-                  }}
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Leave Project
-                </button>
-              </>
-            )}
-            {isOwner && onDelete && (
-              <>
-                <div className="my-1 border-t border-border/50" />
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onDelete(project.id);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
-              </>
-            )}
+          <div
+            ref={ellipsisMenuPanelRef}
+            className="absolute right-0 top-7 z-20 max-h-[min(70vh,calc(100vh-2rem))] w-56 max-w-[min(14rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+          >
+            {renderMenuItems()}
           </div>
         )}
         {menuOpen && menuAnchor !== "ellipsis" &&
           createPortal(
             <div
               ref={portalMenuRef}
-              className="fixed z-[100] w-48 rounded-lg border border-border bg-background py-1 shadow-lg"
+              className="fixed z-[100] max-h-[min(70vh,calc(100vh-2rem))] w-56 max-w-[min(14rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
               style={{ left: menuAnchor.x, top: menuAnchor.y }}
             >
-              {onRename && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onRename(project.id, project.name);
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Rename
-                </button>
-              )}
-              {onTogglePin && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeMenu();
-                    onTogglePin(project.id, !project.isPinned);
-                  }}
-                >
-                  {project.isPinned ? (
-                    <>
-                      <PinOff className="h-3.5 w-3.5" />
-                      Unpin from Sidebar
-                    </>
-                  ) : (
-                    <>
-                      <Pin className="h-3.5 w-3.5" />
-                      Pin to Sidebar
-                    </>
-                  )}
-                </button>
-              )}
-              {!isOwner && onLeave && (
-                <>
-                  <div className="my-1 border-t border-border/50" />
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeMenu();
-                      onLeave(project.id);
-                    }}
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Leave Project
-                  </button>
-                </>
-              )}
-              {isOwner && onDelete && (
-                <>
-                  <div className="my-1 border-t border-border/50" />
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeMenu();
-                      onDelete(project.id);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete
-                  </button>
-                </>
-              )}
+              {renderMenuItems()}
             </div>,
             document.body,
           )}
       </div>
+
+      {menuOpen &&
+        statusSubOpen &&
+        isOwner &&
+        createPortal(
+          <div
+            ref={statusSubmenuPortalRef}
+            className="fixed z-[110] max-h-[min(50vh,calc(100vh-2rem))] w-40 max-w-[min(10rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+            onMouseEnter={onStatusPointerEnter}
+            onMouseLeave={onStatusPointerLeave}
+            role="menu"
+            aria-label="Set project status"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                role="menuitem"
+                disabled={patchingStatus}
+                className={[
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors disabled:opacity-50",
+                  project.status === s
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground/70 hover:bg-foreground/5",
+                ].join(" ")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleSetProjectStatus(s);
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
 
       {/* Icon & Role badge */}
       <div className="mb-3 flex items-center gap-2">

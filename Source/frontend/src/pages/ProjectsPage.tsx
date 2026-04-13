@@ -301,6 +301,7 @@ export function ProjectsPage() {
                 onTogglePin={handleToggleProjectPin}
                 onDelete={handleDelete}
                 onLeave={handleLeave}
+                onProjectUpdated={fetchProjects}
               />
             ))}
           </div>

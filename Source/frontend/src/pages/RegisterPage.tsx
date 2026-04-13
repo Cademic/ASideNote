@@ -1,7 +1,16 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { AuthPageShell } from "../components/auth/AuthPageShell";
 import { GoogleSignInButton } from "../components/auth/GoogleSignInButton";
+
+const inputClassName =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+
+const primaryButtonClassName =
+  "w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
+
+const linkAccentClassName = "font-medium text-primary hover:underline";
 
 export function RegisterPage() {
   const { register, isAuthenticated } = useAuth();
@@ -61,130 +70,119 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">ASideNote</h1>
-          <p className="mt-2 text-sm text-foreground/60">Create your account</p>
+    <AuthPageShell subtitle="Create your account">
+      {error && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+          {error}
         </div>
+      )}
 
-        <div className="space-y-5 rounded-xl border border-border bg-surface p-8 shadow-sm">
-          {error && (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
-              {error}
-            </div>
-          )}
+      <GoogleSignInButton onError={setError} />
 
-          <GoogleSignInButton onError={setError} />
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-surface px-2 text-foreground/40">or register with email</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-1.5">
-              <label htmlFor="username" className="block text-sm font-medium text-foreground">
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="Your username"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-sm font-medium text-foreground">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="At least 6 characters"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                placeholder="Repeat your password"
-              />
-            </div>
-
-            <div className="flex items-start gap-3">
-              <input
-                id="acceptTerms"
-                type="checkbox"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/20"
-                aria-describedby="acceptTerms-desc"
-              />
-              <label id="acceptTerms-desc" htmlFor="acceptTerms" className="text-sm text-foreground/90">
-                I accept the{" "}
-                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                  Terms and Conditions
-                </Link>
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting ? "Creating account..." : "Create Account"}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-foreground/60">
-            Already have an account?{" "}
-            <Link to="/login" className="font-medium text-primary hover:underline">
-              Sign in
-            </Link>
-          </p>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/80" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase tracking-wide">
+          <span className="bg-surface px-2 text-foreground/40">
+            or register with email
+          </span>
         </div>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <label htmlFor="username" className="block text-sm font-medium text-foreground">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            required
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className={inputClassName}
+            placeholder="Your username"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-sm font-medium text-foreground">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={inputClassName}
+            placeholder="you@example.com"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="password" className="block text-sm font-medium text-foreground">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputClassName}
+            placeholder="At least 6 characters"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
+            Confirm Password
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={inputClassName}
+            placeholder="Repeat your password"
+          />
+        </div>
+
+        <div className="flex items-start gap-3">
+          <input
+            id="acceptTerms"
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-primary/20"
+            aria-describedby="acceptTerms-desc"
+          />
+          <label id="acceptTerms-desc" htmlFor="acceptTerms" className="text-sm text-foreground/90">
+            I accept the{" "}
+            <Link to="/terms" target="_blank" rel="noopener noreferrer" className={linkAccentClassName}>
+              Terms and Conditions
+            </Link>
+          </label>
+        </div>
+
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClassName}>
+          {isSubmitting ? "Creating account..." : "Create Account"}
+        </button>
+      </form>
+
+      <p className="text-center text-sm text-foreground/60">
+        Already have an account?{" "}
+        <Link to="/login" className={linkAccentClassName}>
+          Sign in
+        </Link>
+      </p>
+    </AuthPageShell>
   );
 }
