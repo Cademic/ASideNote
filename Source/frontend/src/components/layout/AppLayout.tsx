@@ -6,6 +6,7 @@ import { getPinnedProjects, toggleProjectPin } from "../../api/projects";
 import { getPinnedNotebooks, toggleNotebookPin } from "../../api/notebooks";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
+import { useSidebarWorkspaceActions } from "./useSidebarWorkspaceActions";
 import { useAuth } from "../../context/AuthContext";
 import { useSessionPresence } from "../../hooks/useSessionPresence";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
@@ -201,6 +202,16 @@ export function AppLayout() {
     }
   }, [refreshPinnedNotebooks]);
 
+  const sidebarWorkspace = useSidebarWorkspaceActions({
+    isAuthenticated: Boolean(isAuthenticated),
+    openedBoards,
+    closeBoard,
+    openNotebook,
+    refreshPinnedBoards,
+    refreshPinnedProjects,
+    refreshPinnedNotebooks,
+  });
+
   // Clear presence when leaving board or notebook editor routes
   useEffect(() => {
     const onBoard = /^\/boards\/[^/]+$/.test(location.pathname) || /^\/chalkboards\/[^/]+$/.test(location.pathname);
@@ -242,6 +253,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {sidebarWorkspace.dialogs}
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
       {!isMobile && (
         <Sidebar
@@ -253,12 +265,15 @@ export function AppLayout() {
           pinnedBoards={pinnedBoards}
           pinnedProjects={pinnedProjects}
           pinnedNotebooks={pinnedNotebooks}
-          onOpenNotebook={openNotebook}
           onUnpinBoard={handleUnpinBoard}
           onUnpinProject={handleUnpinProject}
           onUnpinNotebook={handleUnpinNotebook}
           connectedUsers={connectedUsers}
           boardHubConnected={boardHubConnected}
+          getProjectCardProps={sidebarWorkspace.getProjectCardProps}
+          getBoardCardProps={sidebarWorkspace.getBoardCardProps}
+          getNotebookCardProps={sidebarWorkspace.getNotebookCardProps}
+          resolveBoardDto={sidebarWorkspace.resolveBoardDto}
         />
       )}
       {isMobile && (
@@ -289,12 +304,15 @@ export function AppLayout() {
               pinnedBoards={pinnedBoards}
               pinnedProjects={pinnedProjects}
               pinnedNotebooks={pinnedNotebooks}
-              onOpenNotebook={openNotebook}
               onUnpinBoard={handleUnpinBoard}
               onUnpinProject={handleUnpinProject}
               onUnpinNotebook={handleUnpinNotebook}
               connectedUsers={connectedUsers}
               boardHubConnected={boardHubConnected}
+              getProjectCardProps={sidebarWorkspace.getProjectCardProps}
+              getBoardCardProps={sidebarWorkspace.getBoardCardProps}
+              getNotebookCardProps={sidebarWorkspace.getNotebookCardProps}
+              resolveBoardDto={sidebarWorkspace.resolveBoardDto}
             />
           </div>
         </>

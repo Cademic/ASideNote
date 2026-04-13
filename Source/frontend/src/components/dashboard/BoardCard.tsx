@@ -22,8 +22,9 @@ import {
   Trash2,
   ChevronRight,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { BoardSummaryDto, ProjectSummaryDto } from "../../types";
+import { getSidebarEllipsisMenuAnchor } from "../../lib/sidebar-menu-anchor";
 
 interface BoardCardProps {
   board: BoardSummaryDto;
@@ -38,6 +39,10 @@ interface BoardCardProps {
   onSetProjectFolder?: (boardId: string, folderId: string | null) => void;
   onTogglePin?: (id: string, isPinned: boolean) => void;
   activeProjects?: ProjectSummaryDto[];
+  /** Compact row for sidebar — same ellipsis / context menu as dashboard cards. */
+  layout?: "card" | "sidebarRow";
+  /** When `layout="sidebarRow"`, hide the label when the sidebar is collapsed (icon-only). */
+  sidebarShowLabel?: boolean;
 }
 
 const BOARD_TYPE_CONFIG: Record<
@@ -94,13 +99,22 @@ export function BoardCard({
   onSetProjectFolder,
   onTogglePin,
   activeProjects = [],
+  layout = "card",
+  sidebarShowLabel = true,
 }: BoardCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const config = BOARD_TYPE_CONFIG[board.boardType] ?? BOARD_TYPE_CONFIG.NoteBoard;
   const Icon = config.icon;
   const projectName = board.projectId
     ? activeProjects.find((p) => p.id === board.projectId)?.name
     : null;
+  const boardPath = getBoardRoute(board);
+  const isBoardRouteActive = location.pathname === boardPath;
+  const isSidebarRow = layout === "sidebarRow";
+  const menuDropdownTopClass = isSidebarRow ? "top-full mt-0.5" : "top-7";
+  /** w-48 — must match portal / inline panel width for sidebar ellipsis positioning */
+  const SIDEBAR_MENU_WIDTH_PX = 192;
   const showMenuActions = Boolean(
     onRename ?? onMoveToProject ?? onSetProjectFolder ?? onTogglePin,
   );
@@ -155,7 +169,7 @@ export function BoardCard({
   }
 
   useNudgeDropdownToViewport(
-    menuOpen && menuAnchor === "ellipsis",
+    menuOpen && menuAnchor === "ellipsis" && !isSidebarRow,
     ellipsisMenuPanelRef,
   );
   useFixedPortalInViewport(menuOpen && menuAnchor !== "ellipsis", portalMenuRef);
@@ -214,9 +228,9 @@ export function BoardCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => navigate(getBoardRoute(board))}
+      role={isSidebarRow ? undefined : "button"}
+      tabIndex={isSidebarRow ? undefined : 0}
+      onClick={isSidebarRow ? undefined : () => navigate(boardPath)}
       onContextMenu={(e) => {
         if (!hasEllipsisMenu) return;
         e.preventDefault();
@@ -224,44 +238,88 @@ export function BoardCard({
         setMenuAnchor({ x: e.clientX, y: e.clientY });
         setMenuOpen(true);
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          navigate(getBoardRoute(board));
-        }
-      }}
+      onKeyDown={
+        isSidebarRow
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate(boardPath);
+              }
+            }
+      }
       className={[
-        "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
+        isSidebarRow
+          ? [
+              "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
+              isBoardRouteActive
+                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+            ].join(" ")
+          : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
       ].join(" ")}
     >
-      {/* Colored tape strip at top */}
-      <div
-        className={`absolute inset-x-0 top-0 h-1.5 rounded-t-lg ${config.tapeColor}`}
-      />
-
-      {/* Pin indicator */}
-      {board.isPinned && (
-        <div className="absolute left-3 top-3 z-10">
-          <Pin className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-        </div>
-      )}
-
-      {/* Project name (top right when board is in a project) */}
-      {projectName && (
+      {isSidebarRow ? (
         <div
-          className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
-          title={projectName}
+          role="button"
+          tabIndex={0}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md"
+          onClick={() => navigate(boardPath)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              navigate(boardPath);
+            }
+          }}
         >
-          {projectName}
+          {board.isPinned && (
+            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+          )}
+          <Icon
+            className={`h-4 w-4 shrink-0 ${
+              isBoardRouteActive ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
+            }`}
+          />
+          {sidebarShowLabel && (
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{board.name}</span>
+          )}
         </div>
+      ) : (
+        <>
+          {/* Colored tape strip at top */}
+          <div
+            className={`absolute inset-x-0 top-0 h-1.5 rounded-t-lg ${config.tapeColor}`}
+          />
+
+          {/* Pin indicator */}
+          {board.isPinned && (
+            <div className="absolute left-3 top-3 z-10">
+              <Pin className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+            </div>
+          )}
+
+          {/* Project name (top right when board is in a project) */}
+          {projectName && (
+            <div
+              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
+              title={projectName}
+            >
+              {projectName}
+            </div>
+          )}
+        </>
       )}
 
       {/* Ellipsis menu button */}
       {hasEllipsisMenu && (
       <div
         ref={menuRef}
-        className="absolute right-3 top-3 z-10"
+        className={
+          isSidebarRow
+            ? "relative z-10 shrink-0"
+            : "absolute right-3 top-3 z-10"
+        }
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -270,17 +328,40 @@ export function BoardCard({
           tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
-            setMenuAnchor("ellipsis");
-            setMenuOpen((v) => !v);
             setShowProjectList(false);
             setShowFolderList(false);
+            if (isSidebarRow) {
+              const trigger = e.currentTarget as HTMLElement;
+              if (menuOpen) {
+                setMenuOpen(false);
+                setMenuAnchor("ellipsis");
+              } else {
+                setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
+                setMenuOpen(true);
+              }
+              return;
+            }
+            setMenuAnchor("ellipsis");
+            setMenuOpen((v) => !v);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.stopPropagation();
+              setShowProjectList(false);
+              setShowFolderList(false);
+              if (isSidebarRow) {
+                const trigger = e.currentTarget as HTMLElement;
+                if (menuOpen) {
+                  setMenuOpen(false);
+                  setMenuAnchor("ellipsis");
+                } else {
+                  setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
+                  setMenuOpen(true);
+                }
+                return;
+              }
               setMenuAnchor("ellipsis");
               setMenuOpen((v) => !v);
-              setShowFolderList(false);
             }
           }}
           className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
@@ -289,11 +370,11 @@ export function BoardCard({
           <MoreVertical className="h-4 w-4" />
         </div>
 
-        {/* Dropdown menu */}
-        {menuOpen && menuAnchor === "ellipsis" && (
+        {/* Dropdown menu (dashboard cards only — sidebar uses fixed portal) */}
+        {menuOpen && menuAnchor === "ellipsis" && !isSidebarRow && (
           <div
             ref={ellipsisMenuPanelRef}
-            className="absolute right-0 top-7 z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+            className={`absolute right-0 ${menuDropdownTopClass} z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg`}
           >
             {onRename && (
               <button
@@ -559,37 +640,41 @@ export function BoardCard({
       </div>
       )}
 
-      {/* Icon */}
-      <div
-        className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${config.iconBg}`}
-      >
-        <Icon className="h-5 w-5 text-foreground/60" />
-      </div>
+      {!isSidebarRow && (
+        <>
+          {/* Icon */}
+          <div
+            className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${config.iconBg}`}
+          >
+            <Icon className="h-5 w-5 text-foreground/60" />
+          </div>
 
-      {/* Name */}
-      <h3 className="mb-1 truncate pr-6 text-sm font-semibold text-foreground">
-        {board.name}
-      </h3>
+          {/* Name */}
+          <h3 className="mb-1 truncate pr-6 text-sm font-semibold text-foreground">
+            {board.name}
+          </h3>
 
-      {/* Description */}
-      {board.description && (
-        <p className="mb-3 line-clamp-2 text-xs text-foreground/50">
-          {board.description}
-        </p>
+          {/* Description */}
+          {board.description && (
+            <p className="mb-3 line-clamp-2 text-xs text-foreground/50">
+              {board.description}
+            </p>
+          )}
+
+          {/* Footer — ruled-line separator */}
+          <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
+            <span className="flex items-center gap-1">
+              <StickyNote className="h-3 w-3" />
+              {board.noteCount}
+            </span>
+            <span className="flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              {board.indexCardCount}
+            </span>
+            <span className="ml-auto">{formatRelativeDate(board.updatedAt)}</span>
+          </div>
+        </>
       )}
-
-      {/* Footer — ruled-line separator */}
-      <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
-        <span className="flex items-center gap-1">
-          <StickyNote className="h-3 w-3" />
-          {board.noteCount}
-        </span>
-        <span className="flex items-center gap-1">
-          <CreditCard className="h-3 w-3" />
-          {board.indexCardCount}
-        </span>
-        <span className="ml-auto">{formatRelativeDate(board.updatedAt)}</span>
-      </div>
 
       {showFolderList && folderFlyoutPos && onSetProjectFolder &&
         createPortal(

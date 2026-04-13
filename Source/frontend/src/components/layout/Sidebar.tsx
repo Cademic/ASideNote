@@ -21,6 +21,9 @@ import { useAuth } from "../../context/AuthContext";
 import type { BoardPresenceUser, OpenedBoard } from "./AppLayout";
 import { BoardConnectedUsersSidebar } from "../dashboard/BoardConnectedUsers";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
+import { ProjectCard } from "../projects/ProjectCard";
+import { BoardCard } from "../dashboard/BoardCard";
+import { NotebookCard } from "../notebooks/NotebookCard";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,13 +35,35 @@ interface SidebarProps {
   pinnedBoards: BoardSummaryDto[];
   pinnedProjects: ProjectSummaryDto[];
   pinnedNotebooks: NotebookSummaryDto[];
-  onOpenNotebook: (id: string) => void;
   onUnpinBoard: (id: string) => void;
   onUnpinProject: (id: string) => void;
   onUnpinNotebook: (id: string) => void;
   /** When the board SignalR hub is connected, presence is shown here instead of the board toolbar. */
   connectedUsers: BoardPresenceUser[];
   boardHubConnected: boolean;
+  getProjectCardProps: () => {
+    onRename?: (id: string, currentName: string) => void;
+    onTogglePin?: (id: string, isPinned: boolean) => void;
+    onDelete?: (id: string) => void;
+    onLeave?: (id: string) => void;
+    onProjectUpdated?: () => void;
+  };
+  getBoardCardProps: () => {
+    onDelete?: (id: string) => void;
+    onRename?: (id: string, currentName: string) => void;
+    onMoveToProject?: (boardId: string, projectId: string, folderId?: string) => void;
+    onTogglePin?: (id: string, isPinned: boolean) => void;
+    activeProjects?: ProjectSummaryDto[];
+  };
+  getNotebookCardProps: () => {
+    onOpen: (id: string) => void;
+    onRename?: (id: string, currentName: string) => void;
+    onTogglePin?: (id: string, isPinned: boolean) => void;
+    onDelete?: (id: string) => void;
+    onAddToProject?: (notebookId: string, projectId: string, folderId?: string) => void;
+    activeProjects?: ProjectSummaryDto[];
+  };
+  resolveBoardDto: (id: string) => BoardSummaryDto | undefined;
 }
 
 const NAV_ITEMS = [
@@ -93,12 +118,15 @@ export function Sidebar({
   pinnedBoards,
   pinnedProjects,
   pinnedNotebooks,
-  onOpenNotebook,
   onUnpinBoard,
   onUnpinProject,
   onUnpinNotebook,
   connectedUsers,
   boardHubConnected,
+  getProjectCardProps,
+  getBoardCardProps,
+  getNotebookCardProps,
+  resolveBoardDto,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -240,73 +268,48 @@ export function Sidebar({
             </span>
           )}
           <div className="overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 max-h-48 scrollbar-thin">
-            {pinnedProjects.map((project) => {
-              const projectPath = `/projects/${project.id}`;
-              const active = location.pathname === projectPath;
-              return (
-                <Link
-                  key={`project-${project.id}`}
-                  to={projectPath}
-                  title={project.name}
-                  className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
-                    active
-                      ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                      : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-                    !expanded && "justify-center",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <FolderOpen
-                    className={`h-4 w-4 flex-shrink-0 ${
-                      active ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
-                    }`}
+            {pinnedProjects.map((project) => (
+              <div
+                key={`project-${project.id}`}
+                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+              >
+                <div className="min-w-0 flex-1">
+                  <ProjectCard
+                    layout="sidebarRow"
+                    sidebarShowLabel={expanded}
+                    project={project}
+                    {...getProjectCardProps()}
                   />
-                  {expanded && (
-                    <>
-                      <span className="flex-1 truncate text-xs font-medium">{project.name}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onUnpinProject(project.id);
-                        }}
-                        className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10"
-                        title="Unpin project"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </>
-                  )}
-                </Link>
-              );
-            })}
+                </div>
+                {expanded && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onUnpinProject(project.id);
+                    }}
+                    className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10"
+                    title="Unpin project"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
             {pinnedNotebooks.map((notebook) => (
               <div
                 key={`notebook-${notebook.id}`}
-                className={[
-                  "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
-                  "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-                  !expanded && "justify-center",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
               >
-                <button
-                  type="button"
-                  onClick={() => onOpenNotebook(notebook.id)}
-                  title={notebook.name}
-                  className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-                >
-                  <BookOpen
-                    className="h-4 w-4 flex-shrink-0 text-foreground/40 group-hover:text-foreground/60"
+                <div className="min-w-0 flex-1">
+                  <NotebookCard
+                    layout="sidebarRow"
+                    sidebarShowLabel={expanded}
+                    notebook={notebook}
+                    {...getNotebookCardProps()}
                   />
-                  {expanded && (
-                    <span className="truncate text-xs font-medium">{notebook.name}</span>
-                  )}
-                </button>
+                </div>
                 {expanded && (
                   <button
                     type="button"
@@ -323,50 +326,35 @@ export function Sidebar({
                 )}
               </div>
             ))}
-            {pinnedBoards.map((board) => {
-              const boardPath = board.boardType === "ChalkBoard" ? `/chalkboards/${board.id}` : `/boards/${board.id}`;
-              const active = location.pathname === boardPath;
-              const BoardIcon = BOARD_TYPE_ICON[board.boardType] ?? ClipboardList;
-              return (
-                <Link
-                  key={`board-${board.id}`}
-                  to={boardPath}
-                  title={board.name}
-                  className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
-                    active
-                      ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                      : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-                    !expanded && "justify-center",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <BoardIcon
-                    className={`h-4 w-4 flex-shrink-0 ${
-                      active ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
-                    }`}
+            {pinnedBoards.map((board) => (
+              <div
+                key={`board-${board.id}`}
+                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+              >
+                <div className="min-w-0 flex-1">
+                  <BoardCard
+                    layout="sidebarRow"
+                    sidebarShowLabel={expanded}
+                    board={board}
+                    {...getBoardCardProps()}
                   />
-                  {expanded && (
-                    <>
-                      <span className="flex-1 truncate text-xs font-medium">{board.name}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onUnpinBoard(board.id);
-                        }}
-                        className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10"
-                        title="Unpin board"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </>
-                  )}
-                </Link>
-              );
-            })}
+                </div>
+                {expanded && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onUnpinBoard(board.id);
+                    }}
+                    className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10"
+                    title="Unpin board"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -386,31 +374,38 @@ export function Sidebar({
           )}
           <div className="overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 max-h-48 scrollbar-thin">
             {filteredOpenedBoards.map((board) => {
-              const active = isBoardActive(board);
-              const Icon = BOARD_TYPE_ICON[board.boardType] ?? ClipboardList;
-              return (
-                <Link
-                  key={board.id}
-                  to={getBoardPath(board)}
-                  title={board.name}
-                  className={[
-                    "group flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
-                    active
-                      ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                      : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-                    !expanded && "justify-center",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <Icon
-                    className={`h-4 w-4 flex-shrink-0 ${
-                      active ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
-                    }`}
-                  />
-                  {expanded && (
-                    <>
-                      <span className="flex-1 truncate text-xs font-medium">{board.name}</span>
+              const fullBoard = resolveBoardDto(board.id);
+              if (!fullBoard) {
+                const active = isBoardActive(board);
+                const Icon = BOARD_TYPE_ICON[board.boardType] ?? ClipboardList;
+                return (
+                  <div
+                    key={board.id}
+                    className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                  >
+                    <Link
+                      to={getBoardPath(board)}
+                      title={board.name}
+                      className={[
+                        "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
+                        active
+                          ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                          : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+                        !expanded && "justify-center",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <Icon
+                        className={`h-4 w-4 flex-shrink-0 ${
+                          active ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
+                        }`}
+                      />
+                      {expanded && (
+                        <span className="flex-1 truncate text-xs font-medium">{board.name}</span>
+                      )}
+                    </Link>
+                    {expanded && (
                       <button
                         type="button"
                         onClick={(e) => handleCloseBoard(e, board)}
@@ -419,9 +414,34 @@ export function Sidebar({
                       >
                         <X className="h-3 w-3" />
                       </button>
-                    </>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={board.id}
+                  className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                >
+                  <div className="min-w-0 flex-1">
+                    <BoardCard
+                      layout="sidebarRow"
+                      sidebarShowLabel={expanded}
+                      board={fullBoard}
+                      {...getBoardCardProps()}
+                    />
+                  </div>
+                  {expanded && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleCloseBoard(e, board)}
+                      className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-foreground/10"
+                      title="Close board"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   )}
-                </Link>
+                </div>
               );
             })}
           </div>
