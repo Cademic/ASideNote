@@ -64,7 +64,7 @@ export function AdminPage() {
   const [users, setUsers] = useState<AdminUserDto[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit] = useState(10);
   const [searchInput, setSearchInput] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [isActiveFilter, setIsActiveFilter] = useState<string>("");
