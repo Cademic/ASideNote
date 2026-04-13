@@ -31,6 +31,7 @@ declare global {
               size?: string;
               text?: string;
               width?: number;
+              logo_alignment?: string;
             },
           ) => void;
         };
@@ -97,6 +98,7 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
       size: "large",
       text: "continue_with",
       width: 400,
+      logo_alignment: "center",
     });
   }, [isScriptLoaded, handleCredentialResponse]);
 
