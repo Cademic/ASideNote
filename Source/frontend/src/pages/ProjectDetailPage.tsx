@@ -69,11 +69,8 @@ import {
 } from "../components/projects/ProjectNamedFolderHeader";
 import { useNudgeDropdownToViewport } from "../lib/useDropdownViewport";
 import { computeProjectAutoProgressPercent } from "../lib/projectAutoProgress";
-import {
-  DraggableProjectItem,
-  FolderDropSurface,
-  type ProjectItemDragPayload,
-} from "../components/projects/ProjectFolderDnD";
+import { DraggableProjectItem, FolderDropSurface } from "../components/projects/ProjectFolderDnD";
+import type { ProjectItemDragPayload } from "../components/projects/projectItemDrag";
 import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
 import type {
   ProjectDetailDto,
@@ -270,6 +267,7 @@ export function ProjectDetailPage() {
   const hasProjectDateRange = Boolean(project?.startDate && project?.endDate);
 
   const effectiveProgress = useMemo(() => {
+    void autoProgressTick;
     if (!project) return 0;
     if (project.autoProgressEnabled && project.startDate && project.endDate)
       return computeProjectAutoProgressPercent(project.startDate, project.endDate);

@@ -237,7 +237,7 @@ export function NotebookEditorPage() {
       for (const uid of toRemove) next.delete(uid);
       return next;
     });
-  }, []);
+  }, [setBoardPresence]);
 
   const handleNotebookUpdated = useCallback((payload: { contentJson: string; updatedAt: string }) => {
     if (Date.now() - lastSaveAtRef.current < NOTEBOOK_ECHO_IGNORE_MS) return;
@@ -400,7 +400,7 @@ export function NotebookEditorPage() {
           saveInProgressRef.current = false;
         }
       }, SAVE_DEBOUNCE_MS),
-    [editor, notebookId, notebook?.updatedAt],
+    [editor, notebookId, notebook],
   );
 
   useEffect(() => {

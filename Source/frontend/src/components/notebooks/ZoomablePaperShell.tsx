@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
 
 /** US Letter width at 96dpi – must match PaperShell so scale-to-fit is correct. */
@@ -59,10 +59,13 @@ export function ZoomablePaperShell({
     return () => ro.disconnect();
   }, []);
 
-  const applyZoomDelta = (delta: number) => {
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom + delta));
-    setZoom(Math.round(newZoom * 100) / 100);
-  };
+  const applyZoomDelta = useCallback(
+    (delta: number) => {
+      const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom + delta));
+      setZoom(Math.round(newZoom * 100) / 100);
+    },
+    [minZoom, maxZoom, zoom, setZoom],
+  );
 
   // Handle Ctrl+scroll wheel zoom (desktop)
   useEffect(() => {
@@ -80,7 +83,7 @@ export function ZoomablePaperShell({
 
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [minZoom, maxZoom, zoom]);
+  }, [applyZoomDelta]);
 
   // Handle touch pinch-to-zoom (mobile)
   useEffect(() => {
@@ -124,7 +127,7 @@ export function ZoomablePaperShell({
       container.removeEventListener("touchend", handleTouchEnd);
       container.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [minZoom, maxZoom, zoom]);
+  }, [applyZoomDelta]);
 
   const handleZoomChange = (newZoom: number) => {
     const clampedZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));

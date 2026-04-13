@@ -711,25 +711,25 @@ export function StickyNote({
 
   const noteColorKeys = Object.keys(NOTE_COLORS);
 
-  function hasVisibleText(html?: string | null) {
-    if (!html) return false;
-    return stripHtmlForPlainText(html).trim().length > 0;
-  }
+  const shouldConfirmDelete = useCallback(() => {
+    function hasVisibleText(html?: string | null) {
+      if (!html) return false;
+      return stripHtmlForPlainText(html).trim().length > 0;
+    }
 
-  function hasFormattingMarkup(html?: string | null) {
-    if (!html) return false;
-    if (hasVisibleText(html)) return false;
-    return /<(strong|b|em|i|u|s|mark|a|h[1-6]|blockquote|code|pre|ul|ol|li|span|font)[^>]*>/i.test(html);
-  }
+    function hasFormattingMarkup(html?: string | null) {
+      if (!html) return false;
+      if (hasVisibleText(html)) return false;
+      return /<(strong|b|em|i|u|s|mark|a|h[1-6]|blockquote|code|pre|ul|ol|li|span|font)[^>]*>/i.test(html);
+    }
 
-  function shouldConfirmDelete() {
     return (
       hasVisibleText(note.title) ||
       hasVisibleText(note.content) ||
       hasFormattingMarkup(note.title) ||
       hasFormattingMarkup(note.content)
     );
-  }
+  }, [note.title, note.content]);
 
   useEffect(() => {
     if (!requestDeleteConfirm) return;
@@ -739,7 +739,7 @@ export function StickyNote({
       onDelete(note.id);
     }
     onDeleteConfirmHandled?.(note.id);
-  }, [requestDeleteConfirm, note.id, note.title, note.content, onDeleteConfirmHandled, onDelete]);
+  }, [requestDeleteConfirm, note.id, shouldConfirmDelete, onDeleteConfirmHandled, onDelete]);
 
   return (
     <Draggable

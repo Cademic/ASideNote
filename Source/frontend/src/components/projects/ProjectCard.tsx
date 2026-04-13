@@ -160,7 +160,7 @@ export function ProjectCard({
       let pw = panel.offsetWidth;
       if (pw < 8) pw = 160;
       let left: number;
-      let top = ar.top;
+      const top = ar.top;
 
       if (preferRight && menuPanel) {
         const mr = menuPanel.getBoundingClientRect();

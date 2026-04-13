@@ -704,6 +704,7 @@ export function DashboardPage() {
   }, [activeProjects]);
 
   const lastActiveDisplay = useMemo(() => {
+    void lastActiveTick;
     if (!lastSessionEndedAt) return "—";
     return formatElapsedSincePreviousSessionEnd(lastSessionEndedAt);
   }, [lastSessionEndedAt, lastActiveTick]);

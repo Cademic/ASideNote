@@ -623,7 +623,7 @@ export function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [isOwnProfile, routeUsername]);
+  }, [isOwnProfile, routeUsername, navigate]);
 
   useEffect(() => {
     if (!profile && !publicProfile) return;
@@ -675,6 +675,7 @@ export function ProfilePage() {
 
   const lastSessionEndIso = profile?.lastSessionEndAt ?? publicProfile?.lastSessionEndAt ?? null;
   const lastActiveDisplay = useMemo(() => {
+    void lastActiveTick;
     if (!lastSessionEndIso) return "—";
     return formatElapsedSincePreviousSessionEnd(lastSessionEndIso);
   }, [lastSessionEndIso, lastActiveTick]);
