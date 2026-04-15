@@ -7,7 +7,9 @@ import {
 import { ProjectMoveFlyout } from "../dashboard/ProjectMoveFlyout";
 import { createPortal } from "react-dom";
 import { BookOpen, ChevronRight, Folder, FolderMinus, FolderOpen, MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import type { NotebookSummaryDto, ProjectSummaryDto } from "../../types";
+import { getSidebarEllipsisMenuAnchor } from "../../lib/sidebar-menu-anchor";
 
 interface NotebookCardProps {
   notebook: NotebookSummaryDto;
@@ -24,6 +26,8 @@ interface NotebookCardProps {
   /** Project detail: move notebook between folders within the project. */
   projectFolders?: { id: string; name: string }[];
   onSetProjectFolder?: (notebookId: string, folderId: string | null) => void;
+  layout?: "card" | "sidebarRow";
+  sidebarShowLabel?: boolean;
 }
 
 function formatRelativeDate(dateStr: string): string {
@@ -52,7 +56,15 @@ export function NotebookCard({
   activeProjects = [],
   projectFolders = [],
   onSetProjectFolder,
+  layout = "card",
+  sidebarShowLabel = true,
 }: NotebookCardProps) {
+  const location = useLocation();
+  const notebookPath = `/notebooks/${notebook.id}`;
+  const isNotebookRouteActive = location.pathname === notebookPath;
+  const isSidebarRow = layout === "sidebarRow";
+  const menuDropdownTopClass = isSidebarRow ? "top-full mt-0.5" : "top-7";
+  const SIDEBAR_MENU_WIDTH_PX = 192;
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<"ellipsis" | { x: number; y: number }>("ellipsis");
   const [showProjectList, setShowProjectList] = useState(false);
@@ -105,7 +117,7 @@ export function NotebookCard({
   );
 
   useNudgeDropdownToViewport(
-    menuOpen && showMenu && menuAnchor === "ellipsis",
+    menuOpen && showMenu && menuAnchor === "ellipsis" && !isSidebarRow,
     ellipsisMenuPanelRef,
   );
   useFixedPortalInViewport(
@@ -171,48 +183,94 @@ export function NotebookCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(notebook.id)}
+      role={isSidebarRow ? undefined : "button"}
+      tabIndex={isSidebarRow ? undefined : 0}
+      onClick={isSidebarRow ? undefined : () => onOpen(notebook.id)}
       onContextMenu={(e) => {
+        if (!showMenu) return;
         e.preventDefault();
         e.stopPropagation();
         setMenuAnchor({ x: e.clientX, y: e.clientY });
         setMenuOpen(true);
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen(notebook.id);
-        }
-      }}
+      onKeyDown={
+        isSidebarRow
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen(notebook.id);
+              }
+            }
+      }
       className={[
-        "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
+        isSidebarRow
+          ? [
+              "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
+              isNotebookRouteActive
+                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+            ].join(" ")
+          : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
       ].join(" ")}
     >
-      {/* Tape strip — reddish-brown / notebook cover */}
-      <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-lg bg-amber-800/70 dark:bg-amber-900/60" />
-
-      {notebook.isPinned && (
-        <div className="absolute left-3 top-3 z-10">
-          <Pin className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-        </div>
-      )}
-
-      {projectName && (
+      {isSidebarRow ? (
         <div
-          className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
-          title={projectName}
+          role="button"
+          tabIndex={0}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md"
+          onClick={() => onOpen(notebook.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen(notebook.id);
+            }
+          }}
         >
-          {projectName}
+          {notebook.isPinned && (
+            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+          )}
+          <BookOpen
+            className={`h-4 w-4 shrink-0 ${
+              isNotebookRouteActive ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
+            }`}
+          />
+          {sidebarShowLabel && (
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{notebook.name}</span>
+          )}
         </div>
+      ) : (
+        <>
+          {/* Tape strip — reddish-brown / notebook cover */}
+          <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-lg bg-amber-800/70 dark:bg-amber-900/60" />
+
+          {notebook.isPinned && (
+            <div className="absolute left-3 top-3 z-10">
+              <Pin className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+            </div>
+          )}
+
+          {projectName && (
+            <div
+              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
+              title={projectName}
+            >
+              {projectName}
+            </div>
+          )}
+        </>
       )}
 
       {/* Ellipsis menu */}
+      {showMenu && (
       <div
         ref={menuRef}
-        className="absolute right-3 top-3 z-10"
+        className={
+          isSidebarRow
+            ? "relative z-10 shrink-0"
+            : "absolute right-3 top-3 z-10"
+        }
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -221,17 +279,40 @@ export function NotebookCard({
           tabIndex={0}
           onClick={(e) => {
             e.stopPropagation();
-            setMenuAnchor("ellipsis");
-            setMenuOpen((v) => !v);
             setShowProjectList(false);
             setShowFolderList(false);
+            if (isSidebarRow) {
+              const trigger = e.currentTarget as HTMLElement;
+              if (menuOpen) {
+                setMenuOpen(false);
+                setMenuAnchor("ellipsis");
+              } else {
+                setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
+                setMenuOpen(true);
+              }
+              return;
+            }
+            setMenuAnchor("ellipsis");
+            setMenuOpen((v) => !v);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.stopPropagation();
+              setShowProjectList(false);
+              setShowFolderList(false);
+              if (isSidebarRow) {
+                const trigger = e.currentTarget as HTMLElement;
+                if (menuOpen) {
+                  setMenuOpen(false);
+                  setMenuAnchor("ellipsis");
+                } else {
+                  setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
+                  setMenuOpen(true);
+                }
+                return;
+              }
               setMenuAnchor("ellipsis");
               setMenuOpen((v) => !v);
-              setShowFolderList(false);
             }
           }}
           className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
@@ -240,10 +321,10 @@ export function NotebookCard({
           <MoreVertical className="h-4 w-4" />
         </div>
 
-        {menuOpen && showMenu && menuAnchor === "ellipsis" && (
+        {menuOpen && showMenu && menuAnchor === "ellipsis" && !isSidebarRow && (
           <div
             ref={ellipsisMenuPanelRef}
-            className="absolute right-0 top-7 z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+            className={`absolute right-0 ${menuDropdownTopClass} z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg`}
           >
             {onRename && (
               <button
@@ -505,22 +586,27 @@ export function NotebookCard({
             document.body,
           )}
       </div>
+      )}
 
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100/80 dark:bg-amber-900/30">
-        <BookOpen className="h-5 w-5 text-foreground/60" />
-      </div>
+      {!isSidebarRow && (
+        <>
+          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100/80 dark:bg-amber-900/30">
+            <BookOpen className="h-5 w-5 text-foreground/60" />
+          </div>
 
-      <h3 className="mb-1 truncate pr-6 text-sm font-semibold text-foreground">
-        {notebook.name}
-      </h3>
+          <h3 className="mb-1 truncate pr-6 text-sm font-semibold text-foreground">
+            {notebook.name}
+          </h3>
 
-      <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
-        <span className="flex items-center gap-1">
-          <BookOpen className="h-3 w-3" />
-          Document
-        </span>
-        <span className="ml-auto">{formatRelativeDate(notebook.updatedAt)}</span>
-      </div>
+          <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
+            <span className="flex items-center gap-1">
+              <BookOpen className="h-3 w-3" />
+              Document
+            </span>
+            <span className="ml-auto">{formatRelativeDate(notebook.updatedAt)}</span>
+          </div>
+        </>
+      )}
 
       {showFolderList && folderFlyoutPos && onSetProjectFolder &&
         createPortal(
