@@ -46,6 +46,14 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [buttonWidth, setButtonWidth] = useState(400);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      document.documentElement.classList.contains("dark") ||
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
+  });
 
   const handleCredentialResponse = useCallback(
     async (response: GoogleCredentialResponse) => {
@@ -85,6 +93,48 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
   }, []);
 
   useEffect(() => {
+    const handleThemeChange = () => {
+      const nextIsDark =
+        document.documentElement.classList.contains("dark") ||
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setIsDarkMode(nextIsDark);
+    };
+
+    handleThemeChange();
+
+    const themeObserver = new MutationObserver(handleThemeChange);
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    darkModeQuery.addEventListener("change", handleThemeChange);
+
+    return () => {
+      themeObserver.disconnect();
+      darkModeQuery.removeEventListener("change", handleThemeChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const syncButtonWidth = () => {
+      if (!containerRef.current) return;
+      const nextWidth = Math.min(Math.floor(containerRef.current.clientWidth), 400);
+      setButtonWidth(nextWidth > 0 ? nextWidth : 400);
+    };
+
+    syncButtonWidth();
+
+    const resizeObserver = new ResizeObserver(syncButtonWidth);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!GOOGLE_CLIENT_ID || !isScriptLoaded || !window.google || !containerRef.current) return;
 
     window.google.accounts.id.initialize({
@@ -92,15 +142,16 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
       callback: handleCredentialResponse,
     });
 
+    containerRef.current.innerHTML = "";
     window.google.accounts.id.renderButton(containerRef.current, {
       type: "standard",
-      theme: "outline",
+      theme: isDarkMode ? "filled_black" : "outline",
       size: "large",
       text: "continue_with",
-      width: 400,
+      width: buttonWidth,
       logo_alignment: "center",
     });
-  }, [isScriptLoaded, handleCredentialResponse]);
+  }, [isScriptLoaded, handleCredentialResponse, buttonWidth, isDarkMode]);
 
   if (!GOOGLE_CLIENT_ID) {
     return null;
@@ -114,7 +165,10 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
         to rotate. The overlay isolates the spinner animation to a small element only.
       */}
       <div className="relative w-full max-w-[400px]">
-        <div ref={containerRef} className={isLoading ? "pointer-events-none opacity-50" : undefined} />
+        <div
+          ref={containerRef}
+          className={`flex justify-center ${isLoading ? "pointer-events-none opacity-50" : ""}`}
+        />
         {isLoading && (
           <div
             className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/90 backdrop-blur-[1px]"
