@@ -170,7 +170,7 @@ export function ProjectsPage() {
   if (isLoading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="mb-6 flex items-center justify-between">
             <div className="skeleton h-8 w-32" />
             <div className="skeleton h-9 w-32" />
@@ -210,7 +210,7 @@ export function ProjectsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">

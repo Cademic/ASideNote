@@ -739,7 +739,7 @@ export function DashboardPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* ── Welcome Notepad ───────────────────────────── */}
         <div className="notepad-card mb-8">
           <div className="notepad-spiral-strip" />
@@ -768,7 +768,7 @@ export function DashboardPage() {
         {/* ── Quick Stats — Sticky Notes ─────────────────── */}
         <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatSticky
-            color="yellow"
+            color="purple"
             icon={CalendarDays}
             label="Today's Date"
             value={formatTodaySticky()}
@@ -1180,17 +1180,19 @@ const STICKY_BG: Record<string, string> = {
   rose: "bg-rose-100 dark:bg-rose-950/40",
   sky: "bg-sky-100 dark:bg-sky-950/40",
   green: "bg-emerald-100 dark:bg-emerald-950/40",
+  purple: "bg-purple-100 dark:bg-purple-950/40",
 };
 
 const STICKY_ACCENT: Record<string, string> = {
-  yellow: "text-amber-600 dark:text-amber-400",
-  rose: "text-rose-600 dark:text-rose-400",
-  sky: "text-sky-600 dark:text-sky-400",
-  green: "text-emerald-600 dark:text-emerald-400",
+  yellow: "text-amber-600 dark:text-amber-500",
+  rose: "text-rose-600 dark:text-rose-500",
+  sky: "text-sky-600 dark:text-sky-500",
+  green: "text-emerald-600 dark:text-emerald-500",
+  purple: "text-purple-600 dark:text-purple-500",
 };
 
 interface StatStickyProps {
-  color: "yellow" | "rose" | "sky" | "green";
+  color: "yellow" | "rose" | "sky" | "green" | "purple";
   icon: typeof BookOpen;
   label: string;
   value: string;

@@ -236,7 +236,7 @@ export function CalendarsPage() {
   if (isLoading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="mb-6 flex items-center justify-between">
             <div className="skeleton h-8 w-32" />
             <div className="flex gap-2">
@@ -258,7 +258,7 @@ export function CalendarsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-6 py-6">
+      <div className="mx-auto max-w-[1600px] px-6 py-6">
         {/* Page header */}
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-950/40">

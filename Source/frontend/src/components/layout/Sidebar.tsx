@@ -213,7 +213,7 @@ export function Sidebar({
               className={[
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
                 active
-                  ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                  ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                   : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
                 !expanded && "justify-center",
               ]
@@ -222,7 +222,7 @@ export function Sidebar({
             >
               <item.icon
                 className={`h-5 w-5 flex-shrink-0 ${
-                  active ? "text-amber-600 dark:text-amber-400" : ""
+                  active ? "text-amber-600 dark:text-sky-400" : ""
                 }`}
               />
               {expanded && <span>{item.label}</span>}
@@ -236,7 +236,7 @@ export function Sidebar({
             className={[
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
               isActive("/admin")
-                ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                 : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
               !expanded && "justify-center",
             ]
@@ -245,7 +245,7 @@ export function Sidebar({
           >
             <ShieldCheck
               className={`h-5 w-5 flex-shrink-0 ${
-                isActive("/admin") ? "text-amber-600 dark:text-amber-400" : ""
+                isActive("/admin") ? "text-amber-600 dark:text-sky-400" : ""
               }`}
             />
             {expanded && <span>Admin</span>}
@@ -389,7 +389,7 @@ export function Sidebar({
                       className={[
                         "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                         active
-                          ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                          ? "bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                           : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
                         !expanded && "justify-center",
                       ]
@@ -398,7 +398,7 @@ export function Sidebar({
                     >
                       <Icon
                         className={`h-4 w-4 flex-shrink-0 ${
-                          active ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
+                          active ? "text-amber-600 dark:text-sky-400" : "text-foreground/40"
                         }`}
                       />
                       {expanded && (
@@ -523,7 +523,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggle}
-          className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-colors duration-150 hover:bg-amber-100 hover:text-amber-800 dark:bg-amber-950/60 dark:text-amber-400/60 dark:hover:bg-amber-900/50 dark:hover:text-amber-300 motion-reduce:transition-none"
+          className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-colors duration-150 hover:bg-amber-100 hover:text-amber-800 dark:bg-sky-950/60 dark:text-sky-400/60 dark:hover:bg-sky-900/50 dark:hover:text-sky-300 motion-reduce:transition-none"
           aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
         >
           {isOpen ? (

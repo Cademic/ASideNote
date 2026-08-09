@@ -918,7 +918,7 @@ body {
 
 .dark .notepad-card {
   background: linear-gradient(180deg, hsl(222, 22%, 17%) 0%, hsl(222, 22%, 15%) 100%);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: hsl(216, 25%, 22%);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.12);
@@ -1002,7 +1002,7 @@ body {
 
 .dark .paper-card {
   background: linear-gradient(180deg, hsl(222, 22%, 18%) 0%, hsl(222, 22%, 16%) 100%);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: hsl(216, 25%, 22%);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.12),
     0 4px 12px rgba(0, 0, 0, 0.08);
@@ -1019,7 +1019,7 @@ body {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.2),
     0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: hsl(216, 25%, 30%);
 }
 
 /* ---- Stat sticky notes ---- */
@@ -1055,13 +1055,13 @@ body {
 .dark .stat-sticky {
   box-shadow:
     1px 2px 4px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
+    0 0 0 1px rgba(0, 0, 0, 0.25);
 }
 
 .dark .stat-sticky:hover {
   box-shadow:
     2px 4px 8px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+    0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
 .dark .stat-sticky::after {
@@ -1206,7 +1206,7 @@ body {
 }
 
 .dark .sidebar-nav-active {
-  box-shadow: inset 3px 0 0 0 #b45309;
+  box-shadow: inset 3px 0 0 0 #0ea5e9;
 }
 
 /* Board tool swatch — subtle colored indicator */
