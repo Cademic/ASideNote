@@ -860,8 +860,9 @@ export function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Tab content */}
-        {activeTab === "calendar" && (
+        {/* Tab content — all panels stay mounted and are just hidden when
+            inactive, so switching tabs doesn't remount/refetch them. */}
+        <div className={activeTab === "calendar" ? undefined : "hidden"}>
           <ProjectCalendar
             projectId={project.id}
             projectName={project.name}
@@ -870,9 +871,9 @@ export function ProjectDetailPage() {
             deadline={project.deadline}
             color={project.color}
           />
-        )}
+        </div>
 
-        {activeTab === "content" && (
+        <div className={activeTab === "content" ? undefined : "hidden"}>
           <ProjectContentTab
             boards={project.boards}
             notebooks={project.notebooks ?? []}
@@ -902,18 +903,18 @@ export function ProjectDetailPage() {
             onRenameNotebook={canEdit ? handleRenameNotebook : undefined}
             onDeleteNotebook={canEdit ? handleDeleteNotebook : undefined}
           />
-        )}
+        </div>
 
-        {activeTab === "members" && (
+        <div className={activeTab === "members" ? undefined : "hidden"}>
           <MembersTab
             project={project}
             isOwner={isOwner}
             onAddMember={() => setIsAddMemberOpen(true)}
             onMemberChanged={fetchProject}
           />
-        )}
+        </div>
 
-        {activeTab === "settings" && (
+        <div className={activeTab === "settings" ? undefined : "hidden"}>
           <SettingsTab
             isOwner={isOwner}
             members={project.members}
@@ -944,7 +945,7 @@ export function ProjectDetailPage() {
             onLeave={handleLeaveProject}
             onTransferOwnership={handleTransferOwnership}
           />
-        )}
+        </div>
       </div>
 
       {/* Dialogs */}

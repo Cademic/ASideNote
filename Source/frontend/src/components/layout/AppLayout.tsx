@@ -338,7 +338,7 @@ export function AppLayout() {
           {isBoardDetailRoute ? (
             <Outlet context={outletContext} />
           ) : (
-            <div key={location.key} className="animate-page-enter motion-reduce:animate-none h-full">
+            <div key={location.pathname} className="animate-page-enter motion-reduce:animate-none h-full">
               <Outlet context={outletContext} />
             </div>
           )}

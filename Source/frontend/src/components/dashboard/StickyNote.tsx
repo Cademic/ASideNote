@@ -101,7 +101,7 @@ export const NOTE_COLORS: Record<string, { bg: string; pin: string }> = {
   pink: { bg: "bg-pink-200 dark:bg-pink-300", pin: "bg-blue-500" },
   blue: { bg: "bg-blue-200 dark:bg-blue-300", pin: "bg-yellow-500" },
   green: { bg: "bg-green-200 dark:bg-green-300", pin: "bg-red-500" },
-  orange: { bg: "bg-orange-200 dark:bg-orange-300", pin: "bg-blue-500" },
+  orange: { bg: "bg-purple-200 dark:bg-purple-300", pin: "bg-blue-500" },
   purple: { bg: "bg-purple-200 dark:bg-purple-300", pin: "bg-yellow-500" },
 };
 
