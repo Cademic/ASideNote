@@ -24,6 +24,7 @@ import { FontSize } from "../lib/tiptap-font-size";
 import { handleTabKey } from "../lib/tiptap-tab-indent";
 import { getNotebookById, updateNotebookContent, downloadNotebookExport, createNotebookVersion, getNotebookVersions, restoreNotebookVersion, uploadNotebookImage } from "../api/notebooks";
 import { useNotebookRealtime, type NotebookPresenceUser } from "../hooks/useNotebookRealtime";
+import { useFileImport } from "../hooks/useFileImport";
 import { getColorForUserId } from "../lib/presenceColors";
 import { useAuth } from "../context/AuthContext";
 import type { NotebookDetailDto, NotebookVersionDto } from "../types";
@@ -205,8 +206,6 @@ export function NotebookEditorPage() {
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const textCursorThrottleRef = useRef<number>(0);
   const TEXT_CURSOR_THROTTLE_MS = 80;
-  const importFileInputRef = useRef<HTMLInputElement>(null);
-  const menuImageInputRef = useRef<HTMLInputElement>(null);
   const [editorContextMenu, setEditorContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const handleTextCursorPosition = useCallback((userId: string, position: number) => {
@@ -535,11 +534,9 @@ export function NotebookEditorPage() {
     }
   }, [notebookId, notebook, editor]);
 
-  const handleMenuImageFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      e.target.value = "";
-      if (!file || !editor || !notebookId) return;
+  const handleMenuImageFile = useCallback(
+    async (file: File) => {
+      if (!editor || !notebookId) return;
       try {
         const { url } = await uploadNotebookImage(notebookId, file);
         editor.chain().focus().setImage({ src: url }).run();
@@ -550,10 +547,19 @@ export function NotebookEditorPage() {
     [editor, notebookId],
   );
 
-  const handleImportJson = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !editor) return;
+  const {
+    inputRef: menuImageInputRef,
+    accept: menuImageAccept,
+    triggerImport: handleMenuImageClick,
+    handleFileSelect: handleMenuImageFileSelect,
+  } = useFileImport({
+    accept: "image/jpeg,image/png,image/webp,image/gif",
+    onFile: handleMenuImageFile,
+  });
+
+  const handleImportJsonFile = useCallback(
+    (file: File) => {
+      if (!editor) return;
       file
         .text()
         .then((text) => {
@@ -566,13 +572,20 @@ export function NotebookEditorPage() {
           } catch {
             // Invalid JSON or not a TipTap doc; ignore
           }
-        })
-        .finally(() => {
-          e.target.value = "";
         });
     },
     [editor],
   );
+
+  const {
+    inputRef: importFileInputRef,
+    accept: importFileAccept,
+    triggerImport: handleImportClick,
+    handleFileSelect: handleImportFileSelect,
+  } = useFileImport({
+    accept: ".json,application/json",
+    onFile: handleImportJsonFile,
+  });
 
   function buildEditorContextMenuItems(ed: Editor): import("../components/ui/ContextMenu").ContextMenuItem[] {
     const { from, to, empty, $from } = ed.state.selection;
@@ -739,7 +752,7 @@ export function NotebookEditorPage() {
               onExport={handleExportFormat}
               onSaveAsHtml={handleSaveAsHtml}
               onSaveAsJson={handleSaveAsJson}
-              onImportClick={() => importFileInputRef.current?.click()}
+              onImportClick={handleImportClick}
               onFileMenuOpen={handleFileMenuOpen}
               exporting={exporting}
               versions={versions}
@@ -747,7 +760,7 @@ export function NotebookEditorPage() {
               onSaveVersion={handleSaveVersion}
               onRestoreVersion={handleRestoreVersion}
               formatVersionDate={formatVersionDate}
-              onInsertImageUpload={() => menuImageInputRef.current?.click()}
+              onInsertImageUpload={handleMenuImageClick}
             />
           </div>
         )}
@@ -770,15 +783,15 @@ export function NotebookEditorPage() {
         <input
           ref={importFileInputRef}
           type="file"
-          accept=".json,application/json"
+          accept={importFileAccept}
           className="hidden"
           aria-hidden
-          onChange={handleImportJson}
+          onChange={handleImportFileSelect}
         />
         <input
           ref={menuImageInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
+          accept={menuImageAccept}
           className="hidden"
           aria-hidden
           onChange={handleMenuImageFileSelect}
