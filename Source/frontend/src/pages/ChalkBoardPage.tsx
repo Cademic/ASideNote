@@ -16,7 +16,9 @@ import { getDrawing, saveDrawing } from "../api/drawings";
 import { getNotes, createNote, patchNote, deleteNote } from "../api/notes";
 import { useTouchViewport } from "../hooks/useTouchViewport";
 import { useBoardRealtime, type BoardItemUpdatePayload } from "../hooks/useBoardRealtime";
+import { useFileImport } from "../hooks/useFileImport";
 import { getColorForUserId } from "../lib/presenceColors";
+import { isWheelOverEditableText, wheelEventDeltaPixels } from "../lib/boardWheelPan";
 import {
   createBoardExportPayload,
   triggerBoardDownload,
@@ -138,7 +140,6 @@ export function ChalkBoardPage() {
   const didRightPanRef = useRef(false);
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<{ x: number; y: number; note: NoteSummaryDto } | null>(null);
-  const loadFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRichTextToolbarChange = useCallback(
     (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => {
@@ -332,33 +333,45 @@ export function ChalkBoardPage() {
     navigateRelativeNote(1);
   }
 
-  // --- Wheel zoom (Ctrl/Cmd + scroll) ---
+  // --- Wheel: Ctrl/Cmd + scroll = zoom; Alt + scroll = horizontal pan ---
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
     function onWheel(e: WheelEvent) {
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
 
-      const rect = viewport!.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+        const rect = viewport!.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
-      const exponent = Math.max(
-        -ZOOM_EXPONENT_CAP,
-        Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
-      );
-      const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
-      const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
-      const vpScale = zoom / RESOLUTION_FACTOR;
-      const newVpScale = newZoom / RESOLUTION_FACTOR;
+        const exponent = Math.max(
+          -ZOOM_EXPONENT_CAP,
+          Math.min(ZOOM_EXPONENT_CAP, -e.deltaY / ZOOM_DELTA_SCALE),
+        );
+        const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
+        const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
+        const vpScale = zoom / RESOLUTION_FACTOR;
+        const newVpScale = newZoom / RESOLUTION_FACTOR;
 
-      // Keep point under cursor fixed (same formula as Note Board CorkBoard)
-      const newPanX = panX + mouseX * (1 / newVpScale - 1 / vpScale);
-      const newPanY = panY + mouseY * (1 / newVpScale - 1 / vpScale);
+        // Keep point under cursor fixed (same formula as Note Board CorkBoard)
+        const newPanX = panX + mouseX * (1 / newVpScale - 1 / vpScale);
+        const newPanY = panY + mouseY * (1 / newVpScale - 1 / vpScale);
 
-      handleViewportChange(newZoom, newPanX, newPanY);
+        handleViewportChange(newZoom, newPanX, newPanY);
+        return;
+      }
+
+      if (isWheelOverEditableText(e.target)) return;
+
+      // Alt + wheel: convert vertical scroll into horizontal pan (mice without a horizontal wheel)
+      if (e.altKey) {
+        e.preventDefault();
+        const { dy } = wheelEventDeltaPixels(e, viewport!);
+        const dx = (RESOLUTION_FACTOR * dy) / zoom;
+        handleViewportChange(zoom, panX - dx, panY);
+      }
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
@@ -984,14 +997,8 @@ export function ChalkBoardPage() {
     triggerBoardDownload(blob, buildBoardExportFilename(board?.name ?? "chalk-board"));
   }
 
-  function handleLoadFromFile() {
-    loadFileInputRef.current?.click();
-  }
-
-  async function handleLoadFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !boardId) return;
+  async function handleLoadFile(file: File) {
+    if (!boardId) return;
     try {
       const text = await file.text();
       const payload = parseBoardExportFile(text);
@@ -1046,6 +1053,16 @@ export function ChalkBoardPage() {
       // Load failed
     }
   }
+
+  const {
+    inputRef: loadFileInputRef,
+    accept: loadFileAccept,
+    triggerImport: handleLoadFromFile,
+    handleFileSelect: handleLoadFileSelect,
+  } = useFileImport({
+    accept: ".json,.asidenote-board,application/json",
+    onFile: handleLoadFile,
+  });
 
   function triggerMenuUndo() {
     document.dispatchEvent(
@@ -1448,7 +1465,7 @@ export function ChalkBoardPage() {
         <input
           ref={loadFileInputRef}
           type="file"
-          accept=".json,.asidenote-board,application/json"
+          accept={loadFileAccept}
           className="hidden"
           aria-hidden
           onChange={handleLoadFileSelect}

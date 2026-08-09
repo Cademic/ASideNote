@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import axios from "axios";
 import {
@@ -12,7 +12,6 @@ import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
   getBoards,
   createBoard,
-  createBoardImageCard,
   deleteBoard,
   updateBoard,
   toggleBoardPin,
@@ -23,13 +22,13 @@ import {
   removeBoardFromProject,
   setBoardProjectFolder,
 } from "../api/projects";
-import { createNote } from "../api/notes";
-import { createIndexCard } from "../api/index-cards";
-import { createConnection } from "../api/connections";
-import { saveDrawing } from "../api/drawings";
 import { parseBoardExportFile } from "../lib/boardExport";
+import { importBoardIntoNew } from "../lib/boardImport";
+import { useFileImport } from "../hooks/useFileImport";
+import { useResourceList } from "../hooks/useResourceList";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
+import { PromptDialog } from "../components/dashboard/PromptDialog";
 import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
 import type { BoardSummaryDto, ProjectSummaryDto } from "../types";
 
@@ -52,30 +51,42 @@ const BOARD_TYPE_FILTERS = [
 
 export function BoardsPage() {
   const { closeBoard, refreshPinnedBoards } = useOutletContext<AppLayoutContext>();
-  const [boards, setBoards] = useState<BoardSummaryDto[]>([]);
   const [activeProjects, setActiveProjects] = useState<ProjectSummaryDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [boardTypeFilter, setBoardTypeFilter] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BoardSummaryDto | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [isImporting, setIsImporting] = useState(false);
-  const importFileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchBoards = useCallback(async () => {
-    try {
-      setError(null);
-      const result = await getBoards({ limit: 200 });
-      setBoards(result.items);
-    } catch {
-      setError("Failed to load boards.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const {
+    items: boards,
+    setItems: setBoards,
+    isLoading,
+    error,
+    refetch: fetchBoards,
+    renameItem,
+    togglePin: handleTogglePin,
+    deleteItem,
+  } = useResourceList<BoardSummaryDto>({
+    fetchList: async () => (await getBoards({ limit: 200 })).items,
+    loadErrorMessage: "Failed to load boards.",
+    rename: { call: (id, name) => updateBoard(id, { name }) },
+    pin: {
+      call: toggleBoardPin,
+      applyOptimistic: (board, isPinned) => ({
+        ...board,
+        isPinned,
+        pinnedAt: isPinned ? new Date().toISOString() : null,
+      }),
+      onSuccess: refreshPinnedBoards,
+    },
+    remove: {
+      call: deleteBoard,
+      onOptimisticRemove: closeBoard,
+      onSuccess: refreshPinnedBoards,
+    },
+  });
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -89,10 +100,6 @@ export function BoardsPage() {
   }, []);
 
   useEffect(() => {
-    fetchBoards();
-  }, [fetchBoards]);
-
-  useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
 
@@ -103,14 +110,7 @@ export function BoardsPage() {
 
   const navigate = useNavigate();
 
-  function handleImportClick() {
-    importFileInputRef.current?.click();
-  }
-
-  async function handleImportFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function handleImportFile(file: File) {
     setIsImporting(true);
     try {
       const text = await file.text();
@@ -128,78 +128,8 @@ export function BoardsPage() {
         boardType: payload.boardType,
       });
       setBoards((prev) => [created, ...prev]);
-      const boardId = created.id;
-      const idMap = new Map<string, string>();
 
-      if (payload.boardType === "NoteBoard") {
-        for (const n of payload.notes ?? []) {
-          const note = await createNote({
-            content: n.content,
-            boardId,
-            title: n.title ?? undefined,
-            positionX: n.positionX ?? 20,
-            positionY: n.positionY ?? 20,
-            width: n.width ?? undefined,
-            height: n.height ?? undefined,
-            color: n.color ?? undefined,
-            rotation: n.rotation ?? undefined,
-          });
-          idMap.set(n.id, note.id);
-        }
-        for (const c of payload.indexCards ?? []) {
-          const card = await createIndexCard({
-            content: c.content,
-            boardId,
-            title: c.title ?? undefined,
-            positionX: c.positionX ?? 20,
-            positionY: c.positionY ?? 20,
-            width: c.width ?? undefined,
-            height: c.height ?? undefined,
-            color: c.color ?? undefined,
-            rotation: c.rotation ?? undefined,
-          });
-          idMap.set(c.id, card.id);
-        }
-        for (const img of payload.imageCards ?? []) {
-          const imageCard = await createBoardImageCard(boardId, {
-            imageUrl: img.imageUrl,
-            positionX: img.positionX,
-            positionY: img.positionY,
-            width: img.width ?? undefined,
-            height: img.height ?? undefined,
-            rotation: img.rotation ?? undefined,
-          });
-          idMap.set(img.id, imageCard.id);
-        }
-        for (const conn of payload.connections ?? []) {
-          const fromId = idMap.get(conn.fromItemId);
-          const toId = idMap.get(conn.toItemId);
-          if (fromId && toId) {
-            await createConnection({
-              fromItemId: fromId,
-              toItemId: toId,
-              boardId,
-            });
-          }
-        }
-      } else if (payload.boardType === "ChalkBoard") {
-        if (payload.drawing?.canvasJson) {
-          await saveDrawing(boardId, { canvasJson: payload.drawing.canvasJson });
-        }
-        for (const n of payload.notes ?? []) {
-          await createNote({
-            content: n.content,
-            boardId,
-            title: n.title ?? undefined,
-            positionX: n.positionX ?? 20,
-            positionY: n.positionY ?? 20,
-            width: n.width ?? undefined,
-            height: n.height ?? undefined,
-            color: n.color ?? undefined,
-            rotation: n.rotation ?? undefined,
-          });
-        }
-      }
+      await importBoardIntoNew(created.id, payload);
 
       const path =
         created.boardType === "ChalkBoard"
@@ -212,6 +142,16 @@ export function BoardsPage() {
       setIsImporting(false);
     }
   }
+
+  const {
+    inputRef: importFileInputRef,
+    accept: importFileAccept,
+    triggerImport: handleImportClick,
+    handleFileSelect: handleImportFileSelect,
+  } = useFileImport({
+    accept: ".json,.asidenote-board,application/json",
+    onFile: handleImportFile,
+  });
 
   async function handleCreate(name: string, description: string, boardType: string) {
     try {
@@ -249,34 +189,17 @@ export function BoardsPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeleteTarget(null);
-    setBoards((prev) => prev.filter((b) => b.id !== id));
-    closeBoard(id);
-    try {
-      await deleteBoard(id);
-      refreshPinnedBoards();
-    } catch {
-      fetchBoards();
-    }
+    await deleteItem(id);
   }
 
   function handleRename(id: string, currentName: string) {
     setRenameTarget({ id, name: currentName });
-    setRenameValue(currentName);
   }
 
-  async function confirmRename() {
-    if (!renameTarget || !renameValue.trim()) return;
-    const { id } = renameTarget;
-    const newName = renameValue.trim();
+  async function confirmRename(newName: string) {
+    if (!renameTarget) return;
     setRenameTarget(null);
-    setBoards((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, name: newName } : b)),
-    );
-    try {
-      await updateBoard(id, { name: newName });
-    } catch {
-      fetchBoards();
-    }
+    await renameItem?.(renameTarget.id, newName);
   }
 
   async function handleMoveToProject(boardId: string, projectId: string, folderId?: string) {
@@ -333,22 +256,6 @@ export function BoardsPage() {
       );
     } catch {
       console.error("Failed to move board to project");
-      fetchBoards();
-    }
-  }
-
-  async function handleTogglePin(id: string, isPinned: boolean) {
-    setBoards((prev) =>
-      prev.map((b) =>
-        b.id === id
-          ? { ...b, isPinned, pinnedAt: isPinned ? new Date().toISOString() : null }
-          : b,
-      ),
-    );
-    try {
-      await toggleBoardPin(id, isPinned);
-      refreshPinnedBoards();
-    } catch {
       fetchBoards();
     }
   }
@@ -490,7 +397,7 @@ export function BoardsPage() {
       <input
         ref={importFileInputRef}
         type="file"
-        accept=".json,.asidenote-board,application/json"
+        accept={importFileAccept}
         className="hidden"
         aria-hidden
         onChange={handleImportFileSelect}
@@ -517,48 +424,14 @@ export function BoardsPage() {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {/* Rename Dialog */}
-      {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">
-              Rename Board
-            </h2>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRename();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRename}
-                disabled={!renameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptDialog
+        isOpen={renameTarget !== null}
+        title="Rename Board"
+        initialValue={renameTarget?.name ?? ""}
+        confirmLabel="Rename"
+        onConfirm={confirmRename}
+        onCancel={() => setRenameTarget(null)}
+      />
     </div>
   );
 }

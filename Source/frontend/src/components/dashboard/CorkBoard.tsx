@@ -1,6 +1,7 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { corkPanToScroll, corkScrollInnerLayout, corkScrollToPan, corkZoomAroundScreenPoint } from "../../lib/boardViewportScroll";
-import { isWheelOverEditableText } from "../../lib/boardWheelPan";
+import { corkScreenToWorld } from "../../lib/boardViewportMath";
+import { isWheelOverEditableText, wheelEventDeltaPixels } from "../../lib/boardWheelPan";
 import { ZoomControls } from "./ZoomControls";
 import { useTouchViewport } from "../../hooks/useTouchViewport";
 
@@ -171,13 +172,11 @@ export function CorkBoard({
     if (!itemType || !onDropItem) return;
 
     // Convert viewport screen coords to board (world) coords.
-    // Transform: screen = zoom*(world + pan) - contentMin*(zoom+1)  =>  world = (screen + contentMin*(zoom+1))/zoom - pan
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
-    const canvasX = (screenX + contentMinX * (zoom + 1)) / zoom - panX;
-    const canvasY = (screenY + contentMinY * (zoom + 1)) / zoom - panY;
+    const { x: canvasX, y: canvasY } = corkScreenToWorld(screenX, screenY, zoom, panX, panY, contentMinX, contentMinY);
 
     onDropItem(itemType, canvasX, canvasY);
   }
@@ -188,8 +187,7 @@ export function CorkBoard({
       if (!rect || !onBoardMouseMove) return;
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
-      const x = (screenX + contentMinX * (zoom + 1)) / zoom - panX;
-      const y = (screenY + contentMinY * (zoom + 1)) / zoom - panY;
+      const { x, y } = corkScreenToWorld(screenX, screenY, zoom, panX, panY, contentMinX, contentMinY);
       onBoardMouseMove(x, y);
     },
     [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
@@ -224,21 +222,32 @@ export function CorkBoard({
         const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
         const newZoom = clamp(z * factor, MIN_ZOOM, MAX_ZOOM);
 
-        const newPanX =
-          px +
-          (mouseX + cmx * (newZoom + 1)) / newZoom -
-          (mouseX + cmx * (z + 1)) / z;
-        const newPanY =
-          py +
-          (mouseY + cmy * (newZoom + 1)) / newZoom -
-          (mouseY + cmy * (z + 1)) / z;
+        const { panX: newPanX, panY: newPanY } = corkZoomAroundScreenPoint(
+          px,
+          py,
+          z,
+          newZoom,
+          mouseX,
+          mouseY,
+          cmx,
+          cmy,
+        );
 
         onViewportChangeRef.current(newZoom, newPanX, newPanY);
         return;
       }
 
       if (isWheelOverEditableText(e.target)) return;
-      // Non-Ctrl: let the overflow:auto viewport handle wheel / trackpad pan (onScroll updates pan)
+
+      // Alt + wheel: convert vertical scroll into horizontal pan (mice without a horizontal wheel)
+      if (e.altKey) {
+        e.preventDefault();
+        const { dy } = wheelEventDeltaPixels(e, viewport!);
+        viewport!.scrollLeft += dy;
+        return;
+      }
+
+      // Otherwise: let the overflow:auto viewport handle wheel / trackpad pan (onScroll updates pan)
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });

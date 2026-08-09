@@ -1,34 +1,29 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PenTool, Plus, PencilLine } from "lucide-react";
 import { getBoards, createBoard, deleteBoard } from "../api/boards";
+import { useResourceList } from "../hooks/useResourceList";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
 import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
 import type { BoardSummaryDto } from "../types";
 
 export function ChalkBoardsPage() {
-  const [boards, setBoards] = useState<BoardSummaryDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BoardSummaryDto | null>(null);
 
-  const fetchBoards = useCallback(async () => {
-    try {
-      setError(null);
-      const result = await getBoards({ boardType: "ChalkBoard", limit: 100 });
-      setBoards(result.items);
-    } catch {
-      setError("Failed to load chalkboards.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchBoards();
-  }, [fetchBoards]);
+  const {
+    items: boards,
+    setItems: setBoards,
+    isLoading,
+    error,
+    refetch: fetchBoards,
+    deleteItem,
+  } = useResourceList<BoardSummaryDto>({
+    fetchList: async () => (await getBoards({ boardType: "ChalkBoard", limit: 100 })).items,
+    loadErrorMessage: "Failed to load chalkboards.",
+    remove: { call: deleteBoard },
+  });
 
   const navigate = useNavigate();
 
@@ -55,12 +50,7 @@ export function ChalkBoardsPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeleteTarget(null);
-    setBoards((prev) => prev.filter((b) => b.id !== id));
-    try {
-      await deleteBoard(id);
-    } catch {
-      fetchBoards();
-    }
+    await deleteItem(id);
   }
 
   if (isLoading) {

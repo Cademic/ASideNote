@@ -49,8 +49,11 @@ import {
   buildBoardExportFilename,
   parseBoardExportFile,
 } from "../lib/boardExport";
+import { importBoardReplacingExisting } from "../lib/boardImport";
 import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
+import { corkPanDeltaForContentMinShift, corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
+import { useFileImport } from "../hooks/useFileImport";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
@@ -71,12 +74,12 @@ export function NoteBoardPage() {
   const [imageCards, setImageCards] = useState<BoardImageSummaryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadFileError, setLoadFileError] = useState<string | null>(null);
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(new Set());
   const [editingCardIds, setEditingCardIds] = useState<Set<string>>(new Set());
   const [richTextToolbar, setRichTextToolbar] = useState<BoardRichTextToolbarState | null>(null);
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const primaryEditingCardIdRef = useRef<string | null>(null);
-  const loadFileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Board UI preferences (persist in localStorage) ---
   const [backgroundTheme, setBackgroundTheme] = useState<BoardBackgroundTheme>(() => {
@@ -228,7 +231,6 @@ export function NoteBoardPage() {
 
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
   const imageIdsRef = useRef<Set<string>>(new Set());
   const deletedImageIdsRef = useRef<Set<string>>(new Set());
   const deletedNoteIdsRef = useRef<Set<string>>(new Set());
@@ -269,8 +271,9 @@ export function NoteBoardPage() {
       contentMinY: canvasBounds.contentMinY,
     };
     if (dx === 0 && dy === 0) return;
-    setPanX((p) => p + (dx * (zoom + 1)) / zoom);
-    setPanY((p) => p + (dy * (zoom + 1)) / zoom);
+    const { dPanX, dPanY } = corkPanDeltaForContentMinShift(dx, dy, zoom);
+    setPanX((p) => p + dPanX);
+    setPanY((p) => p + dPanY);
   }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom, isLoading]);
 
   // --- Context menu state ---
@@ -810,7 +813,7 @@ export function NoteBoardPage() {
         handleQuickAddCard();
       } else if (type === "image-card") {
         setPendingImageDrop(null);
-        imageFileInputRef.current?.click();
+        triggerImageFileInput();
       }
     }
     document.addEventListener("board-tool-click", onToolClick);
@@ -1276,9 +1279,7 @@ export function NoteBoardPage() {
     const centerScreenX = rect.width / 2;
     const centerScreenY = rect.height / 2;
     const { contentMinX, contentMinY } = canvasBounds;
-    const x = (centerScreenX + contentMinX * (zoom + 1)) / zoom - panX;
-    const y = (centerScreenY + contentMinY * (zoom + 1)) / zoom - panY;
-    return { x, y };
+    return corkScreenToWorld(centerScreenX, centerScreenY, zoom, panX, panY, contentMinX, contentMinY);
   }
 
   function panViewportToBoardPoint(centerX: number, centerY: number) {
@@ -1287,8 +1288,15 @@ export function NoteBoardPage() {
     const { contentMinX, contentMinY } = canvasBounds;
     const centerScreenX = rect.width / 2;
     const centerScreenY = rect.height / 2;
-    const newPanX = (centerScreenX + contentMinX * (zoom + 1)) / zoom - centerX;
-    const newPanY = (centerScreenY + contentMinY * (zoom + 1)) / zoom - centerY;
+    const { x: newPanX, y: newPanY } = corkPanToCenterWorldPoint(
+      centerScreenX,
+      centerScreenY,
+      centerX,
+      centerY,
+      zoom,
+      contentMinX,
+      contentMinY,
+    );
     handleViewportChange(zoom, newPanX, newPanY);
   }
 
@@ -1798,13 +1806,11 @@ export function NoteBoardPage() {
   async function handleQuickAddImage() {
     if (!boardId) return;
     setPendingImageDrop(null);
-    imageFileInputRef.current?.click();
+    triggerImageFileInput();
   }
 
-  function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !boardId) return;
+  function handleImageFile(file: File) {
+    if (!boardId) return;
 
     const positionX = pendingImageDrop ? pendingImageDrop.x : 30 + Math.random() * 400;
     const positionY = pendingImageDrop ? pendingImageDrop.y : 30 + Math.random() * 300;
@@ -1827,6 +1833,16 @@ export function NoteBoardPage() {
         // Silently fail
       });
   }
+
+  const {
+    inputRef: imageFileInputRef,
+    accept: imageFileAccept,
+    triggerImport: triggerImageFileInput,
+    handleFileSelect: handleImageFileSelect,
+  } = useFileImport({
+    accept: "image/jpeg,image/png,image/webp,image/gif",
+    onFile: handleImageFile,
+  });
 
   function handleImageDragStart(id: string) {
     draggingImageIdRef.current = id;
@@ -2083,137 +2099,56 @@ export function NoteBoardPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [boardId]);
 
-  function handleLoadFromFile() {
-    loadFileInputRef.current?.click();
-  }
-
-  async function handleLoadFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !boardId) return;
+  async function handleLoadFile(file: File) {
+    if (!boardId) return;
+    setLoadFileError(null);
     try {
       const text = await file.text();
       const payload = parseBoardExportFile(text);
       if (!payload || payload.boardType !== "NoteBoard") {
-        return; // Invalid or wrong board type
+        setLoadFileError("That file isn't a valid note board export.");
+        return;
       }
       setEditingNoteIds(new Set());
       setEditingCardIds(new Set());
       primaryEditingNoteIdRef.current = null;
       primaryEditingCardIdRef.current = null;
       setRichTextToolbar(null);
-      const idMap = new Map<string, string>();
 
-      // Delete existing items
-      for (const conn of connections) {
-        try {
-          await deleteConnection(conn.id);
-        } catch {
-          // ignore
-        }
-      }
-      for (const img of imageCards) {
-        try {
-          await deleteBoardImageCard(boardId, img.id);
-        } catch {
-          // ignore
-        }
-      }
-      for (const card of indexCards) {
-        try {
-          await deleteIndexCard(card.id);
-        } catch {
-          // ignore
-        }
-      }
-      for (const note of notes) {
-        try {
-          await deleteNote(note.id);
-        } catch {
-          // ignore
-        }
-      }
+      const result = await importBoardReplacingExisting(boardId, payload, {
+        notes,
+        indexCards,
+        imageCards,
+        connections,
+      });
 
-      // Create notes
-      const newNotes: NoteSummaryDto[] = [];
-      for (const n of payload.notes ?? []) {
-        const created = await createNote({
-          content: n.content,
-          boardId,
-          title: n.title ?? undefined,
-          positionX: n.positionX ?? 20,
-          positionY: n.positionY ?? 20,
-          width: n.width ?? undefined,
-          height: n.height ?? undefined,
-          color: n.color ?? undefined,
-          rotation: n.rotation ?? undefined,
-        });
-        idMap.set(n.id, created.id);
-        newNotes.push(created);
-      }
+      setNotes(result.notes);
+      setIndexCards(result.indexCards);
+      setImageCards(result.imageCards);
+      setConnections(result.connections);
+      boardUndoStackRef.current = [];
+      boardRedoStackRef.current = [];
 
-      // Create index cards
-      const newCards: IndexCardSummaryDto[] = [];
-      for (const c of payload.indexCards ?? []) {
-        const created = await createIndexCard({
-          content: c.content,
-          boardId,
-          title: c.title ?? undefined,
-          positionX: c.positionX ?? 20,
-          positionY: c.positionY ?? 20,
-          width: c.width ?? undefined,
-          height: c.height ?? undefined,
-          color: c.color ?? undefined,
-          rotation: c.rotation ?? undefined,
-        });
-        idMap.set(c.id, created.id);
-        newCards.push(created);
-      }
-
-      // Create image cards
-      const newImages: BoardImageSummaryDto[] = [];
-      for (const img of payload.imageCards ?? []) {
-        const created = await createBoardImageCard(boardId, {
-          imageUrl: img.imageUrl,
-          positionX: img.positionX,
-          positionY: img.positionY,
-          width: img.width ?? undefined,
-          height: img.height ?? undefined,
-          rotation: img.rotation ?? undefined,
-        });
-        idMap.set(img.id, created.id);
-        newImages.push(created);
-      }
-
-      // Create connections (with mapped IDs)
-      for (const conn of payload.connections ?? []) {
-        const fromId = idMap.get(conn.fromItemId);
-        const toId = idMap.get(conn.toItemId);
-        if (fromId && toId) {
-          try {
-            await createConnection({
-              fromItemId: fromId,
-              toItemId: toId,
-              boardId,
-            });
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      // Restore viewport
       if (payload.viewport) {
         setZoom(payload.viewport.zoom);
         setPanX(payload.viewport.panX);
         setPanY(payload.viewport.panY);
       }
-
-      await fetchData();
-    } catch {
-      // Load failed
+    } catch (err) {
+      console.error("Load board from file failed:", err);
+      setLoadFileError("Couldn't load that file. Your existing board content was not changed.");
     }
   }
+
+  const {
+    inputRef: loadFileInputRef,
+    accept: loadFileAccept,
+    triggerImport: handleLoadFromFile,
+    handleFileSelect: handleLoadFileSelect,
+  } = useFileImport({
+    accept: ".json,.asidenote-board,application/json",
+    onFile: handleLoadFile,
+  });
 
   function triggerMenuUndo() {
     document.dispatchEvent(
@@ -2256,7 +2191,7 @@ export function NoteBoardPage() {
       }
     } else if (type === "image-card") {
       setPendingImageDrop({ x, y });
-      imageFileInputRef.current?.click();
+      triggerImageFileInput();
     } else if (type === "index-card") {
       const tempId = `temp-card-${nextTempCardId++}`;
       const now = new Date().toISOString();
@@ -2453,11 +2388,25 @@ export function NoteBoardPage() {
       <input
         ref={loadFileInputRef}
         type="file"
-        accept=".json,.asidenote-board,application/json"
+        accept={loadFileAccept}
         className="hidden"
         aria-hidden
         onChange={handleLoadFileSelect}
       />
+      {loadFileError && (
+        <div className="pointer-events-none absolute inset-x-0 top-2 z-50 flex justify-center">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 shadow-lg dark:border-red-800 dark:bg-red-950/80 dark:text-red-300">
+            <span>{loadFileError}</span>
+            <button
+              type="button"
+              onClick={() => setLoadFileError(null)}
+              className="text-red-700/70 hover:text-red-700 dark:text-red-300/70 dark:hover:text-red-300"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {/* Board: menu sits inside the cork frame, just below the top wood edge */}
       <div
         ref={boardViewportRef}
@@ -2630,7 +2579,7 @@ export function NoteBoardPage() {
           <input
             ref={imageFileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept={imageFileAccept}
             className="hidden"
             onChange={handleImageFileSelect}
           />

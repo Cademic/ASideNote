@@ -1,4 +1,4 @@
-import type { AuthResponse, LoginRequest, RegisterRequest, GoogleLoginRequest } from "../types";
+ import type { AuthResponse, LoginRequest, RegisterRequest, GoogleLoginRequest } from "../types";
 import { apiClient } from "./client";
 
 export async function postLogin(data: LoginRequest): Promise<AuthResponse> {

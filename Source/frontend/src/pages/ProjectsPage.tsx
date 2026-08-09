@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import axios from "axios";
 import {
@@ -9,9 +9,11 @@ import {
 } from "lucide-react";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { getProjects, createProject, deleteProject, updateProject, toggleProjectPin, leaveProject } from "../api/projects";
+import { useResourceList } from "../hooks/useResourceList";
 import { ProjectCard } from "../components/projects/ProjectCard";
 import { CreateProjectDialog } from "../components/projects/CreateProjectDialog";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
+import { PromptDialog } from "../components/dashboard/PromptDialog";
 import type { ProjectSummaryDto } from "../types";
 
 const STATUS_FILTERS = [
@@ -24,9 +26,6 @@ const STATUS_FILTERS = [
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { refreshPinnedProjects } = useOutletContext<AppLayoutContext>();
-  const [projects, setProjects] = useState<ProjectSummaryDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummaryDto | null>(
@@ -34,26 +33,49 @@ export function ProjectsPage() {
   );
   const [leaveTarget, setLeaveTarget] = useState<ProjectSummaryDto | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const fetchProjects = useCallback(async () => {
-    try {
-      setError(null);
-      const params: Record<string, string> = {};
-      if (statusFilter) params.status = statusFilter;
-      const result = await getProjects(params);
-      setProjects(result);
-    } catch {
-      setError("Failed to load projects.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [statusFilter]);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+  const {
+    items: projects,
+    setItems: setProjects,
+    isLoading,
+    error,
+    refetch: fetchProjects,
+    renameItem,
+    togglePin: handleToggleProjectPin,
+    deleteItem,
+  } = useResourceList<ProjectSummaryDto>(
+    {
+      fetchList: async () => {
+        const params: Record<string, string> = {};
+        if (statusFilter) params.status = statusFilter;
+        return getProjects(params);
+      },
+      loadErrorMessage: "Failed to load projects.",
+      rename: {
+        call: (id, name, item) =>
+          updateProject(id, {
+            name,
+            status: item?.status ?? "Active",
+            progress: item?.progress ?? 0,
+          }),
+      },
+      pin: {
+        call: toggleProjectPin,
+        applyOptimistic: (project, isPinned) => ({
+          ...project,
+          isPinned,
+          pinnedAt: isPinned ? new Date().toISOString() : undefined,
+        }),
+        onSuccess: refreshPinnedProjects,
+      },
+      remove: {
+        call: deleteProject,
+        onSuccess: refreshPinnedProjects,
+      },
+    },
+    [statusFilter],
+  );
 
   async function handleCreate(
     name: string,
@@ -114,13 +136,7 @@ export function ProjectsPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeleteTarget(null);
-    setProjects((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await deleteProject(id);
-      refreshPinnedProjects();
-    } catch {
-      fetchProjects();
-    }
+    await deleteItem(id);
   }
 
   function handleLeave(id: string) {
@@ -143,43 +159,12 @@ export function ProjectsPage() {
 
   function handleRenameProject(id: string, currentName: string) {
     setRenameTarget({ id, name: currentName });
-    setRenameValue(currentName);
   }
 
-  async function confirmRenameProject() {
-    if (!renameTarget || !renameValue.trim()) return;
-    const { id } = renameTarget;
-    const newName = renameValue.trim();
-    const project = projects.find((p) => p.id === id);
+  async function confirmRenameProject(newName: string) {
+    if (!renameTarget) return;
     setRenameTarget(null);
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name: newName } : p)),
-    );
-    try {
-      await updateProject(id, {
-        name: newName,
-        status: project?.status ?? "Active",
-        progress: project?.progress ?? 0,
-      });
-    } catch {
-      fetchProjects();
-    }
-  }
-
-  async function handleToggleProjectPin(id: string, isPinned: boolean) {
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, isPinned, pinnedAt: isPinned ? new Date().toISOString() : undefined }
-          : p,
-      ),
-    );
-    try {
-      await toggleProjectPin(id, isPinned);
-      await refreshPinnedProjects();
-    } catch {
-      fetchProjects();
-    }
+    await renameItem?.(renameTarget.id, newName);
   }
 
   if (isLoading) {
@@ -337,46 +322,14 @@ export function ProjectsPage() {
         onCancel={() => setLeaveTarget(null)}
       />
 
-      {/* Rename Project Dialog */}
-      {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Project</h2>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRenameProject();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRenameProject}
-                disabled={!renameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptDialog
+        isOpen={renameTarget !== null}
+        title="Rename Project"
+        initialValue={renameTarget?.name ?? ""}
+        confirmLabel="Rename"
+        onConfirm={confirmRenameProject}
+        onCancel={() => setRenameTarget(null)}
+      />
     </div>
   );
 }

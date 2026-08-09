@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import axios from "axios";
 import { BookOpen, Plus, PencilLine, Upload } from "lucide-react";
@@ -11,42 +11,56 @@ import {
   toggleNotebookPin,
   updateNotebookContent,
 } from "../api/notebooks";
+import { useFileImport } from "../hooks/useFileImport";
+import { useResourceList } from "../hooks/useResourceList";
 import { NotebookCard } from "../components/notebooks/NotebookCard";
 import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
+import { PromptDialog } from "../components/dashboard/PromptDialog";
 import type { NotebookSummaryDto } from "../types";
 
 export function NotebooksPage() {
   const { openNotebook, refreshPinnedNotebooks } = useOutletContext<AppLayoutContext>();
-  const [notebooks, setNotebooks] = useState<NotebookSummaryDto[]>([]);
   const [totalNotebooks, setTotalNotebooks] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<NotebookSummaryDto | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const importFileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchNotebooks = useCallback(async () => {
-    try {
-      setError(null);
+  const {
+    items: notebooks,
+    setItems: setNotebooks,
+    isLoading,
+    error,
+    refetch: fetchNotebooks,
+    renameItem,
+    togglePin: handleTogglePin,
+    deleteItem,
+  } = useResourceList<NotebookSummaryDto>({
+    fetchList: async () => {
       const result = await getNotebooks({ limit: 200 });
-      setNotebooks(result.items);
       setTotalNotebooks(result.total);
-    } catch {
-      setError("Failed to load notebooks.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNotebooks();
-  }, [fetchNotebooks]);
+      return result.items;
+    },
+    loadErrorMessage: "Failed to load notebooks.",
+    rename: { call: (id, name) => updateNotebook(id, { name }) },
+    pin: {
+      call: toggleNotebookPin,
+      applyOptimistic: (notebook, isPinned) => ({
+        ...notebook,
+        isPinned,
+        pinnedAt: isPinned ? new Date().toISOString() : null,
+      }),
+      onSuccess: refreshPinnedNotebooks,
+    },
+    remove: {
+      call: deleteNotebook,
+      onOptimisticRemove: () => setTotalNotebooks((t) => Math.max(0, t - 1)),
+      onSuccess: refreshPinnedNotebooks,
+    },
+  });
 
   /** Derive notebook name from file name: strip path and remove .json extension. */
   function nameFromFileName(fileName: string): string {
@@ -55,10 +69,7 @@ export function NotebooksPage() {
     return withoutExt || "Imported notebook";
   }
 
-  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function handleImportFile(file: File) {
     if (totalNotebooks >= 5) {
       setImportError("Maximum 5 notebooks. Delete one to import another.");
       return;
@@ -87,6 +98,16 @@ export function NotebooksPage() {
       setImporting(false);
     }
   }
+
+  const {
+    inputRef: importFileInputRef,
+    accept: importFileAccept,
+    triggerImport: handleImportClick,
+    handleFileSelect: handleImportFileSelect,
+  } = useFileImport({
+    accept: ".json,application/json",
+    onFile: handleImportFile,
+  });
 
   async function handleCreate(name: string) {
     try {
@@ -117,50 +138,17 @@ export function NotebooksPage() {
     if (!deleteTarget) return;
     const id = deleteTarget.id;
     setDeleteTarget(null);
-    setNotebooks((prev) => prev.filter((n) => n.id !== id));
-    setTotalNotebooks((t) => Math.max(0, t - 1));
-    try {
-      await deleteNotebook(id);
-      refreshPinnedNotebooks();
-    } catch {
-      fetchNotebooks();
-    }
+    await deleteItem(id);
   }
 
   function handleRename(id: string, currentName: string) {
     setRenameTarget({ id, name: currentName });
-    setRenameValue(currentName);
   }
 
-  async function confirmRename() {
-    if (!renameTarget || !renameValue.trim()) return;
-    const { id } = renameTarget;
-    const newName = renameValue.trim();
+  async function confirmRename(newName: string) {
+    if (!renameTarget) return;
     setRenameTarget(null);
-    setNotebooks((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, name: newName } : n)),
-    );
-    try {
-      await updateNotebook(id, { name: newName });
-    } catch {
-      fetchNotebooks();
-    }
-  }
-
-  async function handleTogglePin(id: string, isPinned: boolean) {
-    setNotebooks((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, isPinned, pinnedAt: isPinned ? new Date().toISOString() : null }
-          : n,
-      ),
-    );
-    try {
-      await toggleNotebookPin(id, isPinned);
-      refreshPinnedNotebooks();
-    } catch {
-      fetchNotebooks();
-    }
+    await renameItem?.(renameTarget.id, newName);
   }
 
   if (isLoading) {
@@ -231,14 +219,14 @@ export function NotebooksPage() {
             <input
               ref={importFileInputRef}
               type="file"
-              accept=".json,application/json"
+              accept={importFileAccept}
               className="hidden"
               aria-hidden
-              onChange={handleImportFile}
+              onChange={handleImportFileSelect}
             />
             <button
               type="button"
-              onClick={() => importFileInputRef.current?.click()}
+              onClick={handleImportClick}
               disabled={totalNotebooks >= 5 || importing}
               className="flex flex-shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:-translate-y-0.5 hover:border-primary/40 hover:bg-foreground/5 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none motion-reduce:hover:transform-none"
             >
@@ -310,47 +298,14 @@ export function NotebooksPage() {
         onCancel={() => setDeleteTarget(null)}
       />
 
-      {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">
-              Rename Notebook
-            </h2>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRename();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRename}
-                disabled={!renameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PromptDialog
+        isOpen={renameTarget !== null}
+        title="Rename Notebook"
+        initialValue={renameTarget?.name ?? ""}
+        confirmLabel="Rename"
+        onConfirm={confirmRename}
+        onCancel={() => setRenameTarget(null)}
+      />
     </div>
   );
 }
