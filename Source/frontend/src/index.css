@@ -189,8 +189,70 @@ body,
   min-height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   @apply bg-background text-foreground antialiased;
+}
+
+/* ---- Landing page scroll-reveal ---- */
+@keyframes landing-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.landing-reveal.is-visible {
+  animation: landing-fade-in-up 650ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-reveal,
+  .landing-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* ---- Landing page hero pin — gentle idle wiggle ---- */
+@keyframes landing-pin-wiggle {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-12deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(4deg);
+  }
+}
+
+.landing-pin {
+  animation: landing-pin-wiggle 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-pin {
+    animation: none;
+    transform: translateX(-50%) rotate(-12deg);
+  }
 }
 
 /* Comic-style halftone dot backdrop — applied to page-level background containers */
