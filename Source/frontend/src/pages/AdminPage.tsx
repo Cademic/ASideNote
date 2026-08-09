@@ -235,10 +235,10 @@ export function AdminPage() {
     : 1;
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="h-full overflow-y-auto">
       {/* Admin header strip - distinct but on-theme */}
       <div className="border-b border-border/60 bg-gradient-to-r from-slate-100 to-violet-50/50 dark:from-slate-900/80 dark:to-violet-950/20">
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-violet-200/60 bg-white shadow-sm dark:border-violet-800/40 dark:bg-slate-800/60">
               <ShieldCheck className="h-6 w-6 text-violet-600 dark:text-violet-400" />
@@ -258,7 +258,7 @@ export function AdminPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Stats cards - compact admin style */}
         <section className="mb-8">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-foreground/50">

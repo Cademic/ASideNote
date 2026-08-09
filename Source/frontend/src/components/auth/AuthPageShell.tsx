@@ -10,7 +10,7 @@ interface AuthPageShellProps {
 
 export function AuthPageShell({ children, subtitle }: AuthPageShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background bg-dots">
       <main className="flex flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-14">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-5 flex justify-center sm:mb-6">

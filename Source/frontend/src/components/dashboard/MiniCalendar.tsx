@@ -373,7 +373,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
   const week2Items = getItemsForWeek(week2);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
       {/* Week 1 */}
       <WeekSection
         days={week1}

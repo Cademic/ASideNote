@@ -739,7 +739,7 @@ export function DashboardPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* ── Welcome Notepad ───────────────────────────── */}
         <div className="notepad-card mb-8">
           <div className="notepad-spiral-strip" />
@@ -768,7 +768,7 @@ export function DashboardPage() {
         {/* ── Quick Stats — Sticky Notes ─────────────────── */}
         <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatSticky
-            color="yellow"
+            color="purple"
             icon={CalendarDays}
             label="Today's Date"
             value={formatTodaySticky()}
@@ -1176,21 +1176,23 @@ export function DashboardPage() {
 /* -- Stat Sticky Note ----------------------------------------- */
 
 const STICKY_BG: Record<string, string> = {
-  yellow: "bg-amber-100 dark:bg-amber-950/40",
-  rose: "bg-rose-100 dark:bg-rose-950/40",
-  sky: "bg-sky-100 dark:bg-sky-950/40",
-  green: "bg-emerald-100 dark:bg-emerald-950/40",
+  yellow: "bg-amber-100 dark:bg-amber-950",
+  rose: "bg-rose-100 dark:bg-rose-950",
+  sky: "bg-sky-100 dark:bg-sky-950",
+  green: "bg-emerald-100 dark:bg-emerald-950",
+  purple: "bg-purple-100 dark:bg-purple-950",
 };
 
 const STICKY_ACCENT: Record<string, string> = {
-  yellow: "text-amber-600 dark:text-amber-400",
-  rose: "text-rose-600 dark:text-rose-400",
-  sky: "text-sky-600 dark:text-sky-400",
-  green: "text-emerald-600 dark:text-emerald-400",
+  yellow: "text-amber-700 dark:text-amber-300",
+  rose: "text-rose-700 dark:text-rose-300",
+  sky: "text-sky-700 dark:text-sky-300",
+  green: "text-emerald-700 dark:text-emerald-300",
+  purple: "text-purple-700 dark:text-purple-300",
 };
 
 interface StatStickyProps {
-  color: "yellow" | "rose" | "sky" | "green";
+  color: "yellow" | "rose" | "sky" | "green" | "purple";
   icon: typeof BookOpen;
   label: string;
   value: string;
@@ -1202,7 +1204,7 @@ interface StatStickyProps {
 
 function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueTooltip }: StatStickyProps) {
   const baseClassName = `stat-sticky flex min-h-[7.5rem] w-full min-w-0 flex-col items-center justify-center overflow-hidden px-3 py-5 sm:px-4 ${STICKY_BG[color]}`;
-  const style = { transform: `rotate(${rotation}deg)` };
+  const style = { "--stat-rotate": `${rotation}deg` } as React.CSSProperties;
   const tip = valueTooltip ?? value;
   const content = (
     <>
@@ -1212,7 +1214,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueT
       >
         {value}
       </span>
-      <span className="mt-1 max-w-full truncate px-0.5 text-center text-[11px] font-medium text-foreground/45">
+      <span className="mt-1 max-w-full truncate px-0.5 text-center text-[11px] font-medium text-foreground/60 dark:text-foreground/75">
         {label}
       </span>
     </>
@@ -1224,7 +1226,7 @@ function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueT
         type="button"
         onClick={onClick}
         title={tip.length > 0 ? tip : undefined}
-        className={`${baseClassName} cursor-pointer transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2`}
+        className={`${baseClassName} cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2`}
         style={style}
       >
         {content}

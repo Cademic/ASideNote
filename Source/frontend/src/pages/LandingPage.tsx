@@ -131,7 +131,7 @@ export function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background bg-dots">
       {/* ── Navbar — matches app Navbar styling ───────────── */}
       <header className="navbar-surface sticky top-0 z-30 border-b border-border/50">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-end px-4 sm:px-6">

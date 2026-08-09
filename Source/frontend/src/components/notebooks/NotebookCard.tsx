@@ -208,7 +208,7 @@ export function NotebookCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isNotebookRouteActive
-                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                ? "bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                 : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -229,11 +229,11 @@ export function NotebookCard({
           }}
         >
           {notebook.isPinned && (
-            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-sky-400" />
           )}
           <BookOpen
             className={`h-4 w-4 shrink-0 ${
-              isNotebookRouteActive ? "text-amber-600 dark:text-amber-400" : "text-foreground/40"
+              isNotebookRouteActive ? "text-amber-600 dark:text-sky-400" : "text-foreground/40"
             }`}
           />
           {sidebarShowLabel && (

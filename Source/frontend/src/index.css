@@ -193,6 +193,16 @@ body {
   @apply bg-background text-foreground antialiased;
 }
 
+/* Comic-style halftone dot backdrop — applied to page-level background containers */
+.bg-dots {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px);
+  background-size: 18px 18px;
+}
+
+.dark .bg-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.1px, transparent 1.1px);
+}
+
 /* Cork Board Styles */
 .corkboard-frame {
   position: relative;
@@ -918,7 +928,7 @@ body {
 
 .dark .notepad-card {
   background: linear-gradient(180deg, hsl(222, 22%, 17%) 0%, hsl(222, 22%, 15%) 100%);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: hsl(216, 25%, 22%);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.12);
@@ -1002,7 +1012,7 @@ body {
 
 .dark .paper-card {
   background: linear-gradient(180deg, hsl(222, 22%, 18%) 0%, hsl(222, 22%, 16%) 100%);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: hsl(216, 25%, 22%);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.12),
     0 4px 12px rgba(0, 0, 0, 0.08);
@@ -1019,7 +1029,7 @@ body {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.2),
     0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: hsl(216, 25%, 30%);
 }
 
 /* ---- Stat sticky notes ---- */
@@ -1030,13 +1040,16 @@ body {
   box-shadow:
     1px 2px 4px rgba(0, 0, 0, 0.06),
     0 0 0 1px rgba(0, 0, 0, 0.02);
+  transform: rotate(var(--stat-rotate, 0deg)) scale(1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .stat-sticky:hover {
+  transform: rotate(var(--stat-rotate, 0deg)) scale(1.06);
   box-shadow:
-    2px 4px 8px rgba(0, 0, 0, 0.1),
+    3px 6px 14px rgba(0, 0, 0, 0.16),
     0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 10;
 }
 
 /* Folded corner on sticky notes */
@@ -1055,13 +1068,13 @@ body {
 .dark .stat-sticky {
   box-shadow:
     1px 2px 4px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
+    0 0 0 1px rgba(0, 0, 0, 0.25);
 }
 
 .dark .stat-sticky:hover {
   box-shadow:
-    2px 4px 8px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+    3px 8px 18px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
 .dark .stat-sticky::after {
@@ -1206,7 +1219,7 @@ body {
 }
 
 .dark .sidebar-nav-active {
-  box-shadow: inset 3px 0 0 0 #b45309;
+  box-shadow: inset 3px 0 0 0 #0ea5e9;
 }
 
 /* Board tool swatch — subtle colored indicator */

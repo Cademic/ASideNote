@@ -8,7 +8,7 @@ export function PrivacyPolicyPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background bg-dots">
       <header className="navbar-surface sticky top-0 z-30 border-b border-border/50">
         <div className="mx-auto flex h-14 max-w-3xl items-center px-4 sm:px-6">
           <Link
