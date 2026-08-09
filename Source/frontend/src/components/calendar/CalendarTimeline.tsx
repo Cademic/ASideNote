@@ -266,7 +266,7 @@ export function CalendarTimeline({
   const currentMonth = currentDate.getMonth();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
       {weeks.map((weekDays, weekIdx) => {
         const items = getItemsForWeek(weekDays);
         return (

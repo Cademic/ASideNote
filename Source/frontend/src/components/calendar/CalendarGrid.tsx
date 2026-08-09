@@ -99,7 +99,7 @@ export function CalendarGrid({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-lg border border-border bg-background">
       {/* Weekday headers */}
       <div className="calendar-day-cell grid grid-cols-7 divide-x divide-border/40 border-b border-border">
         {WEEKDAYS.map((day) => (

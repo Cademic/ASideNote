@@ -260,7 +260,7 @@ export function SettingsPage() {
           {profileError && (
             <p className="mb-4 text-sm text-red-500">{profileError}</p>
           )}
-          <form onSubmit={handleSaveProfile} className="space-y-6 rounded-xl border border-border/60 bg-background/50 p-6">
+          <form onSubmit={handleSaveProfile} className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
             {/* Profile picture */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Profile picture</label>
@@ -379,7 +379,7 @@ export function SettingsPage() {
           {prefsError && (
             <p className="mb-4 text-sm text-red-500">{prefsError}</p>
           )}
-          <form onSubmit={handleSavePreferences} className="space-y-6 rounded-xl border border-border/60 bg-background/50 p-6">
+          <form onSubmit={handleSavePreferences} className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
             {/* Theme */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Theme</label>
@@ -421,7 +421,7 @@ export function SettingsPage() {
             <ShieldAlert className="h-5 w-5 text-foreground/50" />
             <h2 className="text-base font-semibold text-foreground">Account actions</h2>
           </div>
-          <div className="space-y-6 rounded-xl border border-border/60 bg-background/50 p-6">
+          <div className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
             {/* Change password */}
             <form onSubmit={handleChangePassword} className="space-y-4">
               <h3 className="text-sm font-medium text-foreground">Change password</h3>

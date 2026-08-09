@@ -193,6 +193,16 @@ body {
   @apply bg-background text-foreground antialiased;
 }
 
+/* Comic-style halftone dot backdrop — applied to page-level background containers */
+.bg-dots {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px);
+  background-size: 18px 18px;
+}
+
+.dark .bg-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.1px, transparent 1.1px);
+}
+
 /* Cork Board Styles */
 .corkboard-frame {
   position: relative;
@@ -1030,13 +1040,16 @@ body {
   box-shadow:
     1px 2px 4px rgba(0, 0, 0, 0.06),
     0 0 0 1px rgba(0, 0, 0, 0.02);
+  transform: rotate(var(--stat-rotate, 0deg)) scale(1);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .stat-sticky:hover {
+  transform: rotate(var(--stat-rotate, 0deg)) scale(1.06);
   box-shadow:
-    2px 4px 8px rgba(0, 0, 0, 0.1),
+    3px 6px 14px rgba(0, 0, 0, 0.16),
     0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 10;
 }
 
 /* Folded corner on sticky notes */
@@ -1060,7 +1073,7 @@ body {
 
 .dark .stat-sticky:hover {
   box-shadow:
-    2px 4px 8px rgba(0, 0, 0, 0.25),
+    3px 8px 18px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 
