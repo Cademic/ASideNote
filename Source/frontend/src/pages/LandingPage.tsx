@@ -93,17 +93,17 @@ const HIGHLIGHTS = [
 ];
 
 const STICKY_BG: Record<string, string> = {
-  yellow: "bg-amber-100 dark:bg-amber-900/35",
-  rose: "bg-rose-100 dark:bg-rose-900/35",
-  sky: "bg-sky-100 dark:bg-sky-900/35",
-  green: "bg-emerald-100 dark:bg-emerald-900/35",
+  yellow: "bg-purple-100 dark:bg-purple-950",
+  rose: "bg-rose-100 dark:bg-rose-950",
+  sky: "bg-sky-100 dark:bg-sky-950",
+  green: "bg-emerald-100 dark:bg-emerald-950",
 };
 
 const STICKY_ACCENT: Record<string, string> = {
-  yellow: "text-amber-600 dark:text-amber-400",
-  rose: "text-rose-600 dark:text-rose-400",
-  sky: "text-sky-600 dark:text-sky-400",
-  green: "text-emerald-600 dark:text-emerald-400",
+  yellow: "text-purple-700 dark:text-purple-300",
+  rose: "text-rose-700 dark:text-rose-300",
+  sky: "text-sky-700 dark:text-sky-300",
+  green: "text-emerald-700 dark:text-emerald-300",
 };
 
 const DASHBOARD_VIDEO_SRC = {
@@ -251,7 +251,7 @@ export function LandingPage() {
               >
                 {h.value}
               </span>
-              <span className="mt-1.5 text-[11px] font-medium text-foreground/45">
+              <span className="mt-1.5 text-[11px] font-medium text-foreground/60 dark:text-foreground/75">
                 {h.label}
               </span>
             </div>
@@ -369,7 +369,7 @@ export function LandingPage() {
       {/* ── CTA — sticky note style ──────────────────────── */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <div
-          className="stat-sticky mx-auto max-w-2xl bg-amber-100 px-8 py-10 text-center dark:bg-amber-950/40 sm:px-12 sm:py-14"
+          className="stat-sticky mx-auto max-w-2xl bg-purple-100 px-8 py-10 text-center dark:bg-purple-950 sm:px-12 sm:py-14"
           style={{ transform: "rotate(-0.5deg)" }}
         >
           <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -383,7 +383,7 @@ export function LandingPage() {
             {isAuthenticated ? (
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-purple-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-purple-600 dark:hover:bg-purple-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Go to Dashboard
@@ -393,14 +393,14 @@ export function LandingPage() {
               <>
                 <Link
                   to="/register"
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                  className="inline-flex items-center gap-2 rounded-lg bg-purple-500 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-purple-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-background dark:bg-purple-600 dark:hover:bg-purple-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
                   Create Free Account
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-6 py-3 text-sm font-semibold text-foreground transition-colors duration-150 hover:bg-amber-50 dark:border-amber-800/40 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 motion-reduce:transition-none"
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-300/60 bg-purple-50/60 px-6 py-3 text-sm font-semibold text-foreground transition-colors duration-150 hover:bg-purple-50 dark:border-purple-800/40 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 motion-reduce:transition-none"
                 >
                   Sign In
                 </Link>

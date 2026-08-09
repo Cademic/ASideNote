@@ -121,11 +121,13 @@ function assignLanes(items: Omit<WeekItem, "lane">[]): WeekItem[] {
 
 interface MiniCalendarProps {
   projects: ProjectSummaryDto[];
+  /** Called after this widget creates, edits, or deletes an event so the parent can refresh its own calendar data (e.g. the "Next Up" sticky). */
+  onEventsChanged?: () => void;
 }
 
 /* ─── Main Component ───────────────────────────────────── */
 
-export function MiniCalendar({ projects }: MiniCalendarProps) {
+export function MiniCalendar({ projects, onEventsChanged }: MiniCalendarProps) {
   const navigate = useNavigate();
   const [events, setEvents] = useState<CalendarEventDto[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -349,6 +351,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
       setDialogOpen(false);
       setEditingEvent(null);
       fetchEvents();
+      onEventsChanged?.();
     } catch {
       console.error("Failed to save event");
     }
@@ -362,6 +365,7 @@ export function MiniCalendar({ projects }: MiniCalendarProps) {
       setDialogOpen(false);
       setEditingEvent(null);
       fetchEvents();
+      onEventsChanged?.();
     } catch {
       console.error("Failed to delete event");
     }

@@ -29,17 +29,17 @@ import type {
 import { formatElapsedSincePreviousSessionEnd } from "../utils/format-last-active";
 
 const STICKY_BG: Record<string, string> = {
-  yellow: "bg-amber-100 dark:bg-amber-950/40",
-  rose: "bg-rose-100 dark:bg-rose-950/40",
-  sky: "bg-sky-100 dark:bg-sky-950/40",
-  green: "bg-emerald-100 dark:bg-emerald-950/40",
+  yellow: "bg-purple-100 dark:bg-purple-950",
+  rose: "bg-rose-100 dark:bg-rose-950",
+  sky: "bg-sky-100 dark:bg-sky-950",
+  green: "bg-emerald-100 dark:bg-emerald-950",
 };
 
 const STICKY_ACCENT: Record<string, string> = {
-  yellow: "text-amber-600 dark:text-amber-400",
-  rose: "text-rose-600 dark:text-rose-400",
-  sky: "text-sky-600 dark:text-sky-400",
-  green: "text-emerald-600 dark:text-emerald-400",
+  yellow: "text-purple-700 dark:text-purple-300",
+  rose: "text-rose-700 dark:text-rose-300",
+  sky: "text-sky-700 dark:text-sky-300",
+  green: "text-emerald-700 dark:text-emerald-300",
 };
 
 const SECTION_ACCENT: Record<string, string> = {
@@ -393,7 +393,7 @@ function StatSticky({
     >
       <Icon className={`mb-1.5 h-4 w-4 ${STICKY_ACCENT[color]}`} />
       <span className={`text-lg font-bold leading-tight ${STICKY_ACCENT[color]}`}>{value}</span>
-      <span className="mt-1 text-[11px] font-medium text-foreground/45">{label}</span>
+      <span className="mt-1 text-[11px] font-medium text-foreground/60 dark:text-foreground/75">{label}</span>
     </div>
   );
 }

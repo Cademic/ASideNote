@@ -818,7 +818,7 @@ export function DashboardPage() {
           count={0}
           accentColor="sky"
         >
-          <MiniCalendar projects={projectsOnCalendar} />
+          <MiniCalendar projects={projectsOnCalendar} onEventsChanged={refreshCalendarEvents} />
         </NotebookSection>
 
         {/* ── Active Projects ────────────────────────────── */}

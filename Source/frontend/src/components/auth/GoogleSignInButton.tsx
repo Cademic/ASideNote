@@ -145,7 +145,7 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
     containerRef.current.innerHTML = "";
     window.google.accounts.id.renderButton(containerRef.current, {
       type: "standard",
-      theme: isDarkMode ? "filled_black" : "outline",
+      theme: isDarkMode ? "outline" : "filled_black",
       size: "large",
       text: "continue_with",
       width: buttonWidth,
