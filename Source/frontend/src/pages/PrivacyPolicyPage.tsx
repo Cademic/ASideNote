@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Shield } from "lucide-react";
+import { MarketingHeader } from "../components/layout/MarketingHeader";
 
 export function PrivacyPolicyPage() {
   useEffect(() => {
@@ -8,18 +9,8 @@ export function PrivacyPolicyPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background bg-dots">
-      <header className="navbar-surface sticky top-0 z-30 border-b border-border/50">
-        <div className="mx-auto flex h-14 max-w-3xl items-center px-4 sm:px-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to home
-          </Link>
-        </div>
-      </header>
+    <div className="font-editorial min-h-screen bg-background bg-dots">
+      <MarketingHeader />
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
         <div className="paper-card rounded-xl border border-border/60 bg-surface/30 p-6 sm:p-8">
@@ -29,7 +20,7 @@ export function PrivacyPolicyPage() {
                 <Shield className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                <h1 className="font-display text-xl font-medium tracking-tight text-foreground sm:text-2xl">
                   Privacy Policy
                 </h1>
                 <p className="mt-0.5 text-xs text-foreground/50">
@@ -41,7 +32,7 @@ export function PrivacyPolicyPage() {
 
           <div className="space-y-8">
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 1. Introduction
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">
@@ -52,7 +43,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 2. Information We Collect
               </h2>
               <p className="mb-2 text-sm leading-relaxed text-foreground/80">
@@ -71,7 +62,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 3. How We Use Your Information
               </h2>
               <p className="mb-2 text-sm leading-relaxed text-foreground/80">We use the information we collect to:</p>
@@ -86,7 +77,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 4. Data Sharing and Disclosure
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">
@@ -98,7 +89,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 5. Data Security
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">
@@ -110,7 +101,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 6. Your Rights
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">
@@ -122,7 +113,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 7. Changes to This Policy
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">
@@ -133,7 +124,7 @@ export function PrivacyPolicyPage() {
             </section>
 
             <section className="scroll-mt-6">
-              <h2 className="mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-semibold text-foreground dark:border-l-amber-500">
+              <h2 className="font-display mb-3 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 text-base font-medium text-foreground dark:border-l-amber-500">
                 8. Contact Us
               </h2>
               <p className="text-sm leading-relaxed text-foreground/80">

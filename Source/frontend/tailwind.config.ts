@@ -5,6 +5,14 @@ const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        // Marketing-site typography (About/Contact/FAQ/Privacy/Terms/Landing) — intentionally
+        // NOT named sans/serif/mono, since Tailwind's Preflight applies `sans` app-wide via the
+        // base `html` rule and overriding it would reskin the whole authenticated app.
+        display: ['"Fraunces"', "Georgia", "serif"],
+        editorial: ['"Karla"', "system-ui", "-apple-system", "sans-serif"],
+        label: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+      },
       colors: {
         background: "hsl(var(--color-background) / <alpha-value>)",
         foreground: "hsl(var(--color-foreground) / <alpha-value>)",
