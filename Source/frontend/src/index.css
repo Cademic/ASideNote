@@ -373,7 +373,9 @@ body {
   --note-rotate: -2deg;
   --note-delay: 0.27s;
   border-radius: 3px;
-  background: var(--land-paper);
+  /* Always light paper, regardless of theme — this mockup represents an index card,
+     which stays white in the real app in both light and dark mode. */
+  background: #fffdf8;
   /* clip-path instead of overflow:hidden — on a rotated border-radius box, Chromium's
      overflow:hidden clipping anti-aliases badly and leaves a jagged halo of whatever's
      behind the element (page background) around the edge. clip-path renders cleanly. */
@@ -389,7 +391,7 @@ body {
 .landing-note--n3 .landing-note-rules span {
   display: block;
   height: 1.6cqw;
-  background: var(--land-rule);
+  background: #e3daca;
   border-radius: 2px;
   margin-bottom: 3.4cqw;
 }
@@ -427,15 +429,17 @@ body {
   aspect-ratio: 1.6 / 1;
   --note-rotate: 4deg;
   --note-delay: 0.6s;
-  background: var(--land-paper);
-  border: 1px solid var(--land-rule);
+  /* Always light paper, regardless of theme — this mockup represents an index card,
+     which stays white in the real app in both light and dark mode. */
+  background: #fffdf8;
+  border: 1px solid #e3daca;
   border-radius: 2px;
   padding: 6cqw;
 }
 .landing-note--n6 span {
   display: block;
   height: 2.2cqw;
-  background: var(--land-rule);
+  background: #e3daca;
   border-radius: 2px;
   margin-bottom: 3.4cqw;
 }
