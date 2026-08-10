@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
+import { Reveal } from "../components/ui/Reveal";
 
 const FAQS = [
   {
@@ -46,56 +47,79 @@ const FAQS = [
 ];
 
 export function FaqPage() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   return (
-    <div className="landing-editorial bg-dots font-editorial min-h-screen">
+    <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
       <MarketingHeader />
 
-      {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-      <section className="bg-[var(--land-cream)] px-6 py-14 sm:py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
-            Questions
-          </p>
-          <h1 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-            Frequently asked questions
-          </h1>
-          <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-            Answers to common questions about ASideNote.
-          </p>
-        </div>
-      </section>
+      <main className="flex-1">
+        {/* ── Page hero — solid cream backdrop, no dots ───────── */}
+        <section className="bg-[var(--land-cream)] px-6 py-14 sm:py-20">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+              Questions
+            </p>
+            <h1 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
+              Frequently asked questions
+            </h1>
+            <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+              Answers to common questions about ASideNote.
+            </p>
+          </Reveal>
+        </section>
 
-      {/* ── Accordion ────────────────────────────────────────── */}
-      <section className="px-6 py-14 sm:py-20">
-        <div className="mx-auto max-w-3xl">
-          <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
-            {FAQS.map((faq) => (
-              <details key={faq.question} className="group py-5">
-                <summary className="font-display flex cursor-pointer list-none items-center justify-between gap-3 text-base font-medium text-[var(--land-ink)] marker:hidden [&::-webkit-details-marker]:hidden">
-                  {faq.question}
-                  <ChevronDown className="h-4 w-4 shrink-0 text-[var(--land-ink-3)] transition-transform duration-200 group-open:rotate-180" />
-                </summary>
-                <p className="mt-3 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-                  {faq.answer}
-                </p>
-              </details>
-            ))}
-          </div>
+        {/* ── Accordion ────────────────────────────────────────── */}
+        <section className="px-6 py-14 sm:py-20">
+          <div className="mx-auto max-w-3xl">
+            <Reveal>
+              <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
+                {FAQS.map((faq, i) => {
+                  const isOpen = openIndex === i;
+                  return (
+                    <div key={faq.question} className="py-5">
+                      <button
+                        type="button"
+                        onClick={() => setOpenIndex(isOpen ? null : i)}
+                        aria-expanded={isOpen}
+                        className="font-display flex w-full cursor-pointer items-center justify-between gap-3 text-left text-base font-medium text-[var(--land-ink)]"
+                      >
+                        {faq.question}
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-[var(--land-ink-3)] transition-transform duration-300 ease-out-smooth ${isOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      <div
+                        className="grid transition-[grid-template-rows] duration-300 ease-out-smooth motion-reduce:transition-none"
+                        style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
+                      >
+                        <div className="overflow-hidden">
+                          <p className="mt-3 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+                            {faq.answer}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Reveal>
 
-          <div className="mt-8 text-center">
-            <Link
-              to="/"
-              className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
-            >
-              Back to home
-            </Link>
+            <Reveal delay={100} className="mt-8 text-center">
+              <Link
+                to="/"
+                className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
+              >
+                Back to home
+              </Link>
+            </Reveal>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
       {/* ── Footer ─────────────────────────────────────────── */}
       <footer className="navbar-surface border-t border-border/40">
