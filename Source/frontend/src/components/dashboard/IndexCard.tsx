@@ -26,7 +26,7 @@ import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
-  white: "bg-gray-100 dark:bg-gray-300",
+  white: "bg-gray-100 dark:bg-zinc-300",
   ivory: "bg-amber-200 dark:bg-amber-400",
   sky: "bg-sky-200 dark:bg-sky-400",
   rose: "bg-rose-200 dark:bg-rose-400",
@@ -692,10 +692,10 @@ export function IndexCard({
                 </button>
                 {menuOpen && (
                   <div
-                    className="index-card-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    className="index-card-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-zinc-600 dark:bg-zinc-800"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400">
                       Color
                     </div>
                     <div className="flex flex-nowrap items-center gap-1.5 px-2 pb-2">
@@ -709,15 +709,15 @@ export function IndexCard({
                           }}
                           className={`index-card-action-btn h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
                             colorKey === key
-                              ? "border-gray-700 ring-2 ring-gray-400 ring-offset-1 dark:border-gray-300 dark:ring-gray-500"
-                              : "border-gray-300 dark:border-gray-500"
+                              ? "border-gray-700 ring-2 ring-gray-400 ring-offset-1 dark:border-zinc-300 dark:ring-zinc-500"
+                              : "border-gray-300 dark:border-zinc-500"
                           } ${INDEX_CARD_SWATCH[key] ?? INDEX_CARD_COLORS[key].bg}`}
                           title={key}
                           aria-label={`Color ${key}`}
                         />
                       ))}
                     </div>
-                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400 flex items-center gap-1">
                       <RotateCw className="h-3 w-3" />
                       Tilt
                     </div>
@@ -733,8 +733,8 @@ export function IndexCard({
                           className={[
                             "index-card-action-btn flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
                             (card.rotation ?? 0) === deg
-                              ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
-                              : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                              ? "border-gray-800 bg-black/10 text-gray-900 dark:border-zinc-300 dark:bg-white/10 dark:text-zinc-100"
+                              : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300 dark:hover:bg-zinc-600",
                           ].join(" ")}
                           title={`${deg}°`}
                         >
@@ -742,7 +742,7 @@ export function IndexCard({
                         </button>
                       ))}
                     </div>
-                    <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                    <div className="my-1 border-t border-gray-100 dark:border-zinc-700" />
                     {onDuplicate && (
                       <button
                         type="button"
@@ -750,7 +750,7 @@ export function IndexCard({
                           onDuplicate(card.id);
                           setMenuOpen(false);
                         }}
-                        className="index-card-action-btn flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="index-card-action-btn flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                       >
                         <Copy className="h-3.5 w-3.5" />
                         Duplicate card

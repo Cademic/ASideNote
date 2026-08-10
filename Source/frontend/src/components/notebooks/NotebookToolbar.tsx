@@ -132,10 +132,10 @@ function ToolbarButton({
       className={[
         "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
         disabled
-          ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
+          ? "cursor-not-allowed text-gray-400 dark:text-zinc-500"
           : isActive
             ? "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200",
+            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200",
       ].join(" ")}
     >
       {children}
@@ -199,28 +199,28 @@ function WordStyleColorPicker({
 
   return (
     <div
-      className="absolute left-0 top-full z-50 mt-1 w-[248px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+      className="absolute left-0 top-full z-50 mt-1 w-[248px] rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="mb-2 text-[11px] font-medium text-gray-500 dark:text-gray-400">Automatic</div>
+      <div className="mb-2 text-[11px] font-medium text-gray-500 dark:text-zinc-400">Automatic</div>
       <button
         type="button"
         onMouseDown={(e) => {
           e.preventDefault();
           applyColor(AUTOMATIC_COLOR);
         }}
-        className={`mb-3 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+        className={`mb-3 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-zinc-700 ${
           isAutomatic ? "bg-amber-50 dark:bg-amber-900/20" : ""
         }`}
       >
         <span
           className={`h-5 w-5 shrink-0 rounded border ${
-            isAutomatic ? "border-gray-800 ring-1 ring-gray-400" : "border-gray-300 dark:border-gray-500"
-          } ${type === "text" ? "bg-foreground" : "bg-gray-100 dark:bg-gray-700"}`}
+            isAutomatic ? "border-gray-800 ring-1 ring-gray-400" : "border-gray-300 dark:border-zinc-500"
+          } ${type === "text" ? "bg-foreground" : "bg-gray-100 dark:bg-zinc-700"}`}
         />
         <span>Automatic</span>
       </button>
-      <div className="mb-2 text-[11px] font-medium text-gray-500 dark:text-gray-400">Theme colors</div>
+      <div className="mb-2 text-[11px] font-medium text-gray-500 dark:text-zinc-400">Theme colors</div>
       <div className="grid grid-cols-10 gap-0.5">
         {Array.from({ length: 5 }, (_, rowIdx) =>
           THEME_COLORS_GRID.map((col, colIdx) => {
@@ -237,7 +237,7 @@ function WordStyleColorPicker({
                 className={`h-5 w-5 rounded-sm border transition-transform ${
                   currentColor.toLowerCase() === hex.toLowerCase()
                     ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                    : "border-gray-300 hover:scale-105 dark:border-gray-500"
+                    : "border-gray-300 hover:scale-105 dark:border-zinc-500"
                 }`}
                 style={{ backgroundColor: hex }}
               />
@@ -245,7 +245,7 @@ function WordStyleColorPicker({
           }),
         ).flat()}
       </div>
-      <div className="mb-2 mt-2 text-[11px] font-medium text-gray-500 dark:text-gray-400">Standard colors</div>
+      <div className="mb-2 mt-2 text-[11px] font-medium text-gray-500 dark:text-zinc-400">Standard colors</div>
       <div className="flex flex-wrap gap-0.5">
         {STANDARD_COLORS.map((hex) => (
           <button
@@ -258,13 +258,13 @@ function WordStyleColorPicker({
             className={`h-5 w-5 rounded-sm border transition-transform ${
               currentColor.toLowerCase() === hex.toLowerCase()
                 ? "scale-110 border-gray-800 ring-1 ring-gray-400"
-                : "border-gray-300 hover:scale-105 dark:border-gray-500"
+                : "border-gray-300 hover:scale-105 dark:border-zinc-500"
             }`}
             style={{ backgroundColor: hex }}
           />
         ))}
       </div>
-      <div className="mt-2 border-t border-gray-200 pt-2 dark:border-gray-600">
+      <div className="mt-2 border-t border-gray-200 pt-2 dark:border-zinc-600">
         {!showCustom ? (
           <button
             type="button"
@@ -274,9 +274,9 @@ function WordStyleColorPicker({
               setCustomColor(currentColor);
               setHexInput(currentColor.replace(/^#/, "").toUpperCase());
             }}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
-            <span className="inline-block h-4 w-4 rounded border border-gray-300 dark:border-gray-500" style={{ backgroundColor: currentColor }} />
+            <span className="inline-block h-4 w-4 rounded border border-gray-300 dark:border-zinc-500" style={{ backgroundColor: currentColor }} />
             More colors…
           </button>
         ) : (
@@ -290,7 +290,7 @@ function WordStyleColorPicker({
                   setCustomColor(v);
                   setHexInput(v.replace(/^#/, "").toUpperCase());
                 }}
-                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-gray-300 dark:border-gray-500"
+                className="h-8 w-10 shrink-0 cursor-pointer rounded border border-gray-300 dark:border-zinc-500"
               />
               <input
                 type="text"
@@ -305,7 +305,7 @@ function WordStyleColorPicker({
                 }}
                 onKeyDown={(e) => e.key === "Enter" && handleCustomApply()}
                 placeholder="Hex"
-                className="h-8 flex-1 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+                className="h-8 flex-1 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
               />
             </div>
             <div className="flex gap-1">
@@ -325,7 +325,7 @@ function WordStyleColorPicker({
                   e.preventDefault();
                   setShowCustom(false);
                 }}
-                className="rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+                className="rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600"
               >
                 Cancel
               </button>
@@ -347,7 +347,7 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
   }
 
   return (
-    <div className="flex min-w-0 items-center rounded-md border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800">
+    <div className="flex min-w-0 items-center rounded-md border border-gray-200 bg-white dark:border-zinc-600 dark:bg-zinc-800">
       <button
         type="button"
         onMouseDown={(e) => {
@@ -356,7 +356,7 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
         }}
         disabled={currentNum <= MIN_FONT_SIZE}
         title="Decrease font size"
-        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-l-md border-r border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-l-md border-r border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
       >
         <Minus className="h-3.5 w-3.5" />
       </button>
@@ -370,7 +370,7 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
           maxSize={MAX_FONT_SIZE}
           defaultSize={12}
           className="w-full min-w-0"
-          inputClassName="h-8 w-full min-w-[3.25rem] border-0 bg-transparent text-center text-sm text-gray-700 shadow-none focus:outline-none focus:ring-0 dark:text-gray-200"
+          inputClassName="h-8 w-full min-w-[3.25rem] border-0 bg-transparent text-center text-sm text-gray-700 shadow-none focus:outline-none focus:ring-0 dark:text-zinc-200"
         />
       </div>
       <button
@@ -381,7 +381,7 @@ function FontSizeWithButtons({ editor }: { editor: Editor }) {
         }}
         disabled={currentNum >= MAX_FONT_SIZE}
         title="Increase font size"
-        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-r-md border-l border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="flex h-8 w-7 shrink-0 items-center justify-center rounded-r-md border-l border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-700"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
@@ -411,11 +411,11 @@ function TextColorDropdown({ editor, currentColor, isAutomatic }: { editor: Edit
           setShowPicker(!showPicker);
         }}
         title="Text color"
-        className="flex h-8 items-center gap-0.5 rounded-md border border-gray-200 px-1.5 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800"
+        className="flex h-8 items-center gap-0.5 rounded-md border border-gray-200 px-1.5 text-gray-600 hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
       >
         <Type className="h-4 w-4" />
         <span
-          className={`h-3.5 w-3.5 rounded-sm border border-gray-300 dark:border-gray-500 ${isAutomatic ? "bg-foreground" : ""}`}
+          className={`h-3.5 w-3.5 rounded-sm border border-gray-300 dark:border-zinc-500 ${isAutomatic ? "bg-foreground" : ""}`}
           style={isAutomatic ? undefined : { backgroundColor: currentColor }}
         />
       </button>
@@ -476,7 +476,7 @@ function HighlightButton({
             e.preventDefault();
             setShowColors(!showColors);
           }}
-          className="ml-0.5 h-8 w-6 rounded-md border border-gray-200 px-0.5 text-[10px] text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+          className="ml-0.5 h-8 w-6 rounded-md border border-gray-200 px-0.5 text-[10px] text-gray-500 hover:bg-gray-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
           title="Highlight color"
         >
           <ChevronDown className="mx-auto h-3 w-3" />
@@ -529,7 +529,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
       </ToolbarButton>
       {showInput && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 flex gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          className="absolute left-0 top-full z-50 mt-1 flex gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <input
@@ -545,7 +545,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
             }}
             placeholder="Enter URL"
             autoFocus
-            className="h-8 w-48 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            className="h-8 w-48 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
           />
           <button
             type="button"
@@ -638,7 +638,7 @@ function ImageButton({ editor, notebookId }: { editor: Editor; notebookId: strin
       </ToolbarButton>
       {showInput && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          className="absolute left-0 top-full z-50 mt-1 flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <input
@@ -654,7 +654,7 @@ function ImageButton({ editor, notebookId }: { editor: Editor; notebookId: strin
             }}
             placeholder="Image URL"
             autoFocus
-            className="h-8 w-48 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            className="h-8 w-48 rounded border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
           />
           <div className="flex gap-1">
             <button
@@ -663,12 +663,12 @@ function ImageButton({ editor, notebookId }: { editor: Editor; notebookId: strin
                 e.preventDefault();
                 handleSetImage(url);
               }}
-              className="flex-1 rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+              className="flex-1 rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600"
             >
               Set URL
             </button>
             <label className={`flex flex-1 cursor-pointer items-center justify-center rounded px-2 py-1.5 text-sm ${
-              uploading ? "cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500" : "bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+              uploading ? "cursor-not-allowed bg-gray-100 text-gray-400 dark:bg-zinc-700 dark:text-zinc-500" : "bg-gray-100 hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600"
             }`}>
               {uploading ? "Uploading…" : "Upload"}
               <input
@@ -708,30 +708,30 @@ function TableOptionsButton({ editor }: { editor: Editor }) {
       </ToolbarButton>
       {showDialog && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white p-3 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Table</div>
+          <div className="mb-2 text-sm font-medium text-gray-700 dark:text-zinc-200">Table</div>
           <div className="mb-2 flex items-center gap-2">
-            <label className="text-xs text-gray-600 dark:text-gray-400">Rows</label>
+            <label className="text-xs text-gray-600 dark:text-zinc-400">Rows</label>
             <input
               type="number"
               min={1}
               max={20}
               value={rows}
               onChange={(e) => setRows(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)))}
-              className="h-8 w-16 rounded border border-gray-200 px-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              className="h-8 w-16 rounded border border-gray-200 px-2 text-center text-sm dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
             />
           </div>
           <div className="mb-2 flex items-center gap-2">
-            <label className="text-xs text-gray-600 dark:text-gray-400">Columns</label>
+            <label className="text-xs text-gray-600 dark:text-zinc-400">Columns</label>
             <input
               type="number"
               min={1}
               max={20}
               value={cols}
               onChange={(e) => setCols(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)))}
-              className="h-8 w-16 rounded border border-gray-200 px-2 text-center text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+              className="h-8 w-16 rounded border border-gray-200 px-2 text-center text-sm dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
             />
           </div>
           <div className="mb-2 flex items-center gap-2">
@@ -742,7 +742,7 @@ function TableOptionsButton({ editor }: { editor: Editor }) {
               onChange={(e) => setWithHeaderRow(e.target.checked)}
               className="h-4 w-4"
             />
-            <label htmlFor="header-row" className="text-xs text-gray-600 dark:text-gray-400">
+            <label htmlFor="header-row" className="text-xs text-gray-600 dark:text-zinc-400">
               Header row
             </label>
           </div>
@@ -763,7 +763,7 @@ function TableOptionsButton({ editor }: { editor: Editor }) {
                 e.preventDefault();
                 setShowDialog(false);
               }}
-              className="flex-1 rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
+              className="flex-1 rounded bg-gray-100 px-2 py-1.5 text-sm hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-600"
             >
               Cancel
             </button>
@@ -865,7 +865,7 @@ export function NotebookToolbar({
   };
 
   const selectClassName =
-    "h-8 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200";
+    "h-8 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200";
 
   const toggleSection = (id: string) => {
     setOpenSection((prev) => (prev === id ? null : id));
@@ -881,11 +881,11 @@ export function NotebookToolbar({
     children: React.ReactNode;
   }) =>
     isCompact ? (
-      <div className="border-b border-gray-200 last:border-b-0 dark:border-gray-600">
+      <div className="border-b border-gray-200 last:border-b-0 dark:border-zinc-600">
         <button
           type="button"
           onClick={() => toggleSection(id)}
-          className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           {label}
           <ChevronRight
@@ -893,14 +893,14 @@ export function NotebookToolbar({
           />
         </button>
         {openSection === id && (
-          <div className="border-t border-gray-100 bg-gray-50/50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/50">
+          <div className="border-t border-gray-100 bg-gray-50/50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
             {children}
           </div>
         )}
       </div>
     ) : (
       <div className="space-y-1.5">
-        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+        <div className="text-xs font-medium text-gray-500 dark:text-zinc-400">{label}</div>
         <div className="flex flex-wrap items-center gap-1">{children}</div>
       </div>
     );
@@ -911,13 +911,13 @@ export function NotebookToolbar({
         type="button"
         onClick={() => setMenuOpen(!menuOpen)}
         title="Formatting menu"
-        className="flex h-9 w-9 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+        className="flex h-9 w-9 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
       >
         <Menu className="h-5 w-5" />
       </button>
       {menuOpen && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 min-w-[280px] max-w-[min(95vw,640px)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[280px] max-w-[min(95vw,640px)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div

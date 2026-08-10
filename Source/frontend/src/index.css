@@ -174,10 +174,10 @@ html.theme-transition .navbar-surface {
 
 .dark {
   color-scheme: dark;
-  --color-background: 210 25% 10%;
-  --color-foreground: 210 40% 98%;
-  --color-surface: 222 35% 12%;
-  --color-border: 216 25% 22%;
+  --color-background: 0 0% 5%;
+  --color-foreground: 210 20% 96%;
+  --color-surface: 0 0% 9%;
+  --color-border: 0 0% 19%;
   --color-primary: 217 91% 60%;
   --color-primary-foreground: 222 47% 11%;
   --grid-line-color: rgba(255, 255, 255, 0.12);
@@ -264,13 +264,13 @@ body {
 }
 
 .dark .landing-editorial {
-  --land-cream: #1a1712;
-  --land-white: #0f0d0a;
-  --land-paper: #242019;
-  --land-ink: #f3ede3;
-  --land-ink-2: #b8ae9c;
-  --land-ink-3: #8c8272;
-  --land-rule: #3a3327;
+  --land-cream: #161616;
+  --land-white: #0d0d0d;
+  --land-paper: #1e1e1e;
+  --land-ink: #f2f2f0;
+  --land-ink-2: #adada9;
+  --land-ink-3: #858581;
+  --land-rule: #2e2e2c;
 }
 
 /* ---- Landing page — decorative cork-board notes ---- */
@@ -440,10 +440,14 @@ body {
   margin-bottom: 3.4cqw;
 }
 
-/* Comic-style halftone dot backdrop — applied to page-level background containers */
+/* Comic-style halftone dot backdrop — applied to page-level background containers.
+   background-attachment: local scrolls the pattern with the element's own content
+   when that element is itself the scroll container (e.g. AppLayout's <main>) —
+   the default "scroll" attachment pins it to the element's box instead. */
 .bg-dots {
   background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px);
   background-size: 18px 18px;
+  background-attachment: local;
 }
 
 .dark .bg-dots {
@@ -1174,8 +1178,8 @@ body {
 }
 
 .dark .notepad-card {
-  background: linear-gradient(180deg, hsl(222, 22%, 17%) 0%, hsl(222, 22%, 15%) 100%);
-  border-color: hsl(216, 25%, 22%);
+  background: linear-gradient(180deg, hsl(0, 0%, 11%) 0%, hsl(0, 0%, 9%) 100%);
+  border-color: hsl(0, 0%, 20%);
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.2),
     0 1px 2px rgba(0, 0, 0, 0.12);
@@ -1258,8 +1262,8 @@ body {
 }
 
 .dark .paper-card {
-  background: linear-gradient(180deg, hsl(222, 22%, 18%) 0%, hsl(222, 22%, 16%) 100%);
-  border-color: hsl(216, 25%, 22%);
+  background: linear-gradient(180deg, hsl(0, 0%, 12%) 0%, hsl(0, 0%, 10%) 100%);
+  border-color: hsl(0, 0%, 20%);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.12),
     0 4px 12px rgba(0, 0, 0, 0.08);
@@ -1276,7 +1280,7 @@ body {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.2),
     0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: hsl(216, 25%, 30%);
+  border-color: hsl(0, 0%, 28%);
 }
 
 /* ---- Stat sticky notes ---- */
@@ -1361,7 +1365,7 @@ body {
 }
 
 .dark .navbar-surface {
-  background: linear-gradient(180deg, hsl(222, 22%, 16%) 0%, hsl(222, 22%, 14%) 100%);
+  background: linear-gradient(180deg, hsl(0, 0%, 9%) 0%, hsl(0, 0%, 7%) 100%);
   border-bottom-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
@@ -1376,7 +1380,7 @@ body {
 }
 
 .dark .calendar-day-cell {
-  background: linear-gradient(180deg, hsl(222, 30%, 18%) 0%, hsl(222, 30%, 16%) 100%);
+  background: linear-gradient(180deg, hsl(0, 0%, 13%) 0%, hsl(0, 0%, 11%) 100%);
 }
 
 /* Day grid cells — same as navbar */
@@ -1385,7 +1389,7 @@ body {
 }
 
 .dark .navbar-day-cell {
-  background: linear-gradient(180deg, hsl(222, 22%, 16%) 0%, hsl(222, 22%, 14%) 100%);
+  background: linear-gradient(180deg, hsl(0, 0%, 9%) 0%, hsl(0, 0%, 7%) 100%);
 }
 
 /* Theme segmented control — paper tab strip */
@@ -1443,7 +1447,7 @@ body {
 }
 
 .dark .sidebar-surface {
-  background: linear-gradient(90deg, hsl(222, 22%, 13%) 0%, hsl(222, 22%, 15%) 100%);
+  background: linear-gradient(90deg, hsl(0, 0%, 7%) 0%, hsl(0, 0%, 9%) 100%);
   border-right-color: rgba(255, 255, 255, 0.08);
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.15);
 }

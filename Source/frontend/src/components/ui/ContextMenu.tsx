@@ -65,7 +65,7 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
   const menuContent = (
     <div
       ref={menuRef}
-      className="fixed z-[100] min-w-[220px] max-w-[min(95vw,calc(100vw-1rem))] max-h-[min(400px,calc(100vh-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+      className="fixed z-[100] min-w-[220px] max-w-[min(95vw,calc(100vw-1rem))] max-h-[min(400px,calc(100vh-2rem))] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg dark:border-zinc-600 dark:bg-zinc-800"
       style={{
         left: position.left,
         top: position.top,
@@ -74,7 +74,7 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
     >
       {items.map((item, i) => {
         if ("divider" in item && item.divider) {
-          return <div key={`div-${i}`} className="my-1 border-t border-gray-200 dark:border-gray-600" />;
+          return <div key={`div-${i}`} className="my-1 border-t border-gray-200 dark:border-zinc-600" />;
         }
         const { label, onClick, disabled, icon: Icon, shortcut } = item as ContextMenuItem;
         return (
@@ -91,14 +91,14 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
             }}
             className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
               disabled
-                ? "cursor-not-allowed text-gray-400 dark:text-gray-500"
-                : "text-gray-800 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                ? "cursor-not-allowed text-gray-400 dark:text-zinc-500"
+                : "text-gray-800 hover:bg-gray-100 dark:text-zinc-200 dark:hover:bg-zinc-700"
             }`}
           >
-            {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-gray-600 dark:text-gray-400" />}
+            {Icon && <Icon className="h-4 w-4 flex-shrink-0 text-gray-600 dark:text-zinc-400" />}
             <span className="flex-1">{label}</span>
             {shortcut && (
-              <span className={`text-xs ${disabled ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}>
+              <span className={`text-xs ${disabled ? "text-gray-400 dark:text-zinc-500" : "text-gray-500 dark:text-zinc-400"}`}>
                 {shortcut}
               </span>
             )}

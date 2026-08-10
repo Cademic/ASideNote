@@ -888,13 +888,13 @@ export function StickyNote({
             </button>
             {menuOpen && (
               <div
-                className="note-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                className="note-options-menu absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-zinc-600 dark:bg-zinc-800"
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
               >
-                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400">
                   Color
                 </div>
                 <div className="flex flex-nowrap items-center gap-1 px-2 pb-2">
@@ -908,7 +908,7 @@ export function StickyNote({
                       }}
                       className={`h-6 w-6 shrink-0 rounded-full border-2 transition-transform hover:scale-110 ${
                         colorKey === key
-                          ? "border-gray-700 dark:border-gray-300"
+                          ? "border-gray-700 dark:border-zinc-300"
                           : "border-transparent"
                       } ${NOTE_COLORS[key].bg}`}
                       title={key}
@@ -916,7 +916,7 @@ export function StickyNote({
                     />
                   ))}
                 </div>
-                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-zinc-400 flex items-center gap-1">
                   <RotateCw className="h-3 w-3" />
                   Tilt
                 </div>
@@ -932,8 +932,8 @@ export function StickyNote({
                       className={[
                         "flex h-6 min-w-[28px] items-center justify-center rounded border px-1 text-[10px] font-medium transition-colors",
                         (note.rotation ?? 0) === deg
-                          ? "border-gray-800 bg-black/10 text-gray-900 dark:border-gray-300 dark:bg-white/10 dark:text-gray-100"
-                          : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700/80 dark:text-gray-300 dark:hover:bg-gray-600",
+                          ? "border-gray-800 bg-black/10 text-gray-900 dark:border-zinc-300 dark:bg-white/10 dark:text-zinc-100"
+                          : "border-gray-200 bg-white/80 text-gray-600 hover:bg-gray-50 dark:border-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300 dark:hover:bg-zinc-600",
                       ].join(" ")}
                       title={`${deg}°`}
                     >
@@ -941,7 +941,7 @@ export function StickyNote({
                     </button>
                   ))}
                 </div>
-                <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+                <div className="my-1 border-t border-gray-100 dark:border-zinc-700" />
                 {onDuplicate && (
                   <button
                     type="button"
@@ -949,7 +949,7 @@ export function StickyNote({
                       onDuplicate(note.id);
                       setMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   >
                     <Copy className="h-3.5 w-3.5" />
                     Duplicate note

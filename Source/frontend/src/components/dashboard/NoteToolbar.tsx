@@ -57,7 +57,7 @@ function ToolbarButton({
         "flex h-6 w-6 items-center justify-center rounded transition-colors",
         isActive
           ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300/50 dark:bg-sky-900/40 dark:text-sky-200 dark:ring-sky-500/30"
-          : "text-gray-600 hover:bg-black/10 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200",
+          : "text-gray-600 hover:bg-black/10 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200",
       ].join(" ")}
     >
       {children}
@@ -194,7 +194,7 @@ function ListDropdownButton({
           "flex h-6 items-center gap-0.5 rounded px-1.5 transition-colors",
           isBullet || isOrdered
             ? "bg-sky-100 text-sky-800 ring-1 ring-sky-300/50 dark:bg-sky-900/40 dark:text-sky-200 dark:ring-sky-500/30"
-            : "text-gray-600 hover:bg-black/10 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200",
+            : "text-gray-600 hover:bg-black/10 hover:text-gray-800 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200",
         ].join(" ")}
       >
         <List className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ function ListDropdownButton({
           <div
             ref={panelRef}
             data-board-toolbar-portal
-            className="fixed z-[99999] min-w-[160px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+            className="fixed z-[99999] min-w-[160px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
             style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -224,7 +224,7 @@ function ListDropdownButton({
                 "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
                 opt.active
                   ? "bg-sky-50 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200"
-                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700",
+                  : "text-gray-700 hover:bg-gray-100 dark:text-zinc-300 dark:hover:bg-zinc-700",
               ].join(" ")}
             >
               <opt.icon className="h-3.5 w-3.5 shrink-0" />
@@ -270,7 +270,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
   const popupContent = showInput && (
     <div
       ref={linkPopupRef}
-      className="absolute left-1/2 top-1/2 z-50 flex w-[calc(100%-40px)] max-w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+      className="absolute left-1/2 top-1/2 z-50 flex w-[calc(100%-40px)] max-w-[min(320px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
       onMouseDown={(e) => e.stopPropagation()}
     >
       <input
@@ -286,7 +286,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
         }}
         placeholder="Enter URL"
         autoFocus
-        className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+        className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
       />
       <button
         type="button"
@@ -321,7 +321,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
       {showInput && !noteEl && (
         <div
           ref={linkPopupRef}
-          className="absolute left-1/2 top-full z-50 mt-1 flex w-64 max-w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+          className="absolute left-1/2 top-full z-50 mt-1 flex w-64 max-w-[min(16rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <input
@@ -337,7 +337,7 @@ function LinkButton({ editor, isLinkActive }: { editor: Editor; isLinkActive: bo
             }}
             placeholder="Enter URL"
             autoFocus
-            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
+            className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500/50 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200"
           />
           <button
             type="button"
@@ -436,14 +436,14 @@ export function TextColorDropdown({
       <div
         ref={panelRef}
         data-board-toolbar-portal
-        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
         style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
       >
-        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
           Text color
         </p>
         <div className="flex flex-wrap gap-1.5 px-2.5">
@@ -474,7 +474,7 @@ export function TextColorDropdown({
               e.preventDefault();
               colorInputRef.current?.click();
             }}
-            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
           >
             Custom color…
           </button>
@@ -513,11 +513,11 @@ export function TextColorDropdown({
         }}
         title="Text color"
         className={[
-          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-gray-800/60 dark:border-white/15",
+          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-zinc-800/60 dark:border-white/15",
           open ? "ring-1 ring-sky-400/60" : "hover:bg-black/5 dark:hover:bg-white/10",
         ].join(" ")}
       >
-        <Type className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-300" />
+        <Type className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-zinc-300" />
         <span
           className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/25"
           style={{ backgroundColor: currentColor }}
@@ -612,14 +612,14 @@ export function HighlightColorDropdown({
       <div
         ref={panelRef}
         data-board-toolbar-portal
-        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-800"
+        className="fixed z-[99999] min-w-[200px] max-w-[calc(100vw-2rem)] rounded-lg border border-gray-200 bg-white py-1.5 shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
         style={{ left: dropdownStyle.left, top: dropdownStyle.top }}
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
       >
-        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
           Highlight
         </p>
         {isHighlightActive && (
@@ -631,7 +631,7 @@ export function HighlightColorDropdown({
                 editor.chain().focus().unsetHighlight().run();
                 setOpen(false);
               }}
-              className="w-full rounded-md border border-black/10 px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+              className="w-full rounded-md border border-black/10 px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
             >
               Remove highlight
             </button>
@@ -665,7 +665,7 @@ export function HighlightColorDropdown({
               e.preventDefault();
               colorInputRef.current?.click();
             }}
-            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+            className="w-full rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-gray-50 dark:border-white/15 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
           >
             Custom color…
           </button>
@@ -704,12 +704,12 @@ export function HighlightColorDropdown({
         }}
         title="Highlight color"
         className={[
-          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-gray-800/60 dark:border-white/15",
+          "flex h-6 items-center gap-1 rounded border border-black/15 bg-white/60 px-1.5 transition-colors dark:bg-zinc-800/60 dark:border-white/15",
           isHighlightActive ? "bg-amber-50/80 dark:bg-amber-900/25" : "",
           open ? "ring-1 ring-sky-400/60" : "hover:bg-black/5 dark:hover:bg-white/10",
         ].join(" ")}
       >
-        <Highlighter className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-gray-300" />
+        <Highlighter className="h-3.5 w-3.5 shrink-0 text-gray-600 dark:text-zinc-300" />
         <span
           className="h-3.5 w-3.5 shrink-0 rounded border border-black/25"
           style={{ backgroundColor: highlightColor }}

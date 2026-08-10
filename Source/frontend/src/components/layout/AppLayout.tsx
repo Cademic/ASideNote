@@ -252,7 +252,7 @@ export function AppLayout() {
   const isBoardDetailRoute = isNoteBoardRoute || isChalkBoardRoute;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background bg-dots text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {sidebarWorkspace.dialogs}
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
       {!isMobile && (
@@ -332,7 +332,7 @@ export function AppLayout() {
               ? isNoteBoardRoute
                 ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4"
                 : "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-              : "flex-1 overflow-auto p-4"
+              : "flex-1 overflow-auto p-4 bg-background bg-dots"
           }
         >
           {isBoardDetailRoute ? (
