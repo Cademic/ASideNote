@@ -26,7 +26,7 @@ export interface FontFamilySearchProps {
 }
 
 const defaultInputToolbar =
-  "h-6 rounded border border-black/15 bg-white/60 px-1.5 text-[10px] text-gray-700 placeholder:text-gray-400 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-300/50 dark:border-white/20 dark:bg-white/10 dark:text-gray-100 dark:placeholder:text-gray-500";
+  "h-6 rounded border border-black/15 bg-white/60 px-1.5 text-[10px] text-gray-700 placeholder:text-gray-400 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-300/50 dark:border-white/20 dark:bg-white/10 dark:text-zinc-100 dark:placeholder:text-gray-500";
 
 const defaultInputMenu =
   "h-8 rounded border border-border bg-background px-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30";
@@ -184,9 +184,9 @@ function FontFamilySearchActive({
 
   const rowText =
     size === "menu"
-      ? "px-2 py-1.5 text-left text-sm text-gray-800 hover:bg-sky-100 dark:text-gray-100 dark:hover:bg-sky-900/40"
-      : "px-2 py-1 text-left text-[10px] text-gray-800 hover:bg-sky-100 dark:text-gray-100 dark:hover:bg-sky-900/40";
-  const emptyText = size === "menu" ? "px-2 py-1.5 text-sm text-muted-foreground" : "px-2 py-1.5 text-[10px] text-gray-500 dark:text-gray-400";
+      ? "px-2 py-1.5 text-left text-sm text-gray-800 hover:bg-sky-100 dark:text-zinc-100 dark:hover:bg-sky-900/40"
+      : "px-2 py-1 text-left text-[10px] text-gray-800 hover:bg-sky-100 dark:text-zinc-100 dark:hover:bg-sky-900/40";
+  const emptyText = size === "menu" ? "px-2 py-1.5 text-sm text-muted-foreground" : "px-2 py-1.5 text-[10px] text-gray-500 dark:text-zinc-400";
 
   const listPanel =
     showPortal &&
@@ -197,7 +197,7 @@ function FontFamilySearchActive({
         role="listbox"
         data-font-family-portal
         data-board-toolbar-portal
-        className="fixed z-[99999] max-h-[min(50vh,20rem)] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-black/15 bg-white py-1 shadow-xl dark:border-gray-600 dark:bg-zinc-900"
+        className="fixed z-[99999] max-h-[min(50vh,20rem)] max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-black/15 bg-white py-1 shadow-xl dark:border-zinc-600 dark:bg-zinc-900"
         style={{
           left: dropdownStyle.left,
           top: dropdownStyle.top,

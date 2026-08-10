@@ -237,7 +237,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-background bg-dots">
       <div className="mx-auto max-w-2xl px-6 py-8">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">

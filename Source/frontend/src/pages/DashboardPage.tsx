@@ -738,7 +738,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-background bg-dots">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* ── Welcome Notepad ───────────────────────────── */}
         <div className="notepad-card mb-8">

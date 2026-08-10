@@ -231,7 +231,7 @@ export function ImageCard({
       <div
         ref={nodeRef}
         data-board-item="image"
-        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-black/10 dark:border-white/10"
+        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10"
         style={{
           width: `${size.width}px`,
           height: `${size.height}px`,
@@ -346,11 +346,11 @@ export function ImageCard({
             className="absolute inset-0 z-30 flex items-center justify-center rounded-lg bg-black/40 dark:bg-black/50 backdrop-blur-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mx-4 rounded-lg bg-white dark:bg-gray-800 p-4 shadow-xl border border-black/10 dark:border-white/10">
-              <p className="mb-3 text-sm font-medium text-gray-800 dark:text-gray-100">
+            <div className="mx-4 rounded-lg bg-white dark:bg-zinc-800 p-4 shadow-xl border border-black/10 dark:border-white/10">
+              <p className="mb-3 text-sm font-medium text-gray-800 dark:text-zinc-100">
                 Delete this image?
               </p>
-              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mb-4 text-xs text-gray-500 dark:text-zinc-400">
                 This action cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
@@ -360,7 +360,7 @@ export function ImageCard({
                     e.stopPropagation();
                     setShowDeleteConfirm(false);
                   }}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-zinc-300 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-700"
                 >
                   Cancel
                 </button>

@@ -262,7 +262,7 @@ export function BoardsPage() {
 
   if (isLoading) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto bg-background bg-dots">
         <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="mb-6 flex items-center justify-between">
             <div className="skeleton h-8 w-32" />
@@ -301,7 +301,7 @@ export function BoardsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-background bg-dots">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
