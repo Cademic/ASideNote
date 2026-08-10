@@ -19,6 +19,9 @@ import { RegisterPage } from "../pages/RegisterPage";
 import { VerifyEmailPage } from "../pages/VerifyEmailPage";
 import { PrivacyPolicyPage } from "../pages/PrivacyPolicyPage";
 import { TermsAndConditionsPage } from "../pages/TermsAndConditionsPage";
+import { AboutPage } from "../pages/AboutPage";
+import { ContactPage } from "../pages/ContactPage";
+import { FaqPage } from "../pages/FaqPage";
 import { AdminRoute } from "../components/auth/AdminRoute";
 
 const ChalkBoardPage = lazy(() => import("../pages/ChalkBoardPage").then((m) => ({ default: m.ChalkBoardPage })));
@@ -50,6 +53,9 @@ export function AppRouter() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsAndConditionsPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/faq" element={<FaqPage />} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

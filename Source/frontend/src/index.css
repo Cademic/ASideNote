@@ -233,26 +233,211 @@ body {
   }
 }
 
-/* ---- Landing page hero pin — gentle idle wiggle ---- */
-@keyframes landing-pin-wiggle {
-  0%,
-  100% {
-    transform: translateX(-50%) rotate(-12deg);
-  }
-  50% {
-    transform: translateX(-50%) rotate(4deg);
+/* ---- Landing page — editorial cork-board palette ----
+   Scoped to .landing-editorial (LandingPage.tsx's root wrapper only); does not touch the
+   app-wide --color-* tokens used everywhere else. */
+.landing-editorial {
+  --land-cream: #f7f2e9;
+  --land-white: #ffffff;
+  --land-paper: #fffdf8;
+  --land-ink: #1b1a17;
+  --land-ink-2: #5c564b;
+  --land-ink-3: #8a7f6b;
+  --land-rule: #e3daca;
+  --land-slate: #1f2a24;
+  --land-slate-2: #2c3a33;
+  --land-slate-line: #3e5049;
+  --land-slate-text: #b9c6bf;
+  /* Fixed light foreground for text on the always-dark slate surfaces (buttons, collab band).
+     Deliberately not overridden in dark mode — --land-cream itself flips to a dark tone there,
+     so it can't double as slate foreground. */
+  --land-slate-fg: #f7f2e9;
+  --land-amber: #e8a33d;
+  --land-amber-ink: #412402;
+  --land-amber-deep: #b5751a;
+  --land-coral: #f0997b;
+  --land-yellow: #f2d45b;
+  --land-mint: #9fe1cb;
+
+  background: var(--land-white);
+  color: var(--land-ink);
+}
+
+.dark .landing-editorial {
+  --land-cream: #1a1712;
+  --land-white: #0f0d0a;
+  --land-paper: #242019;
+  --land-ink: #f3ede3;
+  --land-ink-2: #b8ae9c;
+  --land-ink-3: #8c8272;
+  --land-rule: #3a3327;
+}
+
+/* ---- Landing page — decorative cork-board notes ---- */
+@keyframes landing-note-settle {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) rotate(0deg) scale(0.96);
   }
 }
 
-.landing-pin {
-  animation: landing-pin-wiggle 3.2s ease-in-out infinite;
+.landing-note {
+  position: absolute;
+  transform: rotate(var(--note-rotate, 0deg));
+  box-shadow: 2px 4px 10px rgba(90, 58, 20, 0.22);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: landing-note-settle 0.7s cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
+  animation-delay: var(--note-delay, 0s);
+}
+
+.landing-note:hover {
+  transform: rotate(calc(var(--note-rotate, 0deg) * 0.25)) translateY(-6px) scale(1.03);
+  box-shadow: 4px 10px 22px rgba(90, 58, 20, 0.22);
+  z-index: 5;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-pin {
+  .landing-note {
     animation: none;
-    transform: translateX(-50%) rotate(-12deg);
   }
+}
+
+/* Hero cork board — container + fixed note placement (mirrors the reference mockup) */
+.landing-corkboard {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1.06;
+}
+
+.landing-note-pin {
+  position: absolute;
+  top: 7cqw;
+  left: 50%;
+  width: 4.2cqw;
+  height: 4.2cqw;
+  margin-left: -2.1cqw;
+  border-radius: 50%;
+  box-shadow: inset -1px -1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.landing-note-line {
+  height: 2.4cqw;
+  border-radius: 2px;
+  margin-bottom: 3cqw;
+  opacity: 0.55;
+}
+
+.landing-note--sticky {
+  border-radius: 2px;
+  padding: 9cqw 7cqw;
+}
+
+.landing-note--n1 {
+  left: 6%;
+  top: 6%;
+  width: 31%;
+  aspect-ratio: 1;
+  --note-rotate: -4deg;
+  --note-delay: 0.05s;
+  background: var(--land-yellow);
+}
+.landing-note--n1 .landing-note-line {
+  background: #b08f1e;
+}
+.landing-note--n1 .landing-note-pin {
+  background: #d8563a;
+}
+
+.landing-note--n2 {
+  right: 8%;
+  top: 3%;
+  width: 31%;
+  aspect-ratio: 1;
+  --note-rotate: 3.5deg;
+  --note-delay: 0.16s;
+  background: var(--land-coral);
+}
+.landing-note--n2 .landing-note-line {
+  background: #a8492b;
+}
+.landing-note--n2 .landing-note-pin {
+  background: var(--land-slate);
+}
+
+.landing-note--n3 {
+  left: 8%;
+  top: 44%;
+  width: 44%;
+  aspect-ratio: 1.6 / 1;
+  --note-rotate: -2deg;
+  --note-delay: 0.27s;
+  border-radius: 3px;
+  background: var(--land-paper);
+  /* clip-path instead of overflow:hidden — on a rotated border-radius box, Chromium's
+     overflow:hidden clipping anti-aliases badly and leaves a jagged halo of whatever's
+     behind the element (page background) around the edge. clip-path renders cleanly. */
+  clip-path: inset(0 round 3px);
+}
+.landing-note--n3 .landing-note-card-top {
+  height: 5cqw;
+  background: #e0654a;
+}
+.landing-note--n3 .landing-note-rules {
+  padding: 4cqw 5cqw;
+}
+.landing-note--n3 .landing-note-rules span {
+  display: block;
+  height: 1.6cqw;
+  background: var(--land-rule);
+  border-radius: 2px;
+  margin-bottom: 3.4cqw;
+}
+
+.landing-note--n4 {
+  right: 6%;
+  top: 40%;
+  width: 27%;
+  aspect-ratio: 1;
+  --note-rotate: 5deg;
+  --note-delay: 0.38s;
+  background: var(--land-mint);
+  border-radius: 2px;
+  display: grid;
+  place-items: center;
+}
+
+.landing-note--n5 {
+  right: 5%;
+  bottom: 5%;
+  width: 38%;
+  aspect-ratio: 1.4 / 1;
+  --note-rotate: -3deg;
+  --note-delay: 0.49s;
+  background: #26332c;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.landing-note--n6 {
+  left: 7%;
+  bottom: 6%;
+  width: 36%;
+  aspect-ratio: 1.6 / 1;
+  --note-rotate: 4deg;
+  --note-delay: 0.6s;
+  background: var(--land-paper);
+  border: 1px solid var(--land-rule);
+  border-radius: 2px;
+  padding: 6cqw;
+}
+.landing-note--n6 span {
+  display: block;
+  height: 2.2cqw;
+  background: var(--land-rule);
+  border-radius: 2px;
+  margin-bottom: 3.4cqw;
 }
 
 /* Comic-style halftone dot backdrop — applied to page-level background containers */
