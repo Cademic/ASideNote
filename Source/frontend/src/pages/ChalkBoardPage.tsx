@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
+import { useAuth } from "../context/AuthContext";
 import { ChalkCanvas, CHALKBOARD_BG, RESOLUTION_FACTOR, type ChalkCanvasHandle } from "../components/chalkboard/ChalkCanvas";
 import { ChalkToolbar, type ChalkMode, type ChalkTool } from "../components/chalkboard/ChalkToolbar";
 import {
@@ -8,7 +9,7 @@ import {
   type BoardBackgroundTheme,
   type BoardRichTextToolbarState,
 } from "../components/dashboard/BoardMenuBar";
-import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
+import { BoardPresenceButton } from "../components/dashboard/BoardPresenceButton";
 import { StickyNote } from "../components/dashboard/StickyNote";
 import { ZoomControls } from "../components/dashboard/ZoomControls";
 import { getBoardById } from "../api/boards";
@@ -46,6 +47,8 @@ function clamp(value: number, min: number, max: number) {
 export function ChalkBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
   const { setBoardName, openBoard, setBoardPresence, connectedUsers } = useOutletContext<AppLayoutContext>();
+  const { user } = useAuth();
+  const currentUserId = user?.userId ?? undefined;
 
   // --- Board & loading state ---
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
@@ -766,7 +769,7 @@ export function ChalkBoardPage() {
     });
   }, []);
 
-  const { sendFocus, sendCursor } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, sendCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onPresenceUpdate: setBoardPresence,
@@ -1406,12 +1409,7 @@ export function ChalkBoardPage() {
           .join(" ")}
       >
         {/* Menu card inside frame, overlapping chalkboard surface under top border */}
-        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start gap-2 px-2 sm:top-3 sm:px-3">
-          {connectedUsers.length > 0 ? (
-            <div className="invisible shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
-              <BoardConnectedUsers users={connectedUsers} />
-            </div>
-          ) : null}
+        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
           <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
@@ -1456,12 +1454,8 @@ export function ChalkBoardPage() {
               </div>
             </div>
           </div>
-          {connectedUsers.length > 0 ? (
-            <div className="pointer-events-auto shrink-0 rounded-lg border border-border/60 bg-[linear-gradient(180deg,#fffef7_0%,#fffdf2_100%)] px-1.5 py-1 shadow-sm dark:border-border/40 dark:bg-[linear-gradient(180deg,hsl(222,22%,17%)_0%,hsl(222,22%,15%)_100%)] sm:px-2">
-              <BoardConnectedUsers users={connectedUsers} />
-            </div>
-          ) : null}
         </div>
+        <BoardPresenceButton users={connectedUsers} isHubConnected={isHubConnected} currentUserId={currentUserId} />
         <input
           ref={loadFileInputRef}
           type="file"

@@ -6,7 +6,7 @@ import {
   type BoardBackgroundTheme,
   type BoardRichTextToolbarState,
 } from "../components/dashboard/BoardMenuBar";
-import { BoardConnectedUsers } from "../components/dashboard/BoardConnectedUsers";
+import { BoardPresenceButton } from "../components/dashboard/BoardPresenceButton";
 import { CorkBoard } from "../components/dashboard/CorkBoard";
 import { StickyNote, STICKY_NOTE_DEFAULT_SIZE } from "../components/dashboard/StickyNote";
 import { IndexCard } from "../components/dashboard/IndexCard";
@@ -62,7 +62,7 @@ let nextTempCardId = 1;
 
 export function NoteBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
-  const { setBoardName, openBoard, setBoardPresence, connectedUsers, setBoardHubConnected } =
+  const { setBoardName, openBoard, setBoardPresence, connectedUsers } =
     useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
   const currentUserId = user?.userId ?? null;
@@ -720,11 +720,6 @@ export function NoteBoardPage() {
     onImageCardAdded: handleImageCardAdded,
     onImageCardUpdated: mergeImageCardPayload,
   });
-
-  useEffect(() => {
-    setBoardHubConnected(isHubConnected);
-    return () => setBoardHubConnected(false);
-  }, [isHubConnected, setBoardHubConnected]);
 
   useEffect(() => {
     const primaryNote = primaryEditingNoteIdRef.current;
@@ -2507,10 +2502,12 @@ export function NoteBoardPage() {
       >
         <CorkBoard
               topBar={boardTopBar}
-              topBarAside={
-                !isHubConnected && connectedUsers.length > 0
-                  ? <BoardConnectedUsers users={connectedUsers} />
-                  : undefined
+              presenceWidget={
+                <BoardPresenceButton
+                  users={connectedUsers}
+                  isHubConnected={isHubConnected}
+                  currentUserId={currentUserId ?? undefined}
+                />
               }
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}

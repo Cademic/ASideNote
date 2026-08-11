@@ -12,7 +12,10 @@ import { usePreferences } from "../../context/PreferencesContext";
 import { useTutorial } from "../../context/TutorialContext";
 import { useSessionPresence } from "../../hooks/useSessionPresence";
 import { TutorialOverlay } from "../tutorial/TutorialOverlay";
+import type { BoardPresenceUser } from "../../hooks/useBoardRealtime";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
+
+export type { BoardPresenceUser };
 
 /** Tailwind `lg` breakpoint — below this: sidebar becomes hamburger drawer */
 const SIDEBAR_BREAKPOINT = 1024;
@@ -24,11 +27,6 @@ export interface OpenedBoard {
   id: string;
   name: string;
   boardType: string;
-}
-
-export interface BoardPresenceUser {
-  userId: string;
-  displayName: string;
 }
 
 export interface AppLayoutContext {
@@ -45,9 +43,6 @@ export interface AppLayoutContext {
   refreshPinnedNotebooks: () => void;
   /** Desktop only: true when sidebar is expanded (w-60), false when collapsed (w-16). */
   isSidebarOpen: boolean;
-  /** SignalR hub joined the current board (project boards only); drives sidebar vs toolbar presence UI. */
-  boardHubConnected: boolean;
-  setBoardHubConnected: (connected: boolean) => void;
 }
 
 export function AppLayout() {
@@ -62,7 +57,6 @@ export function AppLayout() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < SIDEBAR_BREAKPOINT);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [connectedUsers, setBoardPresence] = useState<BoardPresenceUser[]>([]);
-  const [boardHubConnected, setBoardHubConnected] = useState(false);
   const [openedBoards, setOpenedBoards] = useState<OpenedBoard[]>([]);
   const [pinnedBoards, setPinnedBoards] = useState<BoardSummaryDto[]>([]);
   const [pinnedProjects, setPinnedProjects] = useState<ProjectSummaryDto[]>([]);
@@ -224,7 +218,6 @@ export function AppLayout() {
     const onNotebookEditor = /^\/notebooks\/[^/]+$/.test(location.pathname);
     if (!onBoard && !onNotebookEditor) {
       setBoardPresence([]);
-      setBoardHubConnected(false);
     }
   }, [location.pathname]);
 
@@ -283,8 +276,6 @@ export function AppLayout() {
     openNotebook,
     refreshPinnedNotebooks,
     isSidebarOpen,
-    boardHubConnected,
-    setBoardHubConnected,
   };
 
   /** Note or chalk board detail — hide global navbar for maximum canvas space */
@@ -310,8 +301,6 @@ export function AppLayout() {
           onUnpinBoard={handleUnpinBoard}
           onUnpinProject={handleUnpinProject}
           onUnpinNotebook={handleUnpinNotebook}
-          connectedUsers={connectedUsers}
-          boardHubConnected={boardHubConnected}
           getProjectCardProps={sidebarWorkspace.getProjectCardProps}
           getBoardCardProps={sidebarWorkspace.getBoardCardProps}
           getNotebookCardProps={sidebarWorkspace.getNotebookCardProps}
@@ -349,8 +338,6 @@ export function AppLayout() {
               onUnpinBoard={handleUnpinBoard}
               onUnpinProject={handleUnpinProject}
               onUnpinNotebook={handleUnpinNotebook}
-              connectedUsers={connectedUsers}
-              boardHubConnected={boardHubConnected}
               getProjectCardProps={sidebarWorkspace.getProjectCardProps}
               getBoardCardProps={sidebarWorkspace.getBoardCardProps}
               getNotebookCardProps={sidebarWorkspace.getNotebookCardProps}

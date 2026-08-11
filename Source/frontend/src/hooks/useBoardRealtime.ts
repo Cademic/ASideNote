@@ -7,6 +7,12 @@ const REFETCH_DEBOUNCE_MS = 180;
 export interface BoardPresenceUser {
   userId: string;
   displayName: string;
+  /** This user's relationship to the board: board/project owner, an editor, or a viewer. Board hub always sets this; other presence producers (e.g. notebook) may omit it. */
+  role?: "Owner" | "Editor" | "Viewer";
+}
+
+function normalizeRole(role: string | undefined): "Owner" | "Editor" | "Viewer" {
+  return role === "Owner" || role === "Editor" ? role : "Viewer";
 }
 
 function getHubBaseUrl(): string {
@@ -170,14 +176,18 @@ export function useBoardRealtime(
     let presenceList: BoardPresenceUser[] = [];
     const applyPresence = () => onPresenceUpdateRef.current?.(presenceList);
 
-    const handlePresenceList = (list: Array<{ userId: string; displayName: string }>) => {
-      presenceList = (list ?? []).map((u) => ({ userId: String(u.userId), displayName: u.displayName ?? "" }));
+    const handlePresenceList = (list: Array<{ userId: string; displayName: string; role?: string }>) => {
+      presenceList = (list ?? []).map((u) => ({
+        userId: String(u.userId),
+        displayName: u.displayName ?? "",
+        role: normalizeRole(u.role),
+      }));
       applyPresence();
     };
-    const handleUserJoined = (userId: string, displayName: string) => {
+    const handleUserJoined = (userId: string, displayName: string, role?: string) => {
       const id = String(userId);
       if (presenceList.some((u) => u.userId === id)) return;
-      presenceList = [...presenceList, { userId: id, displayName: displayName ?? "" }];
+      presenceList = [...presenceList, { userId: id, displayName: displayName ?? "", role: normalizeRole(role) }];
       applyPresence();
     };
     const handleUserLeft = (userId: string) => {
