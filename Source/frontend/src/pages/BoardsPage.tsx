@@ -26,6 +26,7 @@ import { parseBoardExportFile } from "../lib/boardExport";
 import { importBoardIntoNew } from "../lib/boardImport";
 import { useFileImport } from "../hooks/useFileImport";
 import { useResourceList } from "../hooks/useResourceList";
+import { useTutorial } from "../context/TutorialContext";
 import { BoardCard } from "../components/dashboard/BoardCard";
 import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
 import { PromptDialog } from "../components/dashboard/PromptDialog";
@@ -109,6 +110,25 @@ export function BoardsPage() {
   }, [boards, boardTypeFilter]);
 
   const navigate = useNavigate();
+  const tutorial = useTutorial();
+  const { registerAction, isActive: isTutorialActive, currentStep: tutorialStep, advanceStep, retreatStep } = tutorial;
+
+  useEffect(() => {
+    return registerAction("create-board", () => setIsCreateOpen(true));
+  }, [registerAction]);
+
+  // Opening the dialog (via the real button or the tour's own action) is what completes
+  // the "create-board" step — walk the user into naming the board next. If the tour moves
+  // off "board-title" for any other reason (e.g. the user clicks Back), close the dialog
+  // so it doesn't linger open behind an unrelated tour step.
+  useEffect(() => {
+    if (!isCreateOpen || !isTutorialActive) return;
+    if (tutorialStep?.id === "create-board") {
+      advanceStep();
+    } else if (tutorialStep?.id !== "board-title") {
+      setIsCreateOpen(false);
+    }
+  }, [isCreateOpen, isTutorialActive, tutorialStep, advanceStep]);
 
   async function handleImportFile(file: File) {
     setIsImporting(true);
@@ -328,6 +348,7 @@ export function BoardsPage() {
             </button>
             <button
               type="button"
+              data-tutorial-target="new-board-button"
               onClick={() => setIsCreateOpen(true)}
               className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-md active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
             >
@@ -408,6 +429,9 @@ export function BoardsPage() {
         onClose={() => {
           setIsCreateOpen(false);
           setCreateError(null);
+          if (isTutorialActive && tutorialStep?.id === "board-title") {
+            retreatStep();
+          }
         }}
         onCreateBoard={handleCreate}
         onCreateProject={() => {}}

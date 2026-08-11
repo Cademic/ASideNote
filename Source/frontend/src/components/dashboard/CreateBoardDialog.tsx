@@ -147,7 +147,10 @@ export function CreateBoardDialog({
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 mx-4 animate-dialog-enter motion-reduce:animate-none">
+      <div
+        data-tutorial-target="create-board-dialog"
+        className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 mx-4 animate-dialog-enter motion-reduce:animate-none"
+      >
         {/* Close button */}
         <button
           type="button"

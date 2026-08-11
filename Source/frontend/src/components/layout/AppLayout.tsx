@@ -8,7 +8,10 @@ import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { useSidebarWorkspaceActions } from "./useSidebarWorkspaceActions";
 import { useAuth } from "../../context/AuthContext";
+import { usePreferences } from "../../context/PreferencesContext";
+import { useTutorial } from "../../context/TutorialContext";
 import { useSessionPresence } from "../../hooks/useSessionPresence";
+import { TutorialOverlay } from "../tutorial/TutorialOverlay";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 
 /** Tailwind `lg` breakpoint — below this: sidebar becomes hamburger drawer */
@@ -52,6 +55,9 @@ export function AppLayout() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   useSessionPresence(isAuthenticated);
+  const { preferences, isLoading: preferencesLoading } = usePreferences();
+  const tutorial = useTutorial();
+  const tutorialTriggeredRef = useRef(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= SIDEBAR_BREAKPOINT);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < SIDEBAR_BREAKPOINT);
   const [boardName, setBoardName] = useState<string | null>(null);
@@ -230,6 +236,41 @@ export function AppLayout() {
     refreshPinnedNotebooks();
   }, [isAuthenticated, refreshPinnedBoards, refreshPinnedProjects, refreshPinnedNotebooks]);
 
+  // Auto-start the onboarding tour once for new users, from their first landing on
+  // the dashboard or boards list (never hijacks other routes they navigate to directly).
+  useEffect(() => {
+    if (tutorialTriggeredRef.current) return;
+    if (preferencesLoading || !preferences) return;
+    if (preferences.hasCompletedTutorial) return;
+    if (tutorial.isActive) return;
+    if (location.pathname !== "/dashboard" && location.pathname !== "/boards") return;
+
+    tutorialTriggeredRef.current = true;
+    if (location.pathname !== "/boards") {
+      navigate("/boards", { replace: true });
+    }
+    tutorial.start();
+  }, [preferences, preferencesLoading, location.pathname, tutorial, navigate]);
+
+  // Advance past "board-title" once navigation lands on the new board's detail page,
+  // i.e. once the user has actually named and submitted the board.
+  useEffect(() => {
+    if (!tutorial.isActive || tutorial.currentStep?.id !== "board-title") return;
+    if (/^\/boards\/[^/]+$/.test(location.pathname)) {
+      tutorial.advanceStep();
+    }
+  }, [location.pathname, tutorial]);
+
+  // The "add a sticky note" / "add an index card" steps spotlight sidebar tools, which are
+  // hidden behind the mobile drawer by default — open it so the target is actually visible.
+  useEffect(() => {
+    if (!tutorial.isActive) return;
+    if (tutorial.currentStep?.id !== "add-note" && tutorial.currentStep?.id !== "add-card") return;
+    if (isMobile && !isSidebarOpen) {
+      setIsSidebarOpen(true);
+    }
+  }, [tutorial, isMobile, isSidebarOpen]);
+
   const outletContext: AppLayoutContext = {
     setBoardName,
     openBoard,
@@ -253,6 +294,7 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <TutorialOverlay />
       {sidebarWorkspace.dialogs}
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
       {!isMobile && (

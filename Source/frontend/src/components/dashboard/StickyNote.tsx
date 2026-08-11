@@ -779,6 +779,7 @@ export function StickyNote({
         }}
       >
         <div
+          data-note-panel={note.id}
           className={[
             "relative flex min-h-0 flex-col overflow-visible rounded shadow-lg transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-xl motion-reduce:transition-none motion-reduce:hover:transform-none",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
@@ -1027,6 +1028,7 @@ export function StickyNote({
               {/* Content rich text editor */}
               <div
                 ref={contentEditorWrapperRef}
+                data-field="content"
                 className="tiptap-editor-area relative !overflow-visible"
                 style={{ minHeight: `${Math.max(60, size.height - 120)}px` }}
               >

@@ -145,7 +145,8 @@ public sealed class UserService : IUserService
         return new UserPreferencesDto
         {
             Theme = prefs.Theme,
-            EmailNotifications = prefs.EmailNotificationsJson
+            EmailNotifications = prefs.EmailNotificationsJson,
+            HasCompletedTutorial = prefs.HasCompletedTutorial
         };
     }
 
@@ -162,12 +163,16 @@ public sealed class UserService : IUserService
                 Theme = request.Theme,
                 UpdatedAt = DateTime.UtcNow
             };
+            if (request.HasCompletedTutorial.HasValue)
+                prefs.HasCompletedTutorial = request.HasCompletedTutorial.Value;
             await _prefsRepo.AddAsync(prefs, cancellationToken);
         }
         else
         {
             prefs.Theme = request.Theme;
             prefs.UpdatedAt = DateTime.UtcNow;
+            if (request.HasCompletedTutorial.HasValue)
+                prefs.HasCompletedTutorial = request.HasCompletedTutorial.Value;
             _prefsRepo.Update(prefs);
         }
 

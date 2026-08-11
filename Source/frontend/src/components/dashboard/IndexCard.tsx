@@ -592,6 +592,7 @@ export function IndexCard({
         }}
       >
         <div
+          data-card-panel={card.id}
           className={[
             "index-card relative flex min-h-0 flex-col overflow-visible rounded-md shadow-lg transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-xl motion-reduce:transition-none motion-reduce:hover:transform-none",
             isEditing ? "cursor-default ring-2 ring-primary/40" : "cursor-pointer",
