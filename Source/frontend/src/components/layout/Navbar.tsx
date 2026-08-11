@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
-import { User, Settings, LogOut, ChevronDown, Menu } from "lucide-react";
+import { User, Settings, LogOut, ChevronDown, Menu, Compass } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useTutorial } from "../../context/TutorialContext";
 import { getAvatarUrl } from "../../constants/avatars";
 import { getColorForUserId } from "../../lib/presenceColors";
 import type { BoardPresenceUser } from "./AppLayout";
@@ -78,6 +79,7 @@ function getBreadcrumbs(pathname: string, itemName: string | null): BreadcrumbSe
 
 export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMenuButton }: NavbarProps) {
   const { user, logout } = useAuth();
+  const tutorial = useTutorial();
   const location = useLocation();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -246,6 +248,19 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
             >
               <Settings className="h-4 w-4 text-foreground/60" />
               Settings
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setDropdownOpen(false);
+                if (location.pathname !== "/boards") navigate("/boards");
+                tutorial.start();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-foreground/5"
+            >
+              <Compass className="h-4 w-4 text-foreground/60" />
+              Take a tour
             </button>
             <button
               type="button"

@@ -63,10 +63,12 @@ export interface UpdateProfileRequest {
 export interface UserPreferencesDto {
   theme: string;
   emailNotifications: string | null;
+  hasCompletedTutorial: boolean;
 }
 
 export interface UpdatePreferencesRequest {
   theme: string;
+  hasCompletedTutorial?: boolean;
 }
 
 export interface ChangePasswordRequest {

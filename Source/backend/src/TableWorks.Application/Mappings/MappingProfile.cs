@@ -94,6 +94,9 @@ public sealed class MappingProfile : Profile
         CreateMap<UserPreferences, UserPreferencesDto>()
             .ForMember(d => d.EmailNotifications, opt => opt.MapFrom(s => s.EmailNotificationsJson));
 
+        // NOTE: UserService currently maps UserPreferences -> UserPreferencesDto manually
+        // rather than via this profile; keep both in sync when adding fields.
+
         // CalendarEvent -> DTO
         CreateMap<CalendarEvent, CalendarEventDto>();
     }

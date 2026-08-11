@@ -474,7 +474,7 @@ export function BoardMenuBar({
       </div>
       ) : null}
 
-      <div className={noteToolbarExpandedClass}>
+      <div data-tutorial-target="note-formatting-toolbar" className={noteToolbarExpandedClass}>
         {hasChalkTools || showCompactBoardTools ? (
           <div className="relative min-w-0 w-full">
             <div className="flex min-w-0 items-center gap-1">

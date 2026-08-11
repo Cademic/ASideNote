@@ -6,6 +6,7 @@ public sealed class UserPreferences
     public Guid UserId { get; set; }
     public string Theme { get; set; } = "System";
     public string? EmailNotificationsJson { get; set; }
+    public bool HasCompletedTutorial { get; set; }
     public DateTime UpdatedAt { get; set; }
 
     public User? User { get; set; }

@@ -41,6 +41,7 @@ import type {
 } from "../types";
 import { useBoardRealtime, type BoardItemUpdatePayload, type BoardPresenceUser } from "../hooks/useBoardRealtime";
 import { useAuth } from "../context/AuthContext";
+import { useTutorial } from "../context/TutorialContext";
 import { getColorForUserId } from "../lib/presenceColors";
 import { resolveNoteColorKey, resolveCardColorKey } from "../lib/boardItemColors";
 import {
@@ -65,6 +66,7 @@ export function NoteBoardPage() {
     useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
   const currentUserId = user?.userId ?? null;
+  const tutorial = useTutorial();
 
   const [board, setBoard] = useState<BoardSummaryDto | null>(null);
   const boardNameRef = useRef<string>(board?.name ?? "");
@@ -393,6 +395,9 @@ export function NoteBoardPage() {
       const target = e.target as Element;
       if (target.closest("[data-board-toolbar-portal]")) return;
       if (target.closest("[data-board-menu-bar]")) return;
+      // The tutorial tooltip/buttons are portaled outside the note/card DOM subtree —
+      // clicking Next/Back there shouldn't be treated as "clicked away" and close editing.
+      if (target.closest("[data-tutorial-overlay]")) return;
 
       const noteEl = target.closest("[data-board-item='note'][data-note-id]");
       const cardEl = target.closest("[data-board-item='card'][data-card-id]");
@@ -1390,10 +1395,18 @@ export function NoteBoardPage() {
       primaryEditingNoteIdRef.current = created.id;
       setEditingCardIds(new Set());
       primaryEditingCardIdRef.current = null;
+      if (tutorial.isActive && tutorial.currentStep?.id === "add-note") {
+        tutorial.noteCreated(created.id);
+      }
+      return created.id;
     } catch {
       // Silently fail - user can retry
     }
   }
+
+  useEffect(() => {
+    return tutorial.registerAction("add-note", handleQuickAddNote);
+  });
 
   const DRAG_ECHO_IGNORE_MS = 280;
   function handleNoteDragStart(id: string) {
@@ -1615,8 +1628,19 @@ export function NoteBoardPage() {
   async function handleQuickAddCard() {
     if (!boardId) return;
     const center = getViewportCenterInBoardCoords();
-    const positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
-    const positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
+    let positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
+    let positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
+    // During the "add a card" tour step, nudge away from the tutorial's sticky note
+    // (which quick-add also centers on screen) so the two items don't spawn stacked.
+    // Kept small and diagonal (not a full card-width shift) so the card stays inside
+    // the viewport on typical desktop widths instead of spawning off-screen.
+    if (tutorial.isActive && tutorial.currentStep?.id === "add-card" && tutorial.tutorialNoteId) {
+      const tutorialNote = notesRef.current.find((n) => n.id === tutorial.tutorialNoteId);
+      if (tutorialNote) {
+        positionX = (tutorialNote.positionX ?? 0) + 130;
+        positionY = (tutorialNote.positionY ?? 0) + (tutorialNote.height ?? STICKY_NOTE_DEFAULT_SIZE) + 40;
+      }
+    }
     const tempId = `temp-card-${nextTempCardId++}`;
     const now = new Date().toISOString();
 
@@ -1653,9 +1677,13 @@ export function NoteBoardPage() {
 
       boardRedoStackRef.current = [];
       boardUndoStackRef.current.push({ type: "card-create", card: created });
-      setIndexCards((prev) =>
-        prev.map((c) => (c.id === tempId ? created : c)),
-      );
+      // A concurrent realtime refetch can land between the optimistic push and this
+      // resolving, replacing state wholesale and dropping the temp entry before we get
+      // here — so reconcile idempotently instead of assuming `tempId` is still present.
+      setIndexCards((prev) => {
+        const withoutTemp = prev.filter((c) => c.id !== tempId);
+        return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
+      });
       setEditingCardIds((prev) => {
         const next = new Set(prev);
         next.delete(tempId);
@@ -1663,10 +1691,17 @@ export function NoteBoardPage() {
         return next;
       });
       primaryEditingCardIdRef.current = created.id;
+      if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
+        tutorial.cardCreated(created.id);
+      }
     } catch {
       // Card stays in local state with temp ID
     }
   }
+
+  useEffect(() => {
+    return tutorial.registerAction("add-card", handleQuickAddCard);
+  });
 
   function handleCardDragStart(id: string) {
     draggingCardIdRef.current = id;
@@ -1812,8 +1847,16 @@ export function NoteBoardPage() {
   function handleImageFile(file: File) {
     if (!boardId) return;
 
-    const positionX = pendingImageDrop ? pendingImageDrop.x : 30 + Math.random() * 400;
-    const positionY = pendingImageDrop ? pendingImageDrop.y : 30 + Math.random() * 300;
+    let positionX: number;
+    let positionY: number;
+    if (pendingImageDrop) {
+      positionX = pendingImageDrop.x;
+      positionY = pendingImageDrop.y;
+    } else {
+      const center = getViewportCenterInBoardCoords();
+      positionX = center.x - IMAGE_CARD_DEFAULT_W / 2;
+      positionY = center.y - IMAGE_CARD_DEFAULT_H / 2;
+    }
     setPendingImageDrop(null);
 
     uploadBoardImage(boardId, file)
@@ -2186,6 +2229,9 @@ export function NoteBoardPage() {
         primaryEditingNoteIdRef.current = created.id;
         setEditingCardIds(new Set());
         primaryEditingCardIdRef.current = null;
+        if (tutorial.isActive && tutorial.currentStep?.id === "add-note") {
+          tutorial.noteCreated(created.id);
+        }
       } catch {
         // Silently fail
       }
@@ -2228,9 +2274,12 @@ export function NoteBoardPage() {
         });
         boardRedoStackRef.current = [];
         boardUndoStackRef.current.push({ type: "card-create", card: created });
-        setIndexCards((prev) =>
-          prev.map((c) => (c.id === tempId ? created : c)),
-        );
+        // See handleQuickAddCard — reconcile idempotently in case a concurrent realtime
+        // refetch already replaced state before this optimistic entry got swapped in.
+        setIndexCards((prev) => {
+          const withoutTemp = prev.filter((c) => c.id !== tempId);
+          return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
+        });
         setEditingCardIds((prev) => {
           const next = new Set(prev);
           next.delete(tempId);
@@ -2238,6 +2287,9 @@ export function NoteBoardPage() {
           return next;
         });
         primaryEditingCardIdRef.current = created.id;
+        if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
+          tutorial.cardCreated(created.id);
+        }
       } catch {
         // Card stays in local state with temp ID
       }
@@ -2266,6 +2318,39 @@ export function NoteBoardPage() {
       // Silently fail
     }
   }
+
+  // Tour fallback for the "link-cards" step: if the user clicks Next instead of manually
+  // dragging a string between the pins, connect the tutorial's note and card ourselves.
+  async function handleTutorialLinkAction() {
+    if (!boardId) return;
+    const sourceId = tutorial.tutorialNoteId;
+    const targetId = tutorial.tutorialCardId;
+    if (!sourceId || !targetId) return;
+
+    const isDuplicate = connectionsRef.current.some(
+      (c) =>
+        (c.fromItemId === sourceId && c.toItemId === targetId) ||
+        (c.fromItemId === targetId && c.toItemId === sourceId),
+    );
+    if (isDuplicate) {
+      tutorial.complete();
+      return;
+    }
+
+    try {
+      const created = await createConnection({ fromItemId: sourceId, toItemId: targetId, boardId });
+      boardRedoStackRef.current = [];
+      boardUndoStackRef.current.push({ type: "connection-create", connection: created });
+      setConnections((prev) => [...prev, created]);
+      tutorial.complete();
+    } catch {
+      // Silently fail - user can retry via drag
+    }
+  }
+
+  useEffect(() => {
+    return tutorial.registerAction("link-cards", handleTutorialLinkAction);
+  });
 
   // Document-level mousemove / mouseup while linking
   useEffect(() => {
@@ -2304,6 +2389,14 @@ export function NoteBoardPage() {
             .then((created) => {
               boardUndoStackRef.current.push({ type: "connection-create", connection: created });
               setConnections((prev) => [...prev, created]);
+              if (
+                tutorial.isActive &&
+                tutorial.currentStep?.id === "link-cards" &&
+                ((sourceId === tutorial.tutorialNoteId && targetNoteId === tutorial.tutorialCardId) ||
+                  (sourceId === tutorial.tutorialCardId && targetNoteId === tutorial.tutorialNoteId))
+              ) {
+                tutorial.complete();
+              }
             })
             .catch(() => {
               // Silently fail
@@ -2322,7 +2415,7 @@ export function NoteBoardPage() {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
-  }, [linkingFrom, boardId, zoom]);
+  }, [linkingFrom, boardId, zoom, tutorial]);
 
   // =============================================
   // Render

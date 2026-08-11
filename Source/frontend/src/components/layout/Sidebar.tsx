@@ -470,6 +470,13 @@ export function Sidebar({
             ).map((tool) => (
               <div
                 key={tool.type}
+                data-tutorial-target={
+                  tool.type === "sticky-note"
+                    ? "sidebar-sticky-note-tool"
+                    : tool.type === "index-card"
+                      ? "sidebar-index-card-tool"
+                      : undefined
+                }
                 draggable="true"
                 onDragStart={(e) => {
                   e.dataTransfer.setData("application/board-item-type", tool.type);
