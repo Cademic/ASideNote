@@ -59,6 +59,8 @@ public sealed class BoardHub : Hub
             throw new HubException("Access denied to this board.");
         }
 
+        var role = await _boardAccess.GetRoleAsync(userId.Value, boardId, cancellationToken);
+
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupPrefix + boardId.ToString(), cancellationToken);
 
         var displayName = await _userRepo.Query()
@@ -66,13 +68,13 @@ public sealed class BoardHub : Hub
             .Select(u => u.Username)
             .FirstOrDefaultAsync(cancellationToken) ?? userId.Value.ToString();
 
-        _presence.AddPresence(boardId, Context.ConnectionId!, userId.Value, displayName);
+        _presence.AddPresence(boardId, Context.ConnectionId!, userId.Value, displayName, role);
 
         var presenceList = _presence.GetPresence(boardId)
-            .Select(p => new { userId = p.UserId, displayName = p.DisplayName })
+            .Select(p => new { userId = p.UserId, displayName = p.DisplayName, role = p.Role })
             .ToList();
         await Clients.Caller.SendAsync("PresenceList", presenceList, cancellationToken);
-        await Clients.OthersInGroup(GroupPrefix + boardId.ToString()).SendAsync("UserJoined", userId.Value, displayName, cancellationToken);
+        await Clients.OthersInGroup(GroupPrefix + boardId.ToString()).SendAsync("UserJoined", userId.Value, displayName, role, cancellationToken);
 
         _logger.LogDebug("JoinBoard: User {UserId} joined board {BoardId}", userId, boardId);
     }

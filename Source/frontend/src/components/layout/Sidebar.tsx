@@ -18,8 +18,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import type { BoardPresenceUser, OpenedBoard } from "./AppLayout";
-import { BoardConnectedUsersSidebar } from "../dashboard/BoardConnectedUsers";
+import type { OpenedBoard } from "./AppLayout";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 import { ProjectCard } from "../projects/ProjectCard";
 import { BoardCard } from "../dashboard/BoardCard";
@@ -38,9 +37,6 @@ interface SidebarProps {
   onUnpinBoard: (id: string) => void;
   onUnpinProject: (id: string) => void;
   onUnpinNotebook: (id: string) => void;
-  /** When the board SignalR hub is connected, presence is shown here instead of the board toolbar. */
-  connectedUsers: BoardPresenceUser[];
-  boardHubConnected: boolean;
   getProjectCardProps: () => {
     onRename?: (id: string, currentName: string) => void;
     onTogglePin?: (id: string, isPinned: boolean) => void;
@@ -121,8 +117,6 @@ export function Sidebar({
   onUnpinBoard,
   onUnpinProject,
   onUnpinNotebook,
-  connectedUsers,
-  boardHubConnected,
   getProjectCardProps,
   getBoardCardProps,
   getNotebookCardProps,
@@ -450,10 +444,6 @@ export function Sidebar({
 
       {/* Spacer to push board tools and user section to bottom */}
       <div className="flex-1" />
-
-      {isOnAnyBoardPage && boardHubConnected && connectedUsers.length > 0 && (
-        <BoardConnectedUsersSidebar users={connectedUsers} expanded={expanded} />
-      )}
 
       {/* Board Tools — draggable stationery items */}
       {isOnAnyBoardPage && (

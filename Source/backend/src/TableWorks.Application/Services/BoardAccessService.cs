@@ -53,6 +53,22 @@ public sealed class BoardAccessService : IBoardAccessService
         return role is "Owner" or "Editor";
     }
 
+    public async Task<string> GetRoleAsync(Guid userId, Guid boardId, CancellationToken cancellationToken = default)
+    {
+        var board = await _boardRepo.Query()
+            .Where(b => b.Id == boardId)
+            .Select(b => new { b.UserId, b.ProjectId })
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (board is null) return "Viewer";
+        if (board.UserId == userId) return "Owner";
+        if (!board.ProjectId.HasValue) return "Viewer";
+
+        var role = await GetProjectRoleAsync(userId, board.ProjectId.Value, cancellationToken);
+        return role ?? "Viewer";
+    }
+
     private async Task<string?> GetProjectRoleAsync(Guid userId, Guid projectId, CancellationToken cancellationToken)
     {
         var project = await _projectRepo.Query()
