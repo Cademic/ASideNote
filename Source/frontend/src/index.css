@@ -28,6 +28,14 @@ html.theme-transition .navbar-surface {
   }
 }
 
+/* Animated theme toggle (useAnimatedThemeToggle) — disable the browser's default
+   cross-fade so only our circular clip-path reveal animates the view transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* Board hover scrollbars (range inputs styled as bar thumbs) */
 .board-scrollbar-range {
   -webkit-appearance: none;
@@ -271,6 +279,68 @@ body {
   --land-ink-2: #adada9;
   --land-ink-3: #858581;
   --land-rule: #2e2e2c;
+}
+
+/* ---- Hero — animated glass gradient backdrop ----
+   A soft, slowly-drifting color wash (evokes the frosted/dichroic glass reference).
+   A bright cream core in the wash sits under the copy column so text stays legible. */
+@keyframes landing-hero-glass-drift {
+  0%, 100% {
+    transform: translate3d(-2.5%, -1.5%, 0) rotate(0deg) scale(1.1);
+  }
+  50% {
+    transform: translate3d(2.5%, 1.5%, 0) rotate(1.2deg) scale(1.16);
+  }
+}
+
+.landing-hero-glass {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-hero-glass-gradient {
+  position: absolute;
+  inset: -12%;
+  background:
+    radial-gradient(38% 46% at 16% 16%, rgba(124, 111, 224, 0.5), transparent 70%),
+    radial-gradient(50% 56% at 44% 52%, rgba(255, 251, 240, 0.92), transparent 68%),
+    radial-gradient(42% 50% at 86% 62%, rgba(240, 153, 123, 0.55), transparent 70%),
+    radial-gradient(34% 40% at 12% 94%, rgba(107, 58, 140, 0.4), transparent 68%),
+    radial-gradient(30% 36% at 92% 6%, rgba(242, 169, 216, 0.38), transparent 68%);
+  filter: blur(6px);
+  animation: landing-hero-glass-drift 26s ease-in-out infinite;
+  will-change: transform;
+}
+
+.dark .landing-hero-glass-gradient {
+  background:
+    radial-gradient(38% 46% at 16% 16%, rgba(84, 68, 156, 0.3), transparent 70%),
+    radial-gradient(50% 56% at 44% 52%, rgba(36, 34, 42, 0.65), transparent 68%),
+    radial-gradient(42% 50% at 86% 62%, rgba(132, 68, 40, 0.3), transparent 70%),
+    radial-gradient(34% 40% at 12% 94%, rgba(52, 24, 76, 0.36), transparent 68%),
+    radial-gradient(30% 36% at 92% 6%, rgba(102, 48, 84, 0.24), transparent 68%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-glass-gradient {
+    animation: none;
+  }
+}
+
+/* ---- Shimmer button (ShimmerButton.tsx) ----
+   container-type: size lets the spark's `cqh`/`cqw` units below reference the button's own
+   box — Tailwind's arbitrary-value classes only cover the length units, not the container-type
+   declaration that makes them resolve against this element instead of the viewport. */
+.shimmer-btn-spark-container {
+  container-type: size;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-btn-spark-container * {
+    animation: none !important;
+  }
 }
 
 /* ---- Landing page — decorative cork-board notes ---- */
@@ -1372,6 +1442,18 @@ body {
   background: linear-gradient(180deg, hsl(0, 0%, 9%) 0%, hsl(0, 0%, 7%) 100%);
   border-bottom-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-surface--glossy {
+  background: linear-gradient(180deg, rgba(253, 252, 250, 0.75) 0%, rgba(248, 247, 245, 0.6) 100%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+.dark .navbar-surface--glossy {
+  background: linear-gradient(180deg, hsla(0, 0%, 9%, 0.7) 0%, hsla(0, 0%, 7%, 0.55) 100%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
 
 /* ========================================

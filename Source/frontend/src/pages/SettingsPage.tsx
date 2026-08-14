@@ -4,7 +4,8 @@ import axios from "axios";
 import { Settings, User, Palette, Save, Loader2, LogOut, ShieldAlert, Trash2, Lock } from "lucide-react";
 import { getProfile, updateProfile, getPreferences, updatePreferences, changePassword as changePasswordApi, deleteAccount as deleteAccountApi } from "../api/users";
 import { useAuth } from "../context/AuthContext";
-import { useThemeContext, type ThemeMode } from "../context/ThemeContext";
+import { useThemeContext, resolveTheme, type ThemeMode } from "../context/ThemeContext";
+import { useAnimatedThemeTransition } from "../hooks/useAnimatedThemeTransition";
 import { AVATAR_KEYS, getAvatarUrl } from "../constants/avatars";
 import type { UserProfileDto } from "../types";
 
@@ -26,6 +27,7 @@ export function SettingsPage() {
   const { user: authUser, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const { setThemeMode } = useThemeContext();
+  const { originRef: saveThemeButtonRef, runTransition: runThemeTransition } = useAnimatedThemeTransition<HTMLButtonElement>();
   const profileSectionRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<UserProfileDto | null>(null);
@@ -157,7 +159,10 @@ export function SettingsPage() {
       await updatePreferences({
         theme: themeToBackend(theme),
       });
-      setThemeMode(theme);
+      runThemeTransition(() => {
+        document.documentElement.classList.toggle("dark", resolveTheme(theme) === "dark");
+        setThemeMode(theme);
+      });
       await loadData();
     } catch {
       setPrefsSaveError("Failed to save preferences.");
@@ -405,6 +410,7 @@ export function SettingsPage() {
               <p className="text-sm text-red-500">{prefsSaveError}</p>
             )}
             <button
+              ref={saveThemeButtonRef}
               type="submit"
               disabled={savingPrefs}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"

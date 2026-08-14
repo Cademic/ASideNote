@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
+import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
+import { HexagonPattern } from "../components/ui/HexagonPattern";
+import { Particles } from "../components/ui/Particles";
 
 const FAQS = [
   {
@@ -48,10 +51,13 @@ const FAQS = [
 
 export function FaqPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const { effectiveTheme } = useThemeContext();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
 
   return (
     <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
@@ -59,8 +65,15 @@ export function FaqPage() {
 
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-        <section className="bg-[var(--land-cream)] px-6 py-14 sm:py-20">
-          <Reveal className="mx-auto max-w-2xl text-center">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-14 sm:py-20">
+          <div className="landing-hero-glass" aria-hidden="true">
+            <div className="landing-hero-glass-gradient" />
+          </div>
+          <HexagonPattern
+            radius={32}
+            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
+          />
+          <Reveal className="relative mx-auto max-w-2xl text-center">
             <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
               Questions
             </p>
@@ -74,8 +87,9 @@ export function FaqPage() {
         </section>
 
         {/* ── Accordion ────────────────────────────────────────── */}
-        <section className="px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-3xl">
+        <section className="relative overflow-hidden px-6 py-14 sm:py-20">
+          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <div className="relative mx-auto max-w-3xl">
             <Reveal>
               <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
                 {FAQS.map((faq, i) => {

@@ -2,21 +2,28 @@ import { Link } from "react-router-dom";
 import { LayoutDashboard, Sun, Moon } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useThemeContext } from "../../context/ThemeContext";
+import { useAnimatedThemeTransition } from "../../hooks/useAnimatedThemeTransition";
+import { Highlighter } from "../ui/Highlighter";
 
 const NAV_LINK_CLASS =
-  "relative text-sm font-medium text-foreground/60 transition-colors after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-amber-500 after:transition-all after:duration-200 hover:text-foreground hover:after:w-full";
+  "inline-block text-sm font-medium text-foreground/60 transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 hover:text-foreground motion-reduce:transition-none motion-reduce:hover:scale-100";
 
 /** Shared public-site header — used on the landing page and every marketing/legal page so they feel like one site. */
 export function MarketingHeader() {
   const { isAuthenticated } = useAuth();
   const { setThemeMode, effectiveTheme } = useThemeContext();
+  const { originRef: themeButtonRef, runTransition } = useAnimatedThemeTransition<HTMLButtonElement>();
 
-  function handleThemeToggle() {
-    setThemeMode(effectiveTheme === "dark" ? "light" : "dark");
+  function toggleTheme() {
+    const nextIsDark = effectiveTheme !== "dark";
+    runTransition(() => {
+      document.documentElement.classList.toggle("dark", nextIsDark);
+      setThemeMode(nextIsDark ? "dark" : "light");
+    });
   }
 
   return (
-    <header className="navbar-surface sticky top-0 z-30 border-b border-border/50">
+    <header className="navbar-surface navbar-surface--glossy sticky top-0 z-30 border-b border-border/50">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2" title="ASideNote">
           <img
@@ -31,20 +38,27 @@ export function MarketingHeader() {
 
         <div className="hidden items-center gap-6 sm:flex">
           <Link to="/about" className={NAV_LINK_CLASS}>
-            About
+            <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+              About
+            </Highlighter>
           </Link>
           <Link to="/contact" className={NAV_LINK_CLASS}>
-            Contact
+            <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+              Contact
+            </Highlighter>
           </Link>
           <Link to="/faq" className={NAV_LINK_CLASS}>
-            FAQ
+            <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+              FAQ
+            </Highlighter>
           </Link>
         </div>
 
         <nav className="flex items-center gap-2 sm:gap-3">
           <button
+            ref={themeButtonRef}
             type="button"
-            onClick={handleThemeToggle}
+            onClick={toggleTheme}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-background"
             aria-label={effectiveTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >

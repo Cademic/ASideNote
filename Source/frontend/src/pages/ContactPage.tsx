@@ -1,15 +1,22 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
+import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
+import { HexagonPattern } from "../components/ui/HexagonPattern";
+import { Particles } from "../components/ui/Particles";
 
 const SUPPORT_EMAIL = "support@asidenote.net";
 
 export function ContactPage() {
+  const { effectiveTheme } = useThemeContext();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
 
   return (
     <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
@@ -17,8 +24,15 @@ export function ContactPage() {
 
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-        <section className="bg-[var(--land-cream)] px-6 py-14 sm:py-20">
-          <Reveal className="mx-auto max-w-2xl text-center">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-14 sm:py-20">
+          <div className="landing-hero-glass" aria-hidden="true">
+            <div className="landing-hero-glass-gradient" />
+          </div>
+          <HexagonPattern
+            radius={32}
+            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
+          />
+          <Reveal className="relative mx-auto max-w-2xl text-center">
             <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
               Contact
             </p>
@@ -32,8 +46,9 @@ export function ContactPage() {
         </section>
 
         {/* ── Content card ─────────────────────────────────────── */}
-        <section className="px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-xl">
+        <section className="relative overflow-hidden px-6 py-14 sm:py-20">
+          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <div className="relative mx-auto max-w-xl">
             <Reveal>
               <div className="rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-8 text-center">
                 <p className="text-[15px] leading-relaxed text-[var(--land-ink-2)]">

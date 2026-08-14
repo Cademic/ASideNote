@@ -1,42 +1,61 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, LayoutDashboard, Sparkles } from "lucide-react";
+import { ArrowRight, Check, LayoutDashboard, Sparkles, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
+import { HexagonPattern } from "../components/ui/HexagonPattern";
+import { StripedPattern } from "../components/ui/StripedPattern";
+import { AnimatedBeam } from "../components/ui/AnimatedBeam";
+import { ShimmerButton } from "../components/ui/ShimmerButton";
+import { Particles } from "../components/ui/Particles";
+import { Highlighter } from "../components/ui/Highlighter";
 
-/* ─── Feature data ────────────────────────────────────── */
+/* ─── Demo data ───────────────────────────────────────── */
 
-const FEATURES = [
+const DEMOS = [
   {
+    id: "note-boards",
     title: "Note boards",
     description:
-      "Pin sticky notes and index cards to a freeform cork board. Rearrange them as your thinking evolves.",
+      "Pin sticky notes and index cards to a freeform cork board, then rearrange them as your thinking evolves.",
+    video: {
+      light: "/ASideNoteLight.mp4",
+      dark: "/ASideNoteDark.mp4",
+    },
     swatch: "var(--land-yellow)",
     tilt: "-rotate-1",
+    reverse: false,
   },
   {
+    id: "chalk-boards",
     title: "Chalk boards",
     description:
       "Sketch diagrams and brainstorm on an infinite canvas with a natural chalk-on-slate feel.",
+    video: {
+      light: "/ChalkboardLight.mp4",
+      dark: "/ChalkboardDark.mp4",
+    },
     swatch: "#26332C",
     chalkIcon: true,
     tilt: "rotate-1",
+    reverse: true,
   },
   {
+    id: "projects",
     title: "Projects & calendar",
     description:
       "Group boards into projects, then see deadlines and milestones on a shared calendar.",
+    video: {
+      light: "/ProjectsLight.mp4",
+      dark: "/ProjectsDark.mp4",
+    },
     swatch: "var(--land-coral)",
     tilt: "-rotate-1",
+    reverse: false,
   },
 ];
-
-const DASHBOARD_VIDEO_SRC = {
-  light: "/ASideNoteLight.mp4",
-  dark: "/ASideNoteDark.mp4",
-} as const;
 
 /* ─── Component ───────────────────────────────────────── */
 
@@ -44,6 +63,10 @@ export function LandingPage() {
   const { isAuthenticated } = useAuth();
   const { effectiveTheme } = useThemeContext();
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [missingVideos, setMissingVideos] = useState<Record<string, boolean>>({});
+  const beamContainerRef = useRef<HTMLDivElement>(null);
+  const beamUser1Ref = useRef<HTMLDivElement>(null);
+  const beamUser2Ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -55,6 +78,7 @@ export function LandingPage() {
 
   const primaryHref = isAuthenticated ? "/dashboard" : "/register";
   const primaryLabel = isAuthenticated ? "Go to Dashboard" : "Create free account";
+  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
 
   return (
     <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
@@ -62,8 +86,15 @@ export function LandingPage() {
 
       <main className="flex-1">
         {/* ── Hero — kept on a solid cream backdrop, no dots ─── */}
-        <section className="bg-[var(--land-cream)] pb-12 pt-10 sm:pb-16 sm:pt-16">
-          <div className="mx-auto max-w-6xl px-6">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] pb-12 pt-10 sm:pb-16 sm:pt-16">
+          <div className="landing-hero-glass" aria-hidden="true">
+            <div className="landing-hero-glass-gradient" />
+          </div>
+          <HexagonPattern
+            radius={32}
+            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
+          />
+          <div className="relative mx-auto max-w-6xl px-6">
             <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               {/* Copy column */}
               <div>
@@ -71,7 +102,7 @@ export function LandingPage() {
                   <img
                     src={effectiveTheme === "dark" ? "/ASideNotTextDark.png" : "/ASideNoteText.png"}
                     alt="ASideNote"
-                    className="mx-auto h-24 w-auto object-contain sm:h-32"
+                    className="mx-auto h-44 w-auto object-contain sm:h-60"
                   />
                 </Reveal>
 
@@ -119,19 +150,18 @@ export function LandingPage() {
 
                 <Reveal delay={300} className="mt-8">
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-                    <Link
-                      to={primaryHref}
-                      className="group inline-flex items-center gap-2 rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none"
-                    >
+                    <ShimmerButton to={primaryHref}>
                       {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                       {primaryLabel}
                       <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                    </Link>
+                    </ShimmerButton>
                     <a
                       href="#demo"
-                      className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
+                      className="inline-block border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
                     >
-                      See a board in action
+                      <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)" padding={4}>
+                        See a board in action
+                      </Highlighter>
                     </a>
                   </div>
                 </Reveal>
@@ -211,92 +241,114 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ── Two kinds of board, one workspace ─────────────── */}
-        <section id="features" className="border-t border-[var(--land-rule)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-6">
+        {/* ── See it in action — one demo video per board type ─ */}
+        <section id="demo" className="relative overflow-hidden py-16 sm:py-20">
+          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <div className="relative mx-auto max-w-7xl px-6">
+            <Reveal className="mx-auto max-w-[34ch] text-center">
+              <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+                See it in action
+              </p>
+              <h2 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
+                Live Demos
+              </h2>
+            </Reveal>
 
-            <div className="mt-12 grid gap-5 sm:grid-cols-3">
-              {FEATURES.map((feature, i) => (
-                <Reveal key={feature.title} delay={i * 100}>
+            <div className="mt-14 space-y-14 sm:space-y-16">
+              {DEMOS.map((demo, i) => {
+                const videoSrc = demo.video[effectiveTheme];
+                const isMissing = missingVideos[demo.id];
+
+                return (
                   <div
-                    className={`group relative h-full overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-7 transition-transform duration-200 ease-out-smooth hover:-translate-y-1 hover:rotate-0 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none ${feature.tilt}`}
+                    key={demo.id}
+                    className={`grid items-center gap-10 lg:gap-12 ${
+                      demo.reverse ? "lg:grid-cols-[2fr_3fr]" : "lg:grid-cols-[3fr_2fr]"
+                    }`}
                   >
-                    <span
-                      className="absolute inset-x-0 top-0 h-1.5 opacity-70"
-                      style={{ background: feature.swatch }}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="mb-5 flex h-[34px] w-[34px] rotate-[-6deg] items-center justify-center rounded-md shadow-sm transition-transform duration-200 group-hover:rotate-0 group-hover:scale-110"
-                      style={{ background: feature.swatch }}
-                    >
-                      {feature.chalkIcon && (
-                        <svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
-                          <path
-                            d="M3 11 Q7 2 11 8 T18 3"
-                            fill="none"
-                            stroke="#EDE7D8"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                    <h3 className="font-display text-xl font-medium text-[var(--land-ink)]">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-                      {feature.description}
-                    </p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
+                    <Reveal delay={i * 50} className={demo.reverse ? "lg:order-2" : undefined}>
+                      <div className="relative mx-auto max-w-3xl lg:mx-0 lg:max-w-none">
+                        <div className="overflow-hidden rounded-2xl bg-[var(--land-paper)] shadow-[8px_8px_0_0_#1b1a17] aspect-video">
+                          {isMissing ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--land-rule)] text-[var(--land-ink-3)]">
+                              <span
+                                className="h-3 w-3 rounded-full"
+                                style={{ background: demo.swatch }}
+                                aria-hidden="true"
+                              />
+                              <span className="font-label text-xs uppercase tracking-[0.16em]">
+                                {demo.title} demo coming soon
+                              </span>
+                            </div>
+                          ) : (
+                            <video
+                              key={`${demo.id}-${effectiveTheme}`}
+                              className="h-full w-full rounded-2xl object-cover"
+                              src={videoSrc}
+                              muted
+                              loop
+                              playsInline
+                              preload="auto"
+                              autoPlay={!prefersReducedMotion}
+                              aria-label={`${demo.title} walkthrough`}
+                              onError={() =>
+                                setMissingVideos((prev) => ({ ...prev, [demo.id]: true }))
+                              }
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </Reveal>
 
-        {/* ── See it in action — dashboard demo video ───────── */}
-        <section id="demo" className="py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="grid items-center gap-10 lg:grid-cols-[3fr_2fr] lg:gap-12">
-              <Reveal>
-                <div className="relative mx-auto max-w-3xl lg:mx-0 lg:max-w-none">
-                  <div className="overflow-hidden rounded-2xl bg-[var(--land-paper)] shadow-[8px_8px_0_0_var(--land-ink)] aspect-video">
-                    <video
-                      key={effectiveTheme}
-                      className="h-full w-full rounded-2xl object-cover"
-                      src={DASHBOARD_VIDEO_SRC[effectiveTheme]}
-                      muted
-                      loop
-                      playsInline
-                      preload="auto"
-                      autoPlay={!prefersReducedMotion}
-                      aria-label="Dashboard walkthrough showing boards, projects, and calendar"
-                    />
+                    <Reveal delay={i * 50 + 100} className={demo.reverse ? "lg:order-1" : undefined}>
+                      <div
+                        className={`group relative h-full overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-7 transition-transform duration-200 ease-out-smooth hover:-translate-y-1 hover:rotate-0 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none ${demo.tilt}`}
+                      >
+                        <span
+                          className="absolute inset-x-0 top-0 h-1.5 opacity-70"
+                          style={{ background: demo.swatch }}
+                          aria-hidden="true"
+                        />
+                        <div
+                          className="mb-5 flex h-[34px] w-[34px] rotate-[-6deg] items-center justify-center rounded-md shadow-sm transition-transform duration-200 group-hover:rotate-0 group-hover:scale-110"
+                          style={{ background: demo.swatch }}
+                        >
+                          {demo.chalkIcon && (
+                            <svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+                              <path
+                                d="M3 11 Q7 2 11 8 T18 3"
+                                fill="none"
+                                stroke="#EDE7D8"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                        <h3 className="font-display text-xl font-medium text-[var(--land-ink)]">
+                          {demo.title}
+                        </h3>
+                        <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+                          {demo.description}
+                        </p>
+                      </div>
+                    </Reveal>
                   </div>
-                </div>
-              </Reveal>
-
-              <Reveal delay={100}>
-                <div className="rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-7 sm:p-8">
-                  <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
-                    See it in action
-                  </p>
-                  <h2 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-                    Live Demo
-                  </h2>
-                  <p className="mt-4 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-                    Preview the dashboard and see how boards, projects, and the calendar work together to keep your ideas organized.
-                  </p>
-                </div>
-              </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>
 
         {/* ── Collaboration — dark band ──────────────────────── */}
-        <section className="bg-[var(--land-slate)] py-16 sm:py-20">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 lg:grid-cols-2 lg:gap-16">
+        <section className="relative overflow-hidden bg-[var(--land-slate)] py-16 sm:py-20">
+          <StripedPattern
+            direction="left"
+            width={14}
+            height={14}
+            className="text-[var(--land-slate-line)] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
+          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-6 lg:grid-cols-2 lg:gap-16">
             <Reveal>
               <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[#8FA79A]">
                 Collaboration
@@ -319,13 +371,60 @@ export function LandingPage() {
                 </div>
                 <div className="mt-3.5 h-11 rotate-[1deg] rounded-sm bg-[#EDE7D8]" />
               </div>
+
+              <div
+                ref={beamContainerRef}
+                className="relative mt-4 flex h-24 items-center justify-between px-8"
+              >
+                <div
+                  ref={beamUser1Ref}
+                  className="z-10 flex h-12 w-12 items-center justify-center rounded-full border-2 border-[var(--land-amber)] bg-[#fffdf8] shadow-md"
+                >
+                  <User className="h-5 w-5 text-[var(--land-slate)]" />
+                </div>
+                <div
+                  ref={beamUser2Ref}
+                  className="z-10 flex h-12 w-12 items-center justify-center rounded-full border-2 border-[var(--land-mint)] bg-[#fffdf8] shadow-md"
+                >
+                  <User className="h-5 w-5 text-[var(--land-slate)]" />
+                </div>
+
+                {!prefersReducedMotion && (
+                  <>
+                    <AnimatedBeam
+                      containerRef={beamContainerRef}
+                      fromRef={beamUser1Ref}
+                      toRef={beamUser2Ref}
+                      curvature={-30}
+                      startYOffset={8}
+                      endYOffset={8}
+                      pathColor="var(--land-slate-line)"
+                      gradientStartColor="var(--land-amber)"
+                      gradientStopColor="var(--land-mint)"
+                    />
+                    <AnimatedBeam
+                      containerRef={beamContainerRef}
+                      fromRef={beamUser1Ref}
+                      toRef={beamUser2Ref}
+                      curvature={30}
+                      startYOffset={-8}
+                      endYOffset={-8}
+                      reverse
+                      pathColor="var(--land-slate-line)"
+                      gradientStartColor="var(--land-mint)"
+                      gradientStopColor="var(--land-amber)"
+                    />
+                  </>
+                )}
+              </div>
             </Reveal>
           </div>
         </section>
 
         {/* ── Pricing ────────────────────────────────────────── */}
-        <section id="pricing" className="border-t border-[var(--land-rule)] py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl px-6">
+        <section id="pricing" className="relative overflow-hidden border-t border-[var(--land-rule)] py-16 sm:py-20">
+          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <div className="relative mx-auto max-w-6xl px-6">
             <Reveal className="mx-auto max-w-[34ch] text-center">
               <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
                 Pricing
@@ -364,14 +463,11 @@ export function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link
-                    to={primaryHref}
-                    className="group mt-7 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none"
-                  >
+                  <ShimmerButton to={primaryHref} className="mt-7">
                     {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                     {primaryLabel}
                     <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                  </Link>
+                  </ShimmerButton>
                 </div>
               </Reveal>
 
@@ -412,27 +508,25 @@ export function LandingPage() {
         </section>
 
         {/* ── Final CTA — sticky note, reuses the app's real .stat-sticky ─ */}
-        <section className="border-t border-[var(--land-rule)] py-16 text-center sm:py-24">
-          <div className="mx-auto max-w-6xl px-6">
+        <section className="relative overflow-hidden border-[var(--land-rule)] py-16 text-center sm:py-24">
+          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <div className="relative mx-auto max-w-6xl px-6">
             <Reveal>
               <div
                 className="stat-sticky mx-auto max-w-2xl bg-[color-mix(in_srgb,var(--land-amber)_65%,white)] px-8 py-10 sm:px-12 sm:py-14"
                 style={{ "--stat-rotate": "-1deg" } as CSSProperties}
               >
                 <h2 className="font-display mx-auto max-w-[18ch] text-3xl font-medium text-[var(--land-amber-ink)] sm:text-4xl">
-                  Start your note-taking journey off right
+                  Making Notes Fun & Functional
                 </h2>
                 <p className="mx-auto mt-5 max-w-[46ch] text-[var(--land-amber-ink)] opacity-80">
                   Create a free account and start turning your ideas into action in minutes.
                 </p>
-                <Link
-                  to={primaryHref}
-                  className="group mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--land-slate)] px-7 py-3.5 text-sm font-medium text-[var(--land-slate-fg)] transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none"
-                >
+                <ShimmerButton to={primaryHref} size="lg" className="mt-8">
                   {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                   {primaryLabel}
                   <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                </Link>
+                </ShimmerButton>
               </div>
             </Reveal>
           </div>
