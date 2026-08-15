@@ -5,11 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
-import { HexagonPattern } from "../components/ui/HexagonPattern";
 import { StripedPattern } from "../components/ui/StripedPattern";
+import { GridPattern } from "../components/ui/GridPattern";
 import { AnimatedBeam } from "../components/ui/AnimatedBeam";
-import { ShimmerButton } from "../components/ui/ShimmerButton";
-import { Particles } from "../components/ui/Particles";
 import { Highlighter } from "../components/ui/Highlighter";
 
 /* ─── Demo data ───────────────────────────────────────── */
@@ -78,10 +76,9 @@ export function LandingPage() {
 
   const primaryHref = isAuthenticated ? "/dashboard" : "/register";
   const primaryLabel = isAuthenticated ? "Go to Dashboard" : "Create free account";
-  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
 
   return (
-    <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
+    <div className="landing-editorial font-editorial flex min-h-screen flex-col">
       <MarketingHeader />
 
       <main className="flex-1">
@@ -90,10 +87,6 @@ export function LandingPage() {
           <div className="landing-hero-glass" aria-hidden="true">
             <div className="landing-hero-glass-gradient" />
           </div>
-          <HexagonPattern
-            radius={32}
-            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
-          />
           <div className="relative mx-auto max-w-6xl px-6">
             <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               {/* Copy column */}
@@ -150,11 +143,14 @@ export function LandingPage() {
 
                 <Reveal delay={300} className="mt-8">
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-                    <ShimmerButton to={primaryHref}>
+                    <Link
+                      to={primaryHref}
+                      className="group inline-flex w-fit shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                    >
                       {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                       {primaryLabel}
                       <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                    </ShimmerButton>
+                    </Link>
                     <a
                       href="#demo"
                       className="inline-block border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
@@ -243,7 +239,12 @@ export function LandingPage() {
 
         {/* ── See it in action — one demo video per board type ─ */}
         <section id="demo" className="relative overflow-hidden py-16 sm:py-20">
-          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
           <div className="relative mx-auto max-w-7xl px-6">
             <Reveal className="mx-auto max-w-[34ch] text-center">
               <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
@@ -423,7 +424,12 @@ export function LandingPage() {
 
         {/* ── Pricing ────────────────────────────────────────── */}
         <section id="pricing" className="relative overflow-hidden border-t border-[var(--land-rule)] py-16 sm:py-20">
-          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
           <div className="relative mx-auto max-w-6xl px-6">
             <Reveal className="mx-auto max-w-[34ch] text-center">
               <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
@@ -463,11 +469,14 @@ export function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <ShimmerButton to={primaryHref} className="mt-7">
+                  <Link
+                    to={primaryHref}
+                    className="group mt-7 inline-flex w-fit shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                  >
                     {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                     {primaryLabel}
                     <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                  </ShimmerButton>
+                  </Link>
                 </div>
               </Reveal>
 
@@ -509,7 +518,12 @@ export function LandingPage() {
 
         {/* ── Final CTA — sticky note, reuses the app's real .stat-sticky ─ */}
         <section className="relative overflow-hidden border-[var(--land-rule)] py-16 text-center sm:py-24">
-          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
           <div className="relative mx-auto max-w-6xl px-6">
             <Reveal>
               <div
@@ -522,11 +536,14 @@ export function LandingPage() {
                 <p className="mx-auto mt-5 max-w-[46ch] text-[var(--land-amber-ink)] opacity-80">
                   Create a free account and start turning your ideas into action in minutes.
                 </p>
-                <ShimmerButton to={primaryHref} size="lg" className="mt-8">
+                <Link
+                  to={primaryHref}
+                  className="group mt-8 inline-flex w-fit shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[var(--land-slate)] px-7 py-3.5 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                >
                   {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
                   {primaryLabel}
                   <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                </ShimmerButton>
+                </Link>
               </div>
             </Reveal>
           </div>

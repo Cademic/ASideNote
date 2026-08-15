@@ -1,95 +1,90 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
-import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
-import { HexagonPattern } from "../components/ui/HexagonPattern";
-import { Particles } from "../components/ui/Particles";
+import { GridPattern } from "../components/ui/GridPattern";
+import { Highlighter } from "../components/ui/Highlighter";
 
 const FAQS = [
   {
     question: "What is ASideNote?",
     answer:
-      "ASideNote is a visual cork-board notetaking app. It brings note boards, chalk boards, projects, and a calendar into one place, so you can pin ideas down and turn them into plans without switching apps.",
+      "ASideNote is a cork board for your notes. It brings note boards, chalk boards, projects, and a calendar together in one app, so you can jot down an idea and turn it into a plan without switching tools.",
   },
   {
     question: "Is ASideNote free to use?",
-    answer: "Yes. Creating an account and using ASideNote is free right now.",
+    answer: "Yep, creating an account and using ASideNote is free right now.",
   },
   {
     question: "What's the difference between a note board and a chalk board?",
     answer:
-      "A note board is a freeform cork board for sticky notes and index cards that you can drag, resize, and rearrange. A chalk board is an infinite canvas with a chalk-on-slate feel, built for sketching diagrams and brainstorming visually.",
+      "A note board is a cork board for sticky notes and index cards you can drag, resize, and move around. A chalk board is an endless canvas that feels like a real chalkboard, made for sketching and brainstorming.",
   },
   {
     question: "Can I organize boards into projects?",
     answer:
-      "Yes. Group related note boards and chalk boards under a project to keep every deliverable and plan in one organized workspace.",
+      "Yes. Group related note boards and chalk boards under a project so everything stays in one place.",
   },
   {
     question: "Does ASideNote have a calendar?",
     answer:
-      "Yes. The calendar view shows deadlines and milestones at a glance and ties directly back into your projects.",
+      "Yes. The calendar shows your deadlines and milestones at a glance, and it's connected to your projects.",
   },
   {
     question: "Can I collaborate with friends?",
-    answer:
-      "Yes. You can invite friends to your boards and projects and work together in real time.",
+    answer: "Yes. Invite friends to a board or project and work together in real time.",
   },
   {
     question: "Is my data synced across devices?",
     answer:
-      "Yes. Your boards, projects, and calendar are stored on your account, so signing in from another device gives you the same workspace.",
+      "Yes. Everything is tied to your account, so signing in on another device gives you the same workspace.",
   },
   {
     question: "Is there a mobile app?",
-    answer:
-      "There's no native mobile app yet, but ASideNote is fully responsive and works well in a mobile browser.",
+    answer: "Not yet, but ASideNote works well in a mobile browser.",
   },
 ];
 
 export function FaqPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const { effectiveTheme } = useThemeContext();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
-
   return (
-    <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
+    <div className="landing-editorial font-editorial flex min-h-screen flex-col">
       <MarketingHeader />
 
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-14 sm:py-20">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-20 sm:py-28">
           <div className="landing-hero-glass" aria-hidden="true">
             <div className="landing-hero-glass-gradient" />
           </div>
-          <HexagonPattern
-            radius={32}
-            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
-          />
-          <Reveal className="relative mx-auto max-w-2xl text-center">
-            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
-              Questions
-            </p>
-            <h1 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-              Frequently asked questions
+          <Reveal className="relative mx-auto max-w-3xl text-center">
+            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+              FAQ
             </h1>
-            <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-              Answers to common questions about ASideNote.
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
+              Quick answers to the questions we get most.
             </p>
           </Reveal>
         </section>
 
         {/* ── Accordion ────────────────────────────────────────── */}
-        <section className="relative overflow-hidden px-6 py-14 sm:py-20">
-          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
+        <section className="relative overflow-hidden px-6 py-20 sm:py-28">
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
           <div className="relative mx-auto max-w-3xl">
+            <h2 className="font-display mb-4 text-2xl font-medium text-[var(--land-ink)] sm:text-5xl">
+              Common Questions
+            </h2>
             <Reveal>
               <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
                 {FAQS.map((faq, i) => {
@@ -100,7 +95,7 @@ export function FaqPage() {
                         type="button"
                         onClick={() => setOpenIndex(isOpen ? null : i)}
                         aria-expanded={isOpen}
-                        className="font-display flex w-full cursor-pointer items-center justify-between gap-3 text-left text-base font-medium text-[var(--land-ink)]"
+                        className="font-display flex w-full cursor-pointer items-center justify-between gap-3 text-left text-lg font-medium text-[var(--land-ink)] sm:text-xl"
                       >
                         {faq.question}
                         <ChevronDown
@@ -112,7 +107,7 @@ export function FaqPage() {
                         style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                       >
                         <div className="overflow-hidden">
-                          <p className="mt-3 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+                          <p className="mt-3 text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
                             {faq.answer}
                           </p>
                         </div>
@@ -126,9 +121,11 @@ export function FaqPage() {
             <Reveal delay={100} className="mt-8 text-center">
               <Link
                 to="/"
-                className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
+                className="inline-block text-[15px] font-medium text-[var(--land-ink-2)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 hover:text-[var(--land-ink)] motion-reduce:transition-none motion-reduce:hover:scale-100"
               >
-                Back to home
+                <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+                  Back to home
+                </Highlighter>
               </Link>
             </Reveal>
           </div>

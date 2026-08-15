@@ -53,15 +53,6 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.96) translateY(-4px)" },
           to: { opacity: "1", transform: "scale(1) translateY(0)" },
         },
-        "spin-around": {
-          "0%":        { transform: "translateZ(0) rotate(0)" },
-          "15%, 35%":  { transform: "translateZ(0) rotate(90deg)" },
-          "65%, 85%":  { transform: "translateZ(0) rotate(270deg)" },
-          "100%":      { transform: "translateZ(0) rotate(360deg)" },
-        },
-        "shimmer-slide": {
-          to: { transform: "translate(calc(100cqw - 100%), 0)" },
-        },
       },
       animation: {
         "dialog-enter":  "dialog-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both",
@@ -70,8 +61,6 @@ const config: Config = {
         "dropdown-pop":  "dropdown-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
         "ripple-out":    "ripple-out 0.85s cubic-bezier(0.2, 0, 0, 1) infinite",
         "skel-shimmer":  "skel-shimmer 1.6s linear infinite",
-        "spin-around":   "spin-around calc(var(--speed) * 2) infinite linear",
-        "shimmer-slide": "shimmer-slide var(--speed) ease-in-out infinite alternate",
       },
     },
   },

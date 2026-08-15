@@ -24,19 +24,19 @@ export function MarketingHeader() {
 
   return (
     <header className="navbar-surface navbar-surface--glossy sticky top-0 z-30 border-b border-border/50">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2" title="ASideNote">
+      <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <Link to="/" className="flex shrink-0 items-center" title="ASideNote">
           <img
-            src="/asidenote-logo-square.png"
-            alt=""
-            className="h-8 w-8 object-contain"
+            src={effectiveTheme === "dark" ? "/ASideNotTextDark.png" : "/ASideNoteText.png"}
+            alt="ASideNote"
+            className="h-8 w-auto object-contain"
           />
-          <span className="text-sm font-bold tracking-tight text-foreground">
-            ASideNote
-          </span>
         </Link>
 
-        <div className="hidden items-center gap-6 sm:flex">
+        {/* Absolutely centered on the header itself — a plain flex `justify-between`
+            item only balances the gaps either side of it, so it drifts off-center
+            whenever the logo and the right-hand button group differ in width. */}
+        <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 sm:flex">
           <Link to="/about" className={NAV_LINK_CLASS}>
             <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
               About

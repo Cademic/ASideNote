@@ -2,38 +2,22 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, LayoutDashboard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useThemeContext } from "../context/ThemeContext";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
-import { HexagonPattern } from "../components/ui/HexagonPattern";
-import { Particles } from "../components/ui/Particles";
+import { DottedMap } from "../components/ui/DottedMap";
+import { GridPattern } from "../components/ui/GridPattern";
+import { Highlighter } from "../components/ui/Highlighter";
+import { WORLD_MAP_POINTS } from "../data/worldMapPoints";
 
-const SECTIONS = [
-  {
-    title: "What is ASideNote?",
-    body: "ASideNote is a visual cork-board notetaking app. Instead of burying ideas in nested folders, you pin sticky notes and index cards to a freeform board and arrange them however your thinking actually works. It brings note boards, chalk boards, projects, and a calendar into one place, so capturing a thought and turning it into a plan happens in the same app.",
-    tilt: "-rotate-1",
-  },
-  {
-    title: "Note boards and chalk boards",
-    body: "Note boards give you a freeform cork board for sticky notes and index cards that you can drag, resize, and rearrange as your thinking evolves. Chalk boards give you an infinite canvas with a natural chalk-on-slate feel for sketching diagrams and brainstorming visually. Use whichever fits the moment — or both.",
-    tilt: "rotate-1",
-  },
-  {
-    title: "Projects and calendar",
-    body: "Group related boards under a project to keep every deliverable and plan in one organized workspace, and see deadlines and milestones at a glance in a calendar view that ties directly back into your projects.",
-    tilt: "-rotate-1",
-  },
-  {
-    title: "Built for visual thinkers",
-    body: "ASideNote is for students, creators, and anyone who thinks better with sticky notes and arrows than with folders and files — whether you're planning solo or inviting friends onto a board to work together in real time.",
-    tilt: "rotate-1",
-  },
+const STORY = [
+  "The usual note apps didn't ever seem like they worked for me, and, subsequently, a lot of other people I knew. They were all just… too neat. Sticky notes, index cards and arrows connecting each idea seemed like the way most of us actually study and work. Not to do lists, and perfect highlighter marks.",
+  "I looked for something that worked like that, but nothing seemed to pop up. So I started ASideNote. It caters to users' creativity and allows them to express it anywhere on any device at any time. Somewhere along the lines it stopped being just a to-do list, and started being a place for creativity to happen while working.",
+  "So many people have had sticky notes on their laptops, struggling to keep them organized. Which is why there's no templates, and no correct way to put your sticky notes and index cards, sketch on the chalkboard, or drag a card across the screen.",
+  "ASideNote goes wherever you go, whether that be on your phone, or a desktop. Start a board on your laptop from class, or pull it up on your phone from a restaurant. Whatever feels best for you. Your ideas shouldn't be limited to one space just because that's what you happened to be on.",
 ];
 
 export function AboutPage() {
   const { isAuthenticated } = useAuth();
-  const { effectiveTheme } = useThemeContext();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -41,54 +25,66 @@ export function AboutPage() {
 
   const primaryHref = isAuthenticated ? "/dashboard" : "/register";
   const primaryLabel = isAuthenticated ? "Go to Dashboard" : "Create free account";
-  const particleColor = effectiveTheme === "dark" ? "#f2f2f0" : "#1b1a17";
 
   return (
-    <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
+    <div className="landing-editorial font-editorial flex min-h-screen flex-col">
       <MarketingHeader />
 
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-14 sm:py-20">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-20 sm:py-28">
           <div className="landing-hero-glass" aria-hidden="true">
             <div className="landing-hero-glass-gradient" />
           </div>
-          <HexagonPattern
-            radius={32}
-            className="fill-[var(--land-ink)]/[0.035] stroke-[var(--land-ink)]/[0.06] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,black,transparent)]"
-          />
-          <Reveal className="relative mx-auto max-w-2xl text-center">
-            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+          <Reveal className="relative mx-auto max-w-3xl text-center">
+            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
               About
-            </p>
-            <h1 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-              Your visual workspace for turning ideas into organized action
             </h1>
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
+              Expressing creativity and ideas in a flexible way. Allowing users to create and organize their thoughts in a way that works best for them.
+            </p>
           </Reveal>
         </section>
 
-        {/* ── Content cards ────────────────────────────────────── */}
-        <section className="relative overflow-hidden px-6 py-14 sm:py-20">
-          <Particles className="absolute inset-0" quantity={50} size={0.6} color={particleColor} />
-          <div className="relative mx-auto max-w-4xl">
-            <div className="grid gap-6 sm:grid-cols-2">
-              {SECTIONS.map((section, i) => (
-                <Reveal key={section.title} delay={i * 100}>
-                  <div
-                    className={`rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-7 transition-transform duration-200 ease-out-smooth hover:-translate-y-1 hover:rotate-0 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none ${section.tilt}`}
-                  >
-                    <h2 className="font-display text-xl font-medium text-[var(--land-ink)]">
-                      {section.title}
-                    </h2>
-                    <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-                      {section.body}
-                    </p>
-                  </div>
-                </Reveal>
+        {/* ── Narrative ─────────────────────────────────────────── */}
+        <section className="relative overflow-hidden px-6 py-20 sm:py-28">
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
+          <div className="relative mx-auto max-w-6xl">
+            <h1 className="font-display mb-4 text-2xl font-medium text-[var(--land-ink)] sm:text-5xl">
+              Our Goal
+            </h1>
+            <Reveal className="space-y-8">
+              {STORY.map((paragraph) => (
+                <p key={paragraph} className="text-lg leading-relaxed text-[var(--land-ink)] sm:text-xl">
+                  {paragraph}
+                </p>
               ))}
-            </div>
+            </Reveal>
+          </div>
 
-            <Reveal delay={400} className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
+          {/* Dotted world map — decorative, no markers. Kept inside this
+              section so the grid background above spans behind it too,
+              instead of cutting off at a section boundary. */}
+          <Reveal className="relative mx-auto mt-20 max-w-7xl sm:mt-28">
+            <DottedMap
+              width={200}
+              height={100}
+              mapPoints={WORLD_MAP_POINTS}
+              dotRadius={0.45}
+              className="h-80 w-full text-[var(--land-ink-3)] sm:h-[28rem]"
+            />
+          </Reveal>
+        </section>
+
+        {/* ── CTA ───────────────────────────────────────────────── */}
+        <section className="relative overflow-hidden px-6 pb-20 sm:pb-28">
+          <div className="relative mx-auto max-w-2xl">
+            <Reveal className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
               <Link
                 to={primaryHref}
                 className="group inline-flex items-center gap-2 rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none"
@@ -99,13 +95,15 @@ export function AboutPage() {
               </Link>
               <Link
                 to="/"
-                className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
+                className="inline-block text-[15px] font-medium text-[var(--land-ink-2)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 hover:text-[var(--land-ink)] motion-reduce:transition-none motion-reduce:hover:scale-100"
               >
-                Back to home
+                <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+                  Back to home
+                </Highlighter>
               </Link>
             </Reveal>
 
-            <Reveal delay={500}>
+            <Reveal delay={100}>
               <p className="mt-14 text-center text-sm text-[var(--land-ink-3)]">
                 Built by{" "}
                 <a
@@ -116,7 +114,7 @@ export function AboutPage() {
                 >
                   Carter Wright
                 </a>
-                , lead developer.
+                {" "}lead developer.
               </p>
             </Reveal>
           </div>
