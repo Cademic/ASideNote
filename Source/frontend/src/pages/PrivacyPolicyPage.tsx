@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
@@ -113,6 +114,14 @@ export function PrivacyPolicyPage() {
 
   return (
     <div className="landing-editorial font-editorial flex min-h-screen flex-col">
+      <Helmet>
+        <title>Privacy Policy — ASideNote</title>
+        <meta
+          name="description"
+          content="How ASideNote collects, uses, discloses, and safeguards your information."
+        />
+        <link rel="canonical" href="https://asidenote.net/privacy" />
+      </Helmet>
       <MarketingHeader />
 
       <main className="flex-1">
@@ -177,8 +186,11 @@ export function PrivacyPolicyPage() {
           </div>
           <Link to="/" className="flex shrink-0 items-center text-foreground/40 transition-colors hover:text-foreground/60">
             <img
-              src="/asidenote-logo.png"
+              src="/asidenote-logo.webp"
               alt="ASideNote"
+              width={410}
+              height={168}
+              loading="lazy"
               className="h-14 w-auto object-contain opacity-70"
             />
           </Link>

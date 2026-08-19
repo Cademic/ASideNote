@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AuthPageShell } from "../components/auth/AuthPageShell";
@@ -70,7 +71,13 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthPageShell subtitle="Create your account">
+    <>
+      <Helmet>
+        <title>Create Account — ASideNote</title>
+        <meta name="description" content="Create a free ASideNote account and start organizing your ideas." />
+        <link rel="canonical" href="https://asidenote.net/register" />
+      </Helmet>
+      <AuthPageShell subtitle="Create your account">
       {error && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
           {error}
@@ -183,6 +190,7 @@ export function RegisterPage() {
           Sign in
         </Link>
       </p>
-    </AuthPageShell>
+      </AuthPageShell>
+    </>
   );
 }

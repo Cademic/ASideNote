@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
@@ -55,6 +56,14 @@ export function FaqPage() {
 
   return (
     <div className="landing-editorial font-editorial flex min-h-screen flex-col">
+      <Helmet>
+        <title>FAQ — ASideNote</title>
+        <meta
+          name="description"
+          content="Answers to common questions about note boards, chalk boards, projects, collaboration, and pricing on ASideNote."
+        />
+        <link rel="canonical" href="https://asidenote.net/faq" />
+      </Helmet>
       <MarketingHeader />
 
       <main className="flex-1">
@@ -64,8 +73,11 @@ export function FaqPage() {
             <div className="landing-hero-glass-gradient" />
           </div>
           <Reveal className="relative mx-auto max-w-3xl text-center">
-            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
-              FAQ
+            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+              Questions
+            </p>
+            <h1 className="mt-4 font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+              Frequently Asked Questions
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
               Quick answers to the questions we get most.
@@ -82,9 +94,6 @@ export function FaqPage() {
             className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
           />
           <div className="relative mx-auto max-w-3xl">
-            <h2 className="font-display mb-4 text-2xl font-medium text-[var(--land-ink)] sm:text-5xl">
-              Common Questions
-            </h2>
             <Reveal>
               <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
                 {FAQS.map((faq, i) => {
@@ -151,8 +160,11 @@ export function FaqPage() {
           </div>
           <Link to="/" className="flex shrink-0 items-center text-foreground/40 transition-colors hover:text-foreground/60">
             <img
-              src="/asidenote-logo.png"
+              src="/asidenote-logo.webp"
               alt="ASideNote"
+              width={410}
+              height={168}
+              loading="lazy"
               className="h-14 w-auto object-contain opacity-70"
             />
           </Link>

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, LayoutDashboard, Sparkles, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useThemeContext } from "../context/ThemeContext";
+import { useRevealOnScroll } from "../hooks/useRevealOnScroll";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
 import { StripedPattern } from "../components/ui/StripedPattern";
@@ -31,9 +33,11 @@ const DEMOS = [
     title: "Chalk boards",
     description:
       "Sketch diagrams and brainstorm on an infinite canvas with a natural chalk-on-slate feel.",
+    // TODO: swap for a dedicated Chalk boards recording once one exists; reuses the note-boards
+    // demo as a placeholder so this section doesn't fire failing requests for missing video files.
     video: {
-      light: "/ChalkboardLight.mp4",
-      dark: "/ChalkboardDark.mp4",
+      light: "/ASideNoteLight.mp4",
+      dark: "/ASideNoteDark.mp4",
     },
     swatch: "#26332C",
     chalkIcon: true,
@@ -45,9 +49,10 @@ const DEMOS = [
     title: "Projects & calendar",
     description:
       "Group boards into projects, then see deadlines and milestones on a shared calendar.",
+    // TODO: swap for a dedicated Projects & calendar recording once one exists; see note above.
     video: {
-      light: "/ProjectsLight.mp4",
-      dark: "/ProjectsDark.mp4",
+      light: "/ASideNoteLight.mp4",
+      dark: "/ASideNoteDark.mp4",
     },
     swatch: "var(--land-coral)",
     tilt: "-rotate-1",
@@ -55,13 +60,61 @@ const DEMOS = [
   },
 ];
 
+/* ─── Demo video: loads only once scrolled near, remounts on theme swap ── */
+
+function DemoVideo({
+  title,
+  swatch,
+  src,
+  prefersReducedMotion,
+}: {
+  title: string;
+  swatch: string;
+  src: string;
+  prefersReducedMotion: boolean;
+}) {
+  const { ref, isVisible } = useRevealOnScroll<HTMLDivElement>({
+    rootMargin: "200px 0px",
+    threshold: 0,
+  });
+  const [isMissing, setIsMissing] = useState(false);
+
+  return (
+    <div
+      ref={ref}
+      className="overflow-hidden rounded-2xl bg-[var(--land-paper)] shadow-[8px_8px_0_0_#1b1a17] aspect-video"
+    >
+      {isMissing ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--land-rule)] text-[var(--land-ink-3)]">
+          <span className="h-3 w-3 rounded-full" style={{ background: swatch }} aria-hidden="true" />
+          <span className="font-label text-xs uppercase tracking-[0.16em]">
+            {title} demo coming soon
+          </span>
+        </div>
+      ) : isVisible ? (
+        <video
+          key={src}
+          className="h-full w-full rounded-2xl object-cover"
+          src={src}
+          muted
+          loop
+          playsInline
+          preload="auto"
+          autoPlay={!prefersReducedMotion}
+          aria-label={`${title} walkthrough`}
+          onError={() => setIsMissing(true)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 /* ─── Component ───────────────────────────────────────── */
 
 export function LandingPage() {
   const { isAuthenticated } = useAuth();
   const { effectiveTheme } = useThemeContext();
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [missingVideos, setMissingVideos] = useState<Record<string, boolean>>({});
   const beamContainerRef = useRef<HTMLDivElement>(null);
   const beamUser1Ref = useRef<HTMLDivElement>(null);
   const beamUser2Ref = useRef<HTMLDivElement>(null);
@@ -79,6 +132,29 @@ export function LandingPage() {
 
   return (
     <div className="landing-editorial font-editorial flex min-h-screen flex-col">
+      <Helmet>
+        <title>ASideNote</title>
+        <meta
+          name="description"
+          content="Pin sticky notes, index cards, and sketches to a freeform cork board. Group them into projects, then plan the week around them with real-time collaboration."
+        />
+        <link rel="canonical" href="https://asidenote.net/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://asidenote.net/" />
+        <meta property="og:title" content="ASideNote" />
+        <meta
+          property="og:description"
+          content="Pin sticky notes, index cards, and sketches to a freeform cork board. Group them into projects, then plan the week around them with real-time collaboration."
+        />
+        <meta property="og:image" content="https://asidenote.net/asidenote-logo.webp" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="ASideNote" />
+        <meta
+          name="twitter:description"
+          content="Pin sticky notes, index cards, and sketches to a freeform cork board. Group them into projects, then plan the week around them with real-time collaboration."
+        />
+        <meta name="twitter:image" content="https://asidenote.net/asidenote-logo.webp" />
+      </Helmet>
       <MarketingHeader />
 
       <main className="flex-1">
@@ -93,8 +169,10 @@ export function LandingPage() {
               <div>
                 <Reveal className="text-center">
                   <img
-                    src={effectiveTheme === "dark" ? "/ASideNotTextDark.png" : "/ASideNoteText.png"}
+                    src={effectiveTheme === "dark" ? "/ASideNotTextDark.webp" : "/ASideNoteText.webp"}
                     alt="ASideNote"
+                    width={1351}
+                    height={468}
                     className="mx-auto h-44 w-auto object-contain sm:h-60"
                   />
                 </Reveal>
@@ -258,7 +336,6 @@ export function LandingPage() {
             <div className="mt-14 space-y-14 sm:space-y-16">
               {DEMOS.map((demo, i) => {
                 const videoSrc = demo.video[effectiveTheme];
-                const isMissing = missingVideos[demo.id];
 
                 return (
                   <div
@@ -269,35 +346,12 @@ export function LandingPage() {
                   >
                     <Reveal delay={i * 50} className={demo.reverse ? "lg:order-2" : undefined}>
                       <div className="relative mx-auto max-w-3xl lg:mx-0 lg:max-w-none">
-                        <div className="overflow-hidden rounded-2xl bg-[var(--land-paper)] shadow-[8px_8px_0_0_#1b1a17] aspect-video">
-                          {isMissing ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--land-rule)] text-[var(--land-ink-3)]">
-                              <span
-                                className="h-3 w-3 rounded-full"
-                                style={{ background: demo.swatch }}
-                                aria-hidden="true"
-                              />
-                              <span className="font-label text-xs uppercase tracking-[0.16em]">
-                                {demo.title} demo coming soon
-                              </span>
-                            </div>
-                          ) : (
-                            <video
-                              key={`${demo.id}-${effectiveTheme}`}
-                              className="h-full w-full rounded-2xl object-cover"
-                              src={videoSrc}
-                              muted
-                              loop
-                              playsInline
-                              preload="auto"
-                              autoPlay={!prefersReducedMotion}
-                              aria-label={`${demo.title} walkthrough`}
-                              onError={() =>
-                                setMissingVideos((prev) => ({ ...prev, [demo.id]: true }))
-                              }
-                            />
-                          )}
-                        </div>
+                        <DemoVideo
+                          title={demo.title}
+                          swatch={demo.swatch}
+                          src={videoSrc}
+                          prefersReducedMotion={prefersReducedMotion}
+                        />
                       </div>
                     </Reveal>
 
@@ -569,8 +623,11 @@ export function LandingPage() {
           </div>
           <Link to="/" className="flex shrink-0 items-center text-foreground/40 transition-colors hover:text-foreground/60">
             <img
-              src="/asidenote-logo.png"
+              src="/asidenote-logo.webp"
               alt="ASideNote"
+              width={410}
+              height={168}
+              loading="lazy"
               className="h-14 w-auto object-contain opacity-70"
             />
           </Link>

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
@@ -15,6 +16,14 @@ export function ContactPage() {
 
   return (
     <div className="landing-editorial font-editorial flex min-h-screen flex-col">
+      <Helmet>
+        <title>Contact — ASideNote</title>
+        <meta
+          name="description"
+          content="Questions, feedback, or a bug you found? Get in touch with the ASideNote team."
+        />
+        <link rel="canonical" href="https://asidenote.net/contact" />
+      </Helmet>
       <MarketingHeader />
 
       <main className="flex-1">
@@ -24,8 +33,12 @@ export function ContactPage() {
             <div className="landing-hero-glass-gradient" />
           </div>
           <Reveal className="relative mx-auto max-w-3xl text-center">
-            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+            
+            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
               Contact
+            </p>
+            <h1 className="mt-4 font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+              Get In Touch
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
               Questions, feedback, or a bug you found? We&apos;d love to hear from you.
@@ -42,9 +55,6 @@ export function ContactPage() {
             className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
           />
           <div className="relative mx-auto max-w-xl">
-            <h2 className="font-display mb-4 text-2xl font-medium text-[var(--land-ink)] sm:text-5xl">
-              Get In Touch
-            </h2>
             <Reveal>
               <div className="rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-8 text-center">
                 <p className="text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
@@ -100,8 +110,11 @@ export function ContactPage() {
           </div>
           <Link to="/" className="flex shrink-0 items-center text-foreground/40 transition-colors hover:text-foreground/60">
             <img
-              src="/asidenote-logo.png"
+              src="/asidenote-logo.webp"
               alt="ASideNote"
+              width={410}
+              height={168}
+              loading="lazy"
               className="h-14 w-auto object-contain opacity-70"
             />
           </Link>

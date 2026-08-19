@@ -27,8 +27,10 @@ export function MarketingHeader() {
       <div className="relative mx-auto flex h-20 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center" title="ASideNote">
           <img
-            src={effectiveTheme === "dark" ? "/ASideNotTextDark.png" : "/ASideNoteText.png"}
+            src={effectiveTheme === "dark" ? "/ASideNotTextDark.webp" : "/ASideNoteText.webp"}
             alt="ASideNote"
+            width={1351}
+            height={468}
             className="h-11 w-auto object-contain"
           />
         </Link>

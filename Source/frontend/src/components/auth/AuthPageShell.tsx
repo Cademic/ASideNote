@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-const LOGO_SRC = "/asidenote-logo.png";
+const LOGO_SRC = "/asidenote-logo.webp";
 
 interface AuthPageShellProps {
   children: ReactNode;
@@ -17,6 +17,8 @@ export function AuthPageShell({ children, subtitle }: AuthPageShellProps) {
             <img
               src={LOGO_SRC}
               alt="ASideNote"
+              width={410}
+              height={168}
               className="h-28 w-auto max-w-full object-contain sm:h-32"
             />
           </div>
