@@ -46,8 +46,11 @@ export function AboutPage() {
             <div className="landing-hero-glass-gradient" />
           </div>
           <Reveal className="relative mx-auto max-w-3xl text-center">
-            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+            <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
               About
+            </p>
+            <h1 className="font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+              What is ASideNote?
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
               Expressing creativity and ideas in a flexible way. Allowing users to create and organize their thoughts in a way that works best for them.

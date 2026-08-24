@@ -53,6 +53,14 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.96) translateY(-4px)" },
           to: { opacity: "1", transform: "scale(1) translateY(0)" },
         },
+        "menu-drop": {
+          from: { opacity: "0", transform: "translateY(-16px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "menu-drop-out": {
+          from: { opacity: "1", transform: "translateY(0)" },
+          to: { opacity: "0", transform: "translateY(-16px)" },
+        },
       },
       animation: {
         "dialog-enter":  "dialog-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both",
@@ -61,6 +69,8 @@ const config: Config = {
         "dropdown-pop":  "dropdown-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both",
         "ripple-out":    "ripple-out 0.85s cubic-bezier(0.2, 0, 0, 1) infinite",
         "skel-shimmer":  "skel-shimmer 1.6s linear infinite",
+        "menu-drop":     "menu-drop 0.25s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "menu-drop-out": "menu-drop-out 0.18s cubic-bezier(0.4, 0, 1, 1) both",
       },
     },
   },
