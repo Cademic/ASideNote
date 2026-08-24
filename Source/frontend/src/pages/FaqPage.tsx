@@ -1,50 +1,12 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
-
-const FAQS = [
-  {
-    question: "What is ASideNote?",
-    answer:
-      "ASideNote is a visual cork-board notetaking app. It brings note boards, chalk boards, projects, and a calendar into one place, so you can pin ideas down and turn them into plans without switching apps.",
-  },
-  {
-    question: "Is ASideNote free to use?",
-    answer: "Yes. Creating an account and using ASideNote is free right now.",
-  },
-  {
-    question: "What's the difference between a note board and a chalk board?",
-    answer:
-      "A note board is a freeform cork board for sticky notes and index cards that you can drag, resize, and rearrange. A chalk board is an infinite canvas with a chalk-on-slate feel, built for sketching diagrams and brainstorming visually.",
-  },
-  {
-    question: "Can I organize boards into projects?",
-    answer:
-      "Yes. Group related note boards and chalk boards under a project to keep every deliverable and plan in one organized workspace.",
-  },
-  {
-    question: "Does ASideNote have a calendar?",
-    answer:
-      "Yes. The calendar view shows deadlines and milestones at a glance and ties directly back into your projects.",
-  },
-  {
-    question: "Can I collaborate with friends?",
-    answer:
-      "Yes. You can invite friends to your boards and projects and work together in real time.",
-  },
-  {
-    question: "Is my data synced across devices?",
-    answer:
-      "Yes. Your boards, projects, and calendar are stored on your account, so signing in from another device gives you the same workspace.",
-  },
-  {
-    question: "Is there a mobile app?",
-    answer:
-      "There's no native mobile app yet, but ASideNote is fully responsive and works well in a mobile browser.",
-  },
-];
+import { GridPattern } from "../components/ui/GridPattern";
+import { Highlighter } from "../components/ui/Highlighter";
+import { FAQS } from "../data/faq";
 
 export function FaqPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -54,28 +16,45 @@ export function FaqPage() {
   }, []);
 
   return (
-    <div className="landing-editorial bg-dots font-editorial flex min-h-screen flex-col">
+    <div className="landing-editorial font-editorial flex min-h-screen flex-col">
+      <Helmet>
+        <title>FAQ — ASideNote</title>
+        <meta
+          name="description"
+          content="Answers to common questions about note boards, chalk boards, projects, collaboration, and pricing on ASideNote."
+        />
+        <link rel="canonical" href="https://asidenote.net/faq" />
+      </Helmet>
       <MarketingHeader />
 
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
-        <section className="bg-[var(--land-cream)] px-6 py-14 sm:py-20">
-          <Reveal className="mx-auto max-w-2xl text-center">
+        <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-20 sm:py-28">
+          <div className="landing-hero-glass" aria-hidden="true">
+            <div className="landing-hero-glass-gradient" />
+          </div>
+          <Reveal className="relative mx-auto max-w-3xl text-center">
             <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
               Questions
             </p>
-            <h1 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-              Frequently asked questions
+            <h1 className="mt-4 font-display text-4xl font-medium text-[var(--land-ink)] sm:text-6xl">
+              Frequently Asked Questions
             </h1>
-            <p className="mx-auto mt-4 max-w-[46ch] text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-              Answers to common questions about ASideNote.
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
+              Quick answers to the questions we get most.
             </p>
           </Reveal>
         </section>
 
         {/* ── Accordion ────────────────────────────────────────── */}
-        <section className="px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-3xl">
+        <section className="relative overflow-hidden px-6 py-20 sm:py-28">
+          <GridPattern
+            width={32}
+            height={32}
+            strokeDasharray="4 2"
+            className="stroke-[var(--land-ink)]/[0.08] dark:stroke-[var(--land-ink)]/[0.04] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+          />
+          <div className="relative mx-auto max-w-3xl">
             <Reveal>
               <div className="divide-y divide-[var(--land-rule)] rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-6 sm:px-8">
                 {FAQS.map((faq, i) => {
@@ -86,7 +65,7 @@ export function FaqPage() {
                         type="button"
                         onClick={() => setOpenIndex(isOpen ? null : i)}
                         aria-expanded={isOpen}
-                        className="font-display flex w-full cursor-pointer items-center justify-between gap-3 text-left text-base font-medium text-[var(--land-ink)]"
+                        className="font-display flex w-full cursor-pointer items-center justify-between gap-3 text-left text-lg font-medium text-[var(--land-ink)] sm:text-xl"
                       >
                         {faq.question}
                         <ChevronDown
@@ -98,7 +77,7 @@ export function FaqPage() {
                         style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                       >
                         <div className="overflow-hidden">
-                          <p className="mt-3 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+                          <p className="mt-3 text-lg leading-relaxed text-[var(--land-ink-2)] sm:text-xl">
                             {faq.answer}
                           </p>
                         </div>
@@ -112,9 +91,11 @@ export function FaqPage() {
             <Reveal delay={100} className="mt-8 text-center">
               <Link
                 to="/"
-                className="border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-colors hover:border-[var(--land-amber)]"
+                className="inline-block text-[15px] font-medium text-[var(--land-ink-2)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 hover:text-[var(--land-ink)] motion-reduce:transition-none motion-reduce:hover:scale-100"
               >
-                Back to home
+                <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+                  Back to home
+                </Highlighter>
               </Link>
             </Reveal>
           </div>
@@ -140,8 +121,11 @@ export function FaqPage() {
           </div>
           <Link to="/" className="flex shrink-0 items-center text-foreground/40 transition-colors hover:text-foreground/60">
             <img
-              src="/asidenote-logo.png"
+              src="/asidenote-logo.webp"
               alt="ASideNote"
+              width={410}
+              height={168}
+              loading="lazy"
               className="h-14 w-auto object-contain opacity-70"
             />
           </Link>

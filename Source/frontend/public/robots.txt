@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /boards
+Disallow: /notebooks
+Disallow: /projects
+Disallow: /calendar
+Disallow: /chalkboards
+Disallow: /profile
+Disallow: /settings
+Disallow: /admin
+
+Sitemap: https://asidenote.net/sitemap.xml

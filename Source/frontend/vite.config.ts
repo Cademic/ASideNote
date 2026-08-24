@@ -1,8 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    ...(process.env.ANALYZE
+      ? [visualizer({ open: true, filename: "dist/stats.html", gzipSize: true, brotliSize: true })]
+      : []),
+  ],
   optimizeDeps: {
     include: ["@microsoft/signalr"],
   },
@@ -24,21 +30,21 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    target: "es2020",
     sourcemap: mode !== "production",
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          tiptap: [
-            "@tiptap/react",
-            "@tiptap/starter-kit",
-            "@tiptap/extension-character-count",
-            "@tiptap/extension-color",
-            "@tiptap/extension-font-family",
-            "@tiptap/extension-text-style",
-          ],
-          fabric: ["fabric"],
-          vendor: ["axios", "lucide-react", "react-draggable"],
+        // Checked in order, so shared low-level deps (e.g. react/jsx-runtime) resolve to
+        // "react" first instead of getting trapped inside whichever vendor chunk happens to
+        // import them first — that trap forces every consumer, including the eager entry, to
+        // fetch the whole trapping chunk just for a few shared bytes.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/node_modules\/(react|react-dom|react-router-dom|scheduler)\//.test(id)) return "react";
+          if (/node_modules\/(@tiptap|prosemirror-)/.test(id)) return "tiptap";
+          if (/node_modules\/fabric\//.test(id)) return "fabric";
+          if (/node_modules\/(axios|lucide-react|react-draggable)\//.test(id)) return "vendor";
+          return undefined;
         },
       },
     },

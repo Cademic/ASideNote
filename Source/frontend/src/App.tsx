@@ -1,3 +1,4 @@
+import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { PreferencesProvider } from "./context/PreferencesContext";
@@ -18,10 +19,12 @@ function AppWithPreferences() {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppWithPreferences />
-      </AuthProvider>
-    </ThemeProvider>
+    <HelmetProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppWithPreferences />
+        </AuthProvider>
+      </ThemeProvider>
+    </HelmetProvider>
   );
 }

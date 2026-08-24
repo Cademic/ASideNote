@@ -178,7 +178,7 @@ export function Sidebar({
           title="ASideNote"
         >
           <img
-            src={expanded ? "/asidenote-logo.png" : "/asidenote-logo-square.png"}
+            src={expanded ? "/asidenote-logo.webp" : "/asidenote-logo-square.png"}
             alt="ASideNote"
             className={["shrink-0 object-contain", expanded ? "h-14 w-auto" : "h-12 w-12"].join(" ")}
           />

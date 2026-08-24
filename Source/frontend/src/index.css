@@ -28,6 +28,14 @@ html.theme-transition .navbar-surface {
   }
 }
 
+/* Animated theme toggle (useAnimatedThemeToggle) — disable the browser's default
+   cross-fade so only our circular clip-path reveal animates the view transition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* Board hover scrollbars (range inputs styled as bar thumbs) */
 .board-scrollbar-range {
   -webkit-appearance: none;
@@ -273,11 +281,67 @@ body {
   --land-rule: #2e2e2c;
 }
 
-/* ---- Landing page — decorative cork-board notes ---- */
+/* ---- Hero — animated glass gradient backdrop ----
+   A soft, slowly-drifting color wash (evokes the frosted/dichroic glass reference).
+   A bright cream core in the wash sits under the copy column so text stays legible. */
+@keyframes landing-hero-glass-drift {
+  0%, 100% {
+    transform: translate3d(-2.5%, -1.5%, 0) rotate(0deg) scale(1.1);
+  }
+  50% {
+    transform: translate3d(2.5%, 1.5%, 0) rotate(1.2deg) scale(1.16);
+  }
+}
+
+.landing-hero-glass {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-hero-glass-gradient {
+  position: absolute;
+  inset: -12%;
+  background:
+    radial-gradient(38% 46% at 16% 16%, rgba(124, 111, 224, 0.5), transparent 70%),
+    radial-gradient(50% 56% at 44% 52%, rgba(255, 251, 240, 0.92), transparent 68%),
+    radial-gradient(42% 50% at 86% 62%, rgba(240, 153, 123, 0.55), transparent 70%),
+    radial-gradient(34% 40% at 12% 94%, rgba(107, 58, 140, 0.4), transparent 68%),
+    radial-gradient(30% 36% at 92% 6%, rgba(242, 169, 216, 0.38), transparent 68%);
+  filter: blur(6px);
+  animation: landing-hero-glass-drift 26s ease-in-out infinite;
+  will-change: transform;
+}
+
+.dark .landing-hero-glass-gradient {
+  background: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-glass-gradient {
+    animation: none;
+  }
+}
+
+/* ---- Landing page — decorative cork-board notes ----
+   A hand-illustrated SVG/CSS scene (no product screenshot, no recording) — the hero
+   equivalent of Evernote's small custom vector graphic. ---- */
 @keyframes landing-note-settle {
   from {
     opacity: 0;
     transform: translateY(-16px) rotate(0deg) scale(0.96);
+  }
+}
+
+@keyframes landing-note-sway {
+  0%,
+  100% {
+    transform: rotate(var(--note-rotate, 0deg));
+  }
+  50% {
+    transform: rotate(calc(var(--note-rotate, 0deg) + 2deg));
   }
 }
 
@@ -296,8 +360,17 @@ body {
   z-index: 5;
 }
 
+/* One note (n1) gets a slow continuous idle sway once it's settled — a plain-CSS stand-in
+   for the light looping motion Evernote gets from a Lottie animation. */
+.landing-note--sway {
+  animation:
+    landing-note-settle 0.7s cubic-bezier(0.2, 0.8, 0.25, 1) var(--note-delay, 0s) backwards,
+    landing-note-sway 6s ease-in-out 0.9s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .landing-note {
+  .landing-note,
+  .landing-note--sway {
     animation: none;
   }
 }
@@ -319,6 +392,28 @@ body {
   margin-left: -2.1cqw;
   border-radius: 50%;
   box-shadow: inset -1px -1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Washi-tape accent — an alternative to a pin for holding a note down, layered on top of
+   the note's corner at an angle for a more "physically collaged" feel. */
+.landing-note-tape {
+  position: absolute;
+  top: -3.2cqw;
+  left: 10%;
+  width: 34%;
+  height: 7cqw;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.55) 4px,
+      rgba(255, 255, 255, 0.28) 4px,
+      rgba(255, 255, 255, 0.28) 8px
+    ),
+    rgba(159, 225, 203, 0.6);
+  transform: rotate(-8deg);
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
 .landing-note-line {
@@ -344,9 +439,6 @@ body {
 }
 .landing-note--n1 .landing-note-line {
   background: #b08f1e;
-}
-.landing-note--n1 .landing-note-pin {
-  background: #d8563a;
 }
 
 .landing-note--n2 {
@@ -1372,6 +1464,18 @@ body {
   background: linear-gradient(180deg, hsl(0, 0%, 9%) 0%, hsl(0, 0%, 7%) 100%);
   border-bottom-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-surface--glossy {
+  background: linear-gradient(180deg, rgba(253, 252, 250, 0.75) 0%, rgba(248, 247, 245, 0.6) 100%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+.dark .navbar-surface--glossy {
+  background: linear-gradient(180deg, hsla(0, 0%, 9%, 0.7) 0%, hsla(0, 0%, 7%, 0.55) 100%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
 
 /* ========================================
