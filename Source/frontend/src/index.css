@@ -325,11 +325,23 @@ body {
   }
 }
 
-/* ---- Landing page — decorative cork-board notes ---- */
+/* ---- Landing page — decorative cork-board notes ----
+   A hand-illustrated SVG/CSS scene (no product screenshot, no recording) — the hero
+   equivalent of Evernote's small custom vector graphic. ---- */
 @keyframes landing-note-settle {
   from {
     opacity: 0;
     transform: translateY(-16px) rotate(0deg) scale(0.96);
+  }
+}
+
+@keyframes landing-note-sway {
+  0%,
+  100% {
+    transform: rotate(var(--note-rotate, 0deg));
+  }
+  50% {
+    transform: rotate(calc(var(--note-rotate, 0deg) + 2deg));
   }
 }
 
@@ -348,8 +360,17 @@ body {
   z-index: 5;
 }
 
+/* One note (n1) gets a slow continuous idle sway once it's settled — a plain-CSS stand-in
+   for the light looping motion Evernote gets from a Lottie animation. */
+.landing-note--sway {
+  animation:
+    landing-note-settle 0.7s cubic-bezier(0.2, 0.8, 0.25, 1) var(--note-delay, 0s) backwards,
+    landing-note-sway 6s ease-in-out 0.9s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .landing-note {
+  .landing-note,
+  .landing-note--sway {
     animation: none;
   }
 }
@@ -371,6 +392,28 @@ body {
   margin-left: -2.1cqw;
   border-radius: 50%;
   box-shadow: inset -1px -1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Washi-tape accent — an alternative to a pin for holding a note down, layered on top of
+   the note's corner at an angle for a more "physically collaged" feel. */
+.landing-note-tape {
+  position: absolute;
+  top: -3.2cqw;
+  left: 10%;
+  width: 34%;
+  height: 7cqw;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.55) 4px,
+      rgba(255, 255, 255, 0.28) 4px,
+      rgba(255, 255, 255, 0.28) 8px
+    ),
+    rgba(159, 225, 203, 0.6);
+  transform: rotate(-8deg);
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
 .landing-note-line {
@@ -396,9 +439,6 @@ body {
 }
 .landing-note--n1 .landing-note-line {
   background: #b08f1e;
-}
-.landing-note--n1 .landing-note-pin {
-  background: #d8563a;
 }
 
 .landing-note--n2 {

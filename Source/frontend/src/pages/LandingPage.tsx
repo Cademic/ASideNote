@@ -1,113 +1,23 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, LayoutDashboard, Sparkles, User } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  Check,
+  LayoutDashboard,
+  StickyNote,
+  User,
+  Waves,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useThemeContext } from "../context/ThemeContext";
-import { useRevealOnScroll } from "../hooks/useRevealOnScroll";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
+import { Highlighter } from "../components/ui/Highlighter";
 import { StripedPattern } from "../components/ui/StripedPattern";
 import { GridPattern } from "../components/ui/GridPattern";
 import { AnimatedBeam } from "../components/ui/AnimatedBeam";
-import { Highlighter } from "../components/ui/Highlighter";
-
-/* ─── Demo data ───────────────────────────────────────── */
-
-const DEMOS = [
-  {
-    id: "note-boards",
-    title: "Note boards",
-    description:
-      "Pin sticky notes and index cards to a freeform cork board, then rearrange them as your thinking evolves.",
-    video: {
-      light: "/ASideNoteLight.mp4",
-      dark: "/ASideNoteDark.mp4",
-    },
-    swatch: "var(--land-yellow)",
-    tilt: "-rotate-1",
-    reverse: false,
-  },
-  {
-    id: "chalk-boards",
-    title: "Chalk boards",
-    description:
-      "Sketch diagrams and brainstorm on an infinite canvas with a natural chalk-on-slate feel.",
-    // TODO: swap for a dedicated Chalk boards recording once one exists; reuses the note-boards
-    // demo as a placeholder so this section doesn't fire failing requests for missing video files.
-    video: {
-      light: "/ASideNoteLight.mp4",
-      dark: "/ASideNoteDark.mp4",
-    },
-    swatch: "#26332C",
-    chalkIcon: true,
-    tilt: "rotate-1",
-    reverse: true,
-  },
-  {
-    id: "projects",
-    title: "Projects & calendar",
-    description:
-      "Group boards into projects, then see deadlines and milestones on a shared calendar.",
-    // TODO: swap for a dedicated Projects & calendar recording once one exists; see note above.
-    video: {
-      light: "/ASideNoteLight.mp4",
-      dark: "/ASideNoteDark.mp4",
-    },
-    swatch: "var(--land-coral)",
-    tilt: "-rotate-1",
-    reverse: false,
-  },
-];
-
-/* ─── Demo video: loads only once scrolled near, remounts on theme swap ── */
-
-function DemoVideo({
-  title,
-  swatch,
-  src,
-  prefersReducedMotion,
-}: {
-  title: string;
-  swatch: string;
-  src: string;
-  prefersReducedMotion: boolean;
-}) {
-  const { ref, isVisible } = useRevealOnScroll<HTMLDivElement>({
-    rootMargin: "200px 0px",
-    threshold: 0,
-  });
-  const [isMissing, setIsMissing] = useState(false);
-
-  return (
-    <div
-      ref={ref}
-      className="overflow-hidden rounded-2xl bg-[var(--land-paper)] shadow-[8px_8px_0_0_#1b1a17] aspect-video"
-    >
-      {isMissing ? (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--land-rule)] text-[var(--land-ink-3)]">
-          <span className="h-3 w-3 rounded-full" style={{ background: swatch }} aria-hidden="true" />
-          <span className="font-label text-xs uppercase tracking-[0.16em]">
-            {title} demo coming soon
-          </span>
-        </div>
-      ) : isVisible ? (
-        <video
-          key={src}
-          className="h-full w-full rounded-2xl object-cover"
-          src={src}
-          muted
-          loop
-          playsInline
-          preload="auto"
-          autoPlay={!prefersReducedMotion}
-          aria-label={`${title} walkthrough`}
-          onError={() => setIsMissing(true)}
-        />
-      ) : null}
-    </div>
-  );
-}
 
 /* ─── Component ───────────────────────────────────────── */
 
@@ -159,238 +69,147 @@ export function LandingPage() {
 
       <main className="flex-1">
         {/* ── Hero — kept on a solid cream backdrop, no dots ─── */}
-        <section className="relative overflow-hidden bg-[var(--land-cream)] pb-12 pt-10 sm:pb-16 sm:pt-16">
-          <div className="landing-hero-glass" aria-hidden="true">
-            <div className="landing-hero-glass-gradient" />
-          </div>
+        <section className="relative overflow-hidden bg-white pt-10 dark:bg-[var(--land-cream)] sm:pt-16">
           <div className="relative mx-auto max-w-6xl px-6">
-            <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-              {/* Copy column */}
-              <div>
-                <Reveal className="text-center">
-                  <img
-                    src={effectiveTheme === "dark" ? "/ASideNotTextDark.webp" : "/ASideNoteText.webp"}
-                    alt="ASideNote"
-                    width={1351}
-                    height={468}
-                    className="mx-auto h-44 w-auto object-contain sm:h-60"
-                  />
-                </Reveal>
-
-                <Reveal delay={30} className="mt-4">
-                  <span className="inline-flex -rotate-2 items-center gap-1.5 rounded-full bg-[var(--land-yellow)] px-3 py-1 text-xs font-semibold text-[var(--land-amber-ink)] shadow-sm">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Fun &amp; functional notetaking
-                  </span>
-                </Reveal>
-
-                <Reveal delay={50} className="mt-4">
-                  <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
-                    Note boards &middot; Chalk boards &middot; Projects
-                  </p>
-                </Reveal>
-
-                <Reveal delay={100} className="mt-5">
-                  <h1 className="font-display text-[40px] font-medium leading-[1.06] tracking-tight text-[var(--land-ink)] sm:text-5xl lg:text-6xl">
-                    Every scattered thought, finally{" "}
-                    <em className="font-normal italic text-[var(--land-amber-deep)]">
-                      in one place.
-                    </em>
-                  </h1>
-                  <svg
-                    className="mt-1 h-3 w-[min(260px,72%)] text-[var(--land-amber)]"
-                    viewBox="0 0 260 12"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M4 8C70 2 150 2 256 7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </Reveal>
-
-                <Reveal delay={200} className="mt-6">
-                  <p className="max-w-[42ch] text-[17px] leading-relaxed text-[var(--land-ink-2)]">
-                    Pin sticky notes, index cards, and sketches to a freeform cork board. Group them
-                    into projects, then plan the week around them.
-                  </p>
-                </Reveal>
-
-                <Reveal delay={300} className="mt-8">
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-                    <Link
-                      to={primaryHref}
-                      className="group inline-flex w-fit shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:transform-none"
-                    >
-                      {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
-                      {primaryLabel}
-                      <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-                    </Link>
-                    <a
-                      href="#demo"
-                      className="inline-block border-b border-[var(--land-rule)] pb-0.5 text-[15px] text-[var(--land-ink)] transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 motion-reduce:transition-none motion-reduce:hover:scale-100"
-                    >
-                      <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)" padding={4}>
-                        See a board in action
-                      </Highlighter>
-                    </a>
-                  </div>
-                </Reveal>
-
-                <Reveal delay={400} className="mt-7">
-                  <p className="font-label text-xs tracking-wide text-[var(--land-ink-3)]">
-                    Free to start &middot; Organize Projects &middot; Collaboration
-                  </p>
-                </Reveal>
-              </div>
-
-              {/* Decorative cork board */}
-              <Reveal delay={150}>
-                <div className="corkboard-frame relative rotate-[-2.5deg] shadow-xl">
-                  <div
-                    className="corkboard-surface landing-corkboard"
-                    role="img"
-                    aria-label="A cork board with sticky notes, an index card, and a chalk sketch pinned to it."
-                  >
-                    <div className="landing-note landing-note--n1 landing-note--sticky">
-                      <span className="landing-note-pin" aria-hidden="true" />
-                      <span className="landing-note-line" style={{ width: "82%" }} />
-                      <span className="landing-note-line" style={{ width: "64%" }} />
-                      <span className="landing-note-line" style={{ width: "44%" }} />
-                    </div>
-
-                    <div className="landing-note landing-note--n2 landing-note--sticky">
-                      <span className="landing-note-pin" aria-hidden="true" />
-                      <span className="landing-note-line" style={{ width: "74%" }} />
-                      <span className="landing-note-line" style={{ width: "56%" }} />
-                      <span className="landing-note-line" style={{ width: "68%" }} />
-                    </div>
-
-                    <div className="landing-note landing-note--n3">
-                      <div className="landing-note-card-top" />
-                      <div className="landing-note-rules">
-                        <span style={{ width: "88%" }} />
-                        <span style={{ width: "70%" }} />
-                        <span style={{ width: "52%" }} />
-                      </div>
-                    </div>
-
-                    <div className="landing-note landing-note--n4">
-                      <svg viewBox="0 0 60 40" className="w-3/4" aria-hidden="true">
-                        <path
-                          d="M6 32 Q17 6 28 24 T54 10"
-                          fill="none"
-                          stroke="#2F7A61"
-                          strokeWidth="2.4"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </div>
-
-                    <div className="landing-note landing-note--n5">
-                      <svg viewBox="0 0 80 40" className="w-3/4" aria-hidden="true">
-                        <path
-                          d="M6 32 Q20 4 34 22 T74 6"
-                          fill="none"
-                          stroke="#EDE7D8"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          opacity="0.9"
-                        />
-                        <circle cx="14" cy="12" r="5" fill="none" stroke="#EDE7D8" strokeWidth="1.6" opacity="0.7" />
-                      </svg>
-                    </div>
-
-                    <div className="landing-note landing-note--n6">
-                      <span style={{ width: "60%" }} />
-                      <span style={{ width: "82%" }} />
-                    </div>
-                  </div>
-                </div>
+            <div className="mx-auto max-w-2xl text-center">
+              <Reveal delay={100} className="flex flex-col items-center">
+                <h1 className="font-display text-[40px] font-medium leading-[1.06] tracking-tight text-[var(--land-ink)] sm:text-5xl lg:text-6xl">
+                  Making Notes Fun & Functional.
+                </h1>
               </Reveal>
+
+              <Reveal delay={200} className="mt-5">
+                <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+                  Note boards &middot; Chalk boards &middot; Projects
+                </p>
+              </Reveal>
+
+              <Reveal delay={300} className="mt-8">
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
+                  <Link
+                    to={primaryHref}
+                    className="group inline-flex w-fit shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[var(--land-slate)] px-6 py-3 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                  >
+                    {isAuthenticated && <LayoutDashboard className="h-4 w-4" />}
+                    {primaryLabel}
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+                  </Link>
+                  <Link
+                    to="/faq"
+                    className="inline-block text-sm font-medium text-[var(--land-ink-3)] underline decoration-[var(--land-rule)] underline-offset-4 transition-[color,transform] duration-200 ease-out-smooth hover:scale-110 hover:text-[var(--land-ink)] motion-reduce:transition-none motion-reduce:hover:scale-100"
+                  >
+                    <Highlighter action="highlight" color="rgba(59, 130, 246, 0.35)">
+                      Questions?
+                    </Highlighter>
+                  </Link>
+                </div>
+                {!isAuthenticated && (
+                  <p className="mt-4 text-sm text-[var(--land-ink-3)]">
+                    Already have an account?{" "}
+                    <Link
+                      to="/login"
+                      className="font-medium text-[var(--land-ink)] underline decoration-[var(--land-rule)] underline-offset-4 transition-colors hover:text-[var(--land-amber-deep)]"
+                    >
+                      Log in
+                    </Link>
+                  </p>
+                )}
+              </Reveal>
+
             </div>
+
+            {/* Demo video — flush with the bottom edge of the hero section */}
+            <Reveal delay={200} className="mt-12 sm:mt-16">
+              <div className="mx-auto max-w-5xl overflow-hidden rounded-t-2xl bg-[var(--land-paper)]">
+                <div className="flex items-center gap-1.5 border-b border-[var(--land-rule)] px-4 py-2.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--land-coral)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--land-yellow)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--land-mint)]" />
+                </div>
+                <video
+                  className="block w-full"
+                  src={effectiveTheme === "dark" ? "/ASideNoteDark.mp4" : "/ASideNoteLight.mp4"}
+                  poster={effectiveTheme === "dark" ? "/ASideNoteDark.png" : "/ASideNotelight.png"}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              </div>
+            </Reveal>
           </div>
         </section>
 
-        {/* ── See it in action — one demo video per board type ─ */}
-        <section id="demo" className="relative overflow-hidden py-16 sm:py-20">
+        {/* ── Features ───────────────────────────────────────── */}
+        <section className="relative overflow-hidden border-t border-[var(--land-rule)] py-16 sm:py-20">
           <GridPattern
             width={32}
             height={32}
             strokeDasharray="4 2"
             className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
           />
-          <div className="relative mx-auto max-w-7xl px-6">
+          <div className="relative mx-auto max-w-6xl px-6">
             <Reveal className="mx-auto max-w-[34ch] text-center">
               <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
-                See it in action
+                Features
               </p>
               <h2 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
-                Live Demos
+                Everything your ideas need
               </h2>
             </Reveal>
 
-            <div className="mt-14 space-y-14 sm:space-y-16">
-              {DEMOS.map((demo, i) => {
-                const videoSrc = demo.video[effectiveTheme];
-
-                return (
-                  <div
-                    key={demo.id}
-                    className={`grid items-center gap-10 lg:gap-12 ${
-                      demo.reverse ? "lg:grid-cols-[2fr_3fr]" : "lg:grid-cols-[3fr_2fr]"
-                    }`}
-                  >
-                    <Reveal delay={i * 50} className={demo.reverse ? "lg:order-2" : undefined}>
-                      <div className="relative mx-auto max-w-3xl lg:mx-0 lg:max-w-none">
-                        <DemoVideo
-                          title={demo.title}
-                          swatch={demo.swatch}
-                          src={videoSrc}
-                          prefersReducedMotion={prefersReducedMotion}
-                        />
-                      </div>
-                    </Reveal>
-
-                    <Reveal delay={i * 50 + 100} className={demo.reverse ? "lg:order-1" : undefined}>
-                      <div
-                        className={`group relative h-full overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-7 transition-transform duration-200 ease-out-smooth hover:-translate-y-1 hover:rotate-0 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:transform-none ${demo.tilt}`}
-                      >
-                        <span
-                          className="absolute inset-x-0 top-0 h-1.5 opacity-70"
-                          style={{ background: demo.swatch }}
-                          aria-hidden="true"
-                        />
-                        <div
-                          className="mb-5 flex h-[34px] w-[34px] rotate-[-6deg] items-center justify-center rounded-md shadow-sm transition-transform duration-200 group-hover:rotate-0 group-hover:scale-110"
-                          style={{ background: demo.swatch }}
-                        >
-                          {demo.chalkIcon && (
-                            <svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
-                              <path
-                                d="M3 11 Q7 2 11 8 T18 3"
-                                fill="none"
-                                stroke="#EDE7D8"
-                                strokeWidth="1.6"
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                        <h3 className="font-display text-xl font-medium text-[var(--land-ink)]">
-                          {demo.title}
-                        </h3>
-                        <p className="mt-2.5 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
-                          {demo.description}
-                        </p>
-                      </div>
-                    </Reveal>
+            <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
+              {[
+                {
+                  icon: StickyNote,
+                  iconBg: "var(--land-yellow)",
+                  iconFg: "var(--land-amber-ink)",
+                  barColor: "var(--land-yellow)",
+                  title: "Note boards",
+                  description:
+                    "Pin sticky notes and index cards to a freeform cork board. Rearrange them as your thinking evolves.",
+                },
+                {
+                  icon: Waves,
+                  iconBg: "var(--land-slate)",
+                  iconFg: "var(--land-slate-fg)",
+                  barColor: "var(--land-slate)",
+                  title: "Chalk boards",
+                  description:
+                    "Sketch diagrams and brainstorm on an infinite canvas with a natural chalk-on-slate feel.",
+                },
+                {
+                  icon: CalendarDays,
+                  iconBg: "var(--land-coral)",
+                  iconFg: "var(--land-ink)",
+                  barColor: "var(--land-coral)",
+                  title: "Projects & calendar",
+                  description:
+                    "Group boards into projects, then see deadlines and milestones on a shared calendar.",
+                },
+              ].map((feature, index) => (
+                <Reveal key={feature.title} delay={index * 100}>
+                  <div className="relative h-full overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 shadow-sm">
+                    <div
+                      className="absolute inset-x-0 top-0 h-1.5"
+                      style={{ background: feature.barColor }}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-xl"
+                      style={{ background: feature.iconBg }}
+                    >
+                      <feature.icon className="h-5 w-5" style={{ color: feature.iconFg }} />
+                    </div>
+                    <h3 className="font-display mt-5 text-xl font-medium text-[var(--land-ink)]">
+                      {feature.title}
+                    </h3>
+                    <p className="mt-2 text-[15px] leading-relaxed text-[var(--land-ink-2)]">
+                      {feature.description}
+                    </p>
                   </div>
-                );
-              })}
+                </Reveal>
+              ))}
             </div>
           </div>
         </section>
