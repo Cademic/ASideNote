@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { MarketingHeader } from "../components/layout/MarketingHeader";
 import { Reveal } from "../components/ui/Reveal";
-import { GridPattern } from "../components/ui/GridPattern";
 
 const SECTIONS = [
   {
@@ -126,12 +125,6 @@ export function PrivacyPolicyPage() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden px-6 py-20 sm:py-28">
-          <GridPattern
-            width={32}
-            height={32}
-            strokeDasharray="4 2"
-            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
-          />
           <div className="relative mx-auto max-w-3xl">
             <Reveal>
               <h1 className="font-display text-3xl font-medium text-[var(--land-ink)] sm:text-5xl">

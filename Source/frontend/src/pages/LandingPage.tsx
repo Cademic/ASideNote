@@ -5,9 +5,12 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
+  GraduationCap,
   LayoutDashboard,
+  Lightbulb,
   StickyNote,
   User,
+  Users,
   Waves,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -18,6 +21,7 @@ import { Highlighter } from "../components/ui/Highlighter";
 import { StripedPattern } from "../components/ui/StripedPattern";
 import { GridPattern } from "../components/ui/GridPattern";
 import { AnimatedBeam } from "../components/ui/AnimatedBeam";
+import { UseCaseTabs } from "../components/ui/UseCaseTabs";
 
 /* ─── Component ───────────────────────────────────────── */
 
@@ -140,7 +144,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ── Features ───────────────────────────────────────── */}
+        {/* ── Features + Use cases — share one grid background ─ */}
         <section className="relative overflow-hidden border-t border-[var(--land-rule)] py-16 sm:py-20">
           <GridPattern
             width={32}
@@ -181,7 +185,7 @@ export function LandingPage() {
                 {
                   icon: CalendarDays,
                   iconBg: "var(--land-coral)",
-                  iconFg: "var(--land-ink)",
+                  iconFg: "#1b1a17",
                   barColor: "var(--land-coral)",
                   title: "Projects & calendar",
                   description:
@@ -211,6 +215,63 @@ export function LandingPage() {
                 </Reveal>
               ))}
             </div>
+          </div>
+
+          {/* ── Use cases ────────────────────────────────────── */}
+          <div className="relative mx-auto mt-16 max-w-6xl px-6 sm:mt-20">
+            <Reveal className="mx-auto max-w-[34ch] text-center">
+              <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">
+                Who it's for
+              </p>
+              <h2 className="font-display mt-3 text-3xl font-medium text-[var(--land-ink)] sm:text-4xl">
+                Built for however you plan
+              </h2>
+            </Reveal>
+
+            <Reveal delay={100} className="mx-auto mt-10 max-w-3xl">
+              <UseCaseTabs
+                tabs={[
+                  {
+                    id: "students",
+                    label: "Students",
+                    icon: GraduationCap,
+                    accentColor: "var(--land-yellow)",
+                    pitch: "Keep every class organized, from lecture notes to exam day.",
+                    bullets: [
+                      "Calendar: never miss a due date or upcoming event",
+                      "Projects: keep coursework organized and collaborate with classmates",
+                      "Note boards: take notes and visualize your ideas",
+                      "Chalk boards: grab a pen for fast notes or working out math problems",
+                    ],
+                  },
+                  {
+                    id: "teams",
+                    label: "Teams",
+                    icon: Users,
+                    accentColor: "var(--land-coral)",
+                    pitch: "Keep everyone aligned with a shared calendar inside every project.",
+                    bullets: [
+                      "See what's upcoming and due, right inside the project",
+                      "Multiple people can view and edit the same board at once",
+                      "Changes appear live for everyone, in real time",
+                      "Add friends to a project for easier team management",
+                    ],
+                  },
+                  {
+                    id: "idea-building",
+                    label: "Idea Building",
+                    icon: Lightbulb,
+                    accentColor: "var(--land-mint)",
+                    pitch: "String your thoughts together and watch ideas take shape.",
+                    bullets: [
+                      "Note boards: link ideas together for that satisfying connected feel",
+                      "Set your own due dates and timeline",
+                      "Projects: keep it all organized in one place",
+                    ],
+                  },
+                ]}
+              />
+            </Reveal>
           </div>
         </section>
 
@@ -295,7 +356,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ── Pricing ────────────────────────────────────────── */}
+        {/* ── Pricing + Final CTA — share one grid background ── */}
         <section id="pricing" className="relative overflow-hidden border-t border-[var(--land-rule)] py-16 sm:py-20">
           <GridPattern
             width={32}
@@ -387,17 +448,9 @@ export function LandingPage() {
               </Reveal>
             </div>
           </div>
-        </section>
 
-        {/* ── Final CTA — sticky note, reuses the app's real .stat-sticky ─ */}
-        <section className="relative overflow-hidden border-[var(--land-rule)] py-16 text-center sm:py-24">
-          <GridPattern
-            width={32}
-            height={32}
-            strokeDasharray="4 2"
-            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
-          />
-          <div className="relative mx-auto max-w-6xl px-6">
+          {/* ── Final CTA — sticky note, reuses the app's real .stat-sticky ─ */}
+          <div className="relative mx-auto mt-16 max-w-6xl px-6 text-center sm:mt-20">
             <Reveal>
               <div
                 className="stat-sticky mx-auto max-w-2xl bg-[color-mix(in_srgb,var(--land-amber)_65%,white)] px-8 py-10 sm:px-12 sm:py-14"
