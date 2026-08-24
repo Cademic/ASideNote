@@ -1,17 +1,19 @@
 import { useState, type FormEvent } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { AuthPageShell } from "../components/auth/AuthPageShell";
 import { GoogleSignInButton } from "../components/auth/GoogleSignInButton";
 
 const inputClassName =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/40 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+  "w-full rounded-lg border border-[var(--land-rule)] bg-[var(--land-white)] px-3 py-2 text-sm text-[var(--land-ink)] placeholder:text-[var(--land-ink-3)] focus:border-[var(--land-amber)] focus:outline-none focus:ring-2 focus:ring-[var(--land-amber)]/20";
 
 const primaryButtonClassName =
-  "w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
+  "group inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--land-slate)] px-4 py-2.5 text-sm font-medium text-[var(--land-slate-fg)] transition-transform duration-200 ease-out-smooth hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none motion-reduce:transition-none motion-reduce:hover:transform-none";
 
-const linkAccentClassName = "font-medium text-primary hover:underline";
+const linkAccentClassName =
+  "font-medium text-[var(--land-ink)] underline decoration-[var(--land-rule)] underline-offset-4 transition-colors hover:text-[var(--land-amber-deep)]";
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -74,10 +76,10 @@ export function LoginPage() {
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border/80" />
+          <span className="w-full border-t border-[var(--land-rule)]" />
         </div>
         <div className="relative flex justify-center text-xs uppercase tracking-wide">
-          <span className="bg-surface px-2 text-foreground/40">
+          <span className="bg-[var(--land-white)] px-2 text-[var(--land-ink-3)]">
             or continue with email
           </span>
         </div>
@@ -85,7 +87,7 @@ export function LoginPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-1.5">
-          <label htmlFor="email" className="block text-sm font-medium text-foreground">
+          <label htmlFor="email" className="block text-sm font-medium text-[var(--land-ink)]">
             Email
           </label>
           <input
@@ -101,7 +103,7 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="block text-sm font-medium text-foreground">
+          <label htmlFor="password" className="block text-sm font-medium text-[var(--land-ink)]">
             Password
           </label>
           <input
@@ -118,10 +120,11 @@ export function LoginPage() {
 
         <button type="submit" disabled={isSubmitting} className={primaryButtonClassName}>
           {isSubmitting ? "Signing in..." : "Sign In"}
+          <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
         </button>
       </form>
 
-      <p className="text-center text-sm text-foreground/60">
+      <p className="text-center text-sm text-[var(--land-ink-2)]">
         Don&apos;t have an account?{" "}
         <Link to="/register" className={linkAccentClassName}>
           Create one

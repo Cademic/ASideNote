@@ -52,7 +52,7 @@ export function FaqPage() {
             width={32}
             height={32}
             strokeDasharray="4 2"
-            className="stroke-[var(--land-ink)]/[0.08] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
+            className="stroke-[var(--land-ink)]/[0.08] dark:stroke-[var(--land-ink)]/[0.04] [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,black,transparent)]"
           />
           <div className="relative mx-auto max-w-3xl">
             <Reveal>

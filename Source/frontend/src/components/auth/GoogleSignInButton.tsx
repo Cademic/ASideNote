@@ -171,15 +171,15 @@ export function GoogleSignInButton({ onError }: GoogleSignInButtonProps) {
         />
         {isLoading && (
           <div
-            className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/90 backdrop-blur-[1px]"
+            className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-[var(--land-white)]/90 backdrop-blur-[1px]"
             role="status"
             aria-live="polite"
           >
             <span
-              className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground"
+              className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[var(--land-ink-3)]/30 border-t-[var(--land-ink)]"
               aria-hidden
             />
-            <span className="text-sm text-foreground/60">Signing in with Google...</span>
+            <span className="text-sm text-[var(--land-ink-2)]">Signing in with Google...</span>
           </div>
         )}
       </div>
