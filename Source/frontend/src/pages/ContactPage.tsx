@@ -29,9 +29,6 @@ export function ContactPage() {
       <main className="flex-1">
         {/* ── Page hero — solid cream backdrop, no dots ───────── */}
         <section className="relative overflow-hidden bg-[var(--land-cream)] px-6 py-20 sm:py-28">
-          <div className="landing-hero-glass" aria-hidden="true">
-            <div className="landing-hero-glass-gradient" />
-          </div>
           <Reveal className="relative mx-auto max-w-3xl text-center">
             
             <p className="font-label text-[11px] uppercase tracking-[0.16em] text-[var(--land-ink-3)]">

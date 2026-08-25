@@ -2,6 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Keep in sync with STORAGE_KEY in src/context/ThemeContext.tsx. Runs before
+         any CSS loads so the browser's default canvas color-scheme (and Tailwind's
+         .dark class) are correct on first paint, instead of flashing white/light. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("asidenote.theme");
+          var isDark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", isDark);
+          document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Start your note taking journey off right" />
     <meta name="theme-color" content="#f7f2e9" />
