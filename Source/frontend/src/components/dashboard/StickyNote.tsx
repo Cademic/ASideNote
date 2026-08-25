@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -18,6 +18,7 @@ import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
+import { sanitizeHtml } from "../../utils/sanitize-html";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -167,7 +168,7 @@ function RemoteCaret({ editor, position, color, wrapperRef }: RemoteCaretProps) 
   );
 }
 
-export function StickyNote({
+function StickyNoteComponent({
   note,
   isEditing,
   zIndex = 0,
@@ -759,7 +760,7 @@ export function StickyNote({
         ref={nodeRef}
         data-board-item="note"
         data-note-id={note.id}
-        className="absolute overflow-visible"
+        className="absolute overflow-visible will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
@@ -1067,7 +1068,7 @@ export function StickyNote({
                 <div
                   data-field="title"
                   className="note-rich-content mb-1 break-words text-sm font-semibold text-gray-800"
-                  dangerouslySetInnerHTML={{ __html: note.title }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(note.title) }}
                 />
               ) : (
                 <p data-field="title" className="mb-1 text-sm font-semibold text-gray-500/50">Untitled</p>
@@ -1076,7 +1077,7 @@ export function StickyNote({
                 <div
                   data-field="content"
                   className="note-rich-content break-words text-xs text-gray-600"
-                  dangerouslySetInnerHTML={{ __html: note.content }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(note.content) }}
                 />
               )}
               {note.tags.length > 0 && (
@@ -1180,3 +1181,31 @@ export function StickyNote({
     </Draggable>
   );
 }
+
+function sameShallowList<T extends Record<string, unknown>>(a?: T[] | null, b?: T[] | null): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, i) => {
+    const other = b[i]!;
+    const keys = Object.keys(item);
+    return keys.length === Object.keys(other).length && keys.every((k) => item[k] === other[k]);
+  });
+}
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every note's JSX (and its TipTap editors) on each broadcast.
+// Only re-render a note when its own data actually changed; callback props are treated as
+// stable since the board's handlers read live data via refs rather than render-scoped closures.
+export const StickyNote = memo(StickyNoteComponent, (prev, next) => {
+  return (
+    prev.note === next.note &&
+    prev.isEditing === next.isEditing &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom &&
+    prev.enlargeWhenEditing === next.enlargeWhenEditing &&
+    prev.requestDeleteConfirm === next.requestDeleteConfirm &&
+    sameShallowList(prev.focusedBy, next.focusedBy) &&
+    sameShallowList(prev.remoteTextCursors, next.remoteTextCursors)
+  );
+});

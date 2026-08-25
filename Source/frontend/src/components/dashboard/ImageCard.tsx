@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { X, GripVertical } from "lucide-react";
 import type { BoardImageSummaryDto } from "../../types";
@@ -40,7 +40,7 @@ interface ImageCardProps {
   zoom?: number;
 }
 
-export function ImageCard({
+function ImageCardComponent({
   image,
   zIndex = 0,
   onDragStart,
@@ -231,7 +231,7 @@ export function ImageCard({
       <div
         ref={nodeRef}
         data-board-item="image"
-        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10"
+        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 will-change-transform"
         style={{
           width: `${size.width}px`,
           height: `${size.height}px`,
@@ -383,3 +383,16 @@ export function ImageCard({
     </Draggable>
   );
 }
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every image's JSX on each broadcast. Only re-render an image
+// when its own data actually changed; callback props are treated as stable since the board's
+// handlers read live data via refs rather than render-scoped closures.
+export const ImageCard = memo(ImageCardComponent, (prev, next) => {
+  return (
+    prev.image === next.image &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom
+  );
+});

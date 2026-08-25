@@ -25,10 +25,10 @@ let failedQueue: Array<{
 
 function processQueue(error: unknown, token: string | null) {
   failedQueue.forEach((promise) => {
-    if (error) {
-      promise.reject(error);
+    if (error || !token) {
+      promise.reject(error ?? new Error("Token refresh failed: no token returned."));
     } else {
-      promise.resolve(token!);
+      promise.resolve(token);
     }
   });
   failedQueue = [];

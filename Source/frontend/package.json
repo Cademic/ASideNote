@@ -12,8 +12,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@csstools/css-parser-algorithms": "^3.0.5",
-    "@csstools/css-tokenizer": "^3.0.4",
     "@floating-ui/dom": "^1.7.6",
     "@microsoft/signalr": "^10.0.0",
     "@tiptap/extension-character-count": "^3.19.0",
@@ -39,6 +37,7 @@
     "@tiptap/starter-kit": "^3.19.0",
     "axios": "^1.15.0",
     "browser-image-compression": "^2.0.2",
+    "dompurify": "^3.4.14",
     "fabric": "^7.2.0",
     "framer-motion": "^13.1.1",
     "html2pdf.js": "^0.14.0",
@@ -53,6 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.24",
     "@types/react-dom": "^18.3.7",

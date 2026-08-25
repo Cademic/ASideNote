@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import type { CalendarEventDto } from "../../types";
 
 const COLOR_MAP: Record<string, { bg: string; text: string; dot: string }> = {
@@ -46,8 +45,4 @@ export function CalendarEventItem({ event, onClick, compact, projectName }: Cale
       </span>
     </button>
   );
-}
-
-export function getEventDotColor(color: string): string {
-  return COLOR_MAP[color]?.dot ?? COLOR_MAP.sky.dot;
 }

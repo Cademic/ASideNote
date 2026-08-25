@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useRef, useState, useCallback } from "react";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -23,6 +23,7 @@ import { INDEX_CARD_COLORS } from "./indexCardColors";
 import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
+import { sanitizeHtml } from "../../utils/sanitize-html";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -100,7 +101,7 @@ function resolveCardColorKey(card: IndexCardSummaryDto): string {
   return keys[Math.abs(hash) % keys.length] ?? "white";
 }
 
-export function IndexCard({
+function IndexCardComponent({
   card,
   isEditing,
   zIndex = 0,
@@ -572,7 +573,7 @@ export function IndexCard({
         ref={nodeRef}
         data-board-item="card"
         data-card-id={card.id}
-        className="absolute overflow-visible"
+        className="absolute overflow-visible will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
@@ -821,7 +822,7 @@ export function IndexCard({
                   <div
                     data-field="title"
                     className="note-rich-content break-words text-sm font-semibold text-gray-800"
-                    dangerouslySetInnerHTML={{ __html: card.title }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.title) }}
                   />
                 ) : (
                   <p data-field="title" className="text-sm font-semibold text-gray-500/50">Untitled</p>
@@ -866,7 +867,7 @@ export function IndexCard({
                   <div
                     data-field="content"
                     className="note-rich-content index-card-content break-words text-xs text-gray-600"
-                    dangerouslySetInnerHTML={{ __html: card.content }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content) }}
                   />
                 )}
                 {card.tags.length > 0 && (
@@ -970,3 +971,29 @@ export function IndexCard({
     </Draggable>
   );
 }
+
+function sameShallowList<T extends Record<string, unknown>>(a?: T[] | null, b?: T[] | null): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, i) => {
+    const other = b[i]!;
+    const keys = Object.keys(item);
+    return keys.length === Object.keys(other).length && keys.every((k) => item[k] === other[k]);
+  });
+}
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every card's JSX (and its TipTap editors) on each broadcast.
+// Only re-render a card when its own data actually changed; callback props are treated as
+// stable since the board's handlers read live data via refs rather than render-scoped closures.
+export const IndexCard = memo(IndexCardComponent, (prev, next) => {
+  return (
+    prev.card === next.card &&
+    prev.isEditing === next.isEditing &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom &&
+    prev.enlargeWhenEditing === next.enlargeWhenEditing &&
+    sameShallowList(prev.focusedBy, next.focusedBy)
+  );
+});
