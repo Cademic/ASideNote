@@ -15,9 +15,6 @@ interface CorkBoardProps {
   presenceWidget?: ReactNode;
   boardRef?: React.RefObject<HTMLDivElement | null>;
   onDropItem?: (type: string, x: number, y: number) => void;
-  /** Board-space (canvas) coords when mouse moves over the viewport */
-  onBoardMouseMove?: (x: number, y: number) => void;
-  onBoardMouseLeave?: () => void;
   /** Called when user clicks the board (receives event so handler can check if click was on background) */
   onBoardClick?: (e: React.MouseEvent) => void;
   zoom: number;
@@ -89,8 +86,6 @@ export function CorkBoard({
   presenceWidget,
   boardRef,
   onDropItem,
-  onBoardMouseMove,
-  onBoardMouseLeave,
   onBoardClick,
   zoom,
   panX,
@@ -220,18 +215,6 @@ export function CorkBoard({
 
     onDropItem(itemType, canvasX, canvasY);
   }
-
-  const handleViewportMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = viewportRef.current?.getBoundingClientRect();
-      if (!rect || !onBoardMouseMove) return;
-      const screenX = e.clientX - rect.left;
-      const screenY = e.clientY - rect.top;
-      const { x, y } = corkScreenToWorld(screenX, screenY, zoom, panX, panY, contentMinX, contentMinY);
-      onBoardMouseMove(x, y);
-    },
-    [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
-  );
 
   // ---- Wheel: Ctrl/Cmd + scroll = zoom; otherwise native scroll on this viewport pans ----
   useEffect(() => {
@@ -435,7 +418,11 @@ export function CorkBoard({
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden corkboard-frame">
       {topBar ? (
-        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
+        // right-[18px] clears the corkboard-surface scrollbar so the toolbar's rounded card never
+        // paints over it — sized above the custom 10px scrollbar width in index.css since not
+        // every browser/build honors ::-webkit-scrollbar sizing (some render a ~15-17px native
+        // gutter regardless), so this leaves margin for that case too.
+        <div className="pointer-events-none absolute left-0 right-[18px] top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
           <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
@@ -460,8 +447,6 @@ export function CorkBoard({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onMouseDown={handleMouseDown}
-        onMouseMove={onBoardMouseMove ? handleViewportMouseMove : undefined}
-        onMouseLeave={onBoardMouseLeave}
       >
         <div
           className="relative"

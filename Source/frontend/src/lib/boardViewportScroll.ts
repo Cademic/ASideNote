@@ -94,3 +94,80 @@ export function corkZoomAroundScreenPoint(
     panY: panY + (newWorld.y - oldWorld.y),
   };
 }
+
+/**
+ * ChalkBoardPage equivalents of the cork* functions above, using chalk's own
+ * resolution-factor-based scale convention (`vpScale = zoom / RESOLUTION_FACTOR`)
+ * instead of a plain `zoom` scale. contentMin is always (0, 0) for chalk boards
+ * (see ChalkBoardPage's fixed board bounds), so unlike the cork* versions there
+ * is no contentMin offset term to carry around.
+ *
+ * Deliberately NOT unified with the cork* functions above — see the module
+ * doc comment in boardViewportMath.ts for why ChalkBoardPage and CorkBoard are
+ * independently-evolving systems that only coincidentally share an algebraic shape.
+ */
+
+/** Inner scroll surface for ChalkBoardPage (scale = zoom / resolutionFactor). */
+export function chalkScrollInnerLayout(
+  canvasWidth: number,
+  canvasHeight: number,
+  zoom: number,
+  resolutionFactor: number,
+): ScrollSize {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    scrollWidth: canvasWidth * vpScale,
+    scrollHeight: canvasHeight * vpScale,
+  };
+}
+
+export function chalkPanToScroll(
+  panX: number,
+  panY: number,
+  zoom: number,
+  resolutionFactor: number,
+): { scrollLeft: number; scrollTop: number } {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    scrollLeft: -vpScale * panX,
+    scrollTop: -vpScale * panY,
+  };
+}
+
+export function chalkScrollToPan(
+  scrollLeft: number,
+  scrollTop: number,
+  zoom: number,
+  resolutionFactor: number,
+): { panX: number; panY: number } {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    panX: -scrollLeft / vpScale,
+    panY: -scrollTop / vpScale,
+  };
+}
+
+/**
+ * Keep the board point under (screenX, screenY) fixed when zoom changes, using
+ * chalk's resolution-factor scale convention.
+ */
+export function chalkZoomAroundScreenPoint(
+  panX: number,
+  panY: number,
+  zoom: number,
+  newZoom: number,
+  screenX: number,
+  screenY: number,
+  resolutionFactor: number,
+): { panX: number; panY: number } {
+  const vpScale = zoom / resolutionFactor;
+  const newVpScale = newZoom / resolutionFactor;
+  const worldX = screenX / vpScale - panX;
+  const worldY = screenY / vpScale - panY;
+  const newWorldX = screenX / newVpScale - panX;
+  const newWorldY = screenY / newVpScale - panY;
+  return {
+    panX: panX + (newWorldX - worldX),
+    panY: panY + (newWorldY - worldY),
+  };
+}

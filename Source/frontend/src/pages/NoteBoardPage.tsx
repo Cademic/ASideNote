@@ -51,7 +51,7 @@ import {
   parseBoardExportFile,
 } from "../lib/boardExport";
 import { importBoardReplacingExisting } from "../lib/boardImport";
-import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
+import { corkZoomAroundScreenPoint, corkScrollInnerLayout, corkScrollToPan } from "../lib/boardViewportScroll";
 import { corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { useFileImport } from "../hooks/useFileImport";
@@ -242,14 +242,24 @@ export function NoteBoardPage() {
     | null
   >(null);
 
-  // --- Board presence: who is focusing which item, remote cursors ---
+  // --- Board presence: who is focusing which item, remote text cursors ---
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
-  const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
   const [remoteTextCursors, setRemoteTextCursors] = useState<Map<string, { itemType: string; itemId: string; field: "title" | "content"; position: number; color: string }>>(new Map());
-  const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
-  const CURSOR_THROTTLE_MS = 60;
 
-  // Restore viewport from localStorage on mount
+  // Whether this board has never been opened before (nothing saved for it yet) — decided once,
+  // during the very first render, before any effect gets a chance to run. Must NOT be computed
+  // inside an effect: the viewport-persistence effect below flushes a default
+  // {zoom:1,panX:0,panY:0} to localStorage from its cleanup function unconditionally, and in
+  // dev StrictMode's mount→unmount→mount double-invoke that cleanup runs between two effect
+  // passes here, so an effect-based check would see its own default value written back and
+  // wrongly conclude a viewport was already saved.
+  const needsInitialCenterRef = useRef<boolean | null>(null);
+  if (needsInitialCenterRef.current === null) {
+    const initial = boardId ? readBoardViewport(boardId) : {};
+    needsInitialCenterRef.current = initial.panX === undefined && initial.panY === undefined;
+  }
+
+  // Restore viewport from localStorage on mount.
   useEffect(() => {
     if (!boardId) return;
     const { zoom: z, panX: px, panY: py } = readBoardViewport(boardId);
@@ -257,6 +267,45 @@ export function NoteBoardPage() {
     if (px !== undefined) setPanX(px);
     if (py !== undefined) setPanY(py);
   }, [boardId]);
+
+  // If this board has never been opened before, center the view on the board instead of
+  // leaving the default panX/panY = 0, which lands on the board's top-left corner
+  // (contentMinX/Y are negative — see canvasBounds — so pan 0,0 is not the board's center).
+  // Deferred until loading finishes: while isLoading is true the board renders a placeholder
+  // instead of the real viewport, so corkBoardScrollRef isn't attached yet.
+  //
+  // Computes the target pan from the scroll midpoint (scrollWidth/2, scrollHeight/2 — the
+  // fixed board spans exactly [0, scrollWidth] x [0, scrollHeight] in scroll coordinates, so
+  // that midpoint *is* the board's center by construction) and pushes it through
+  // handleViewportChange to update panX/panY state.
+  //
+  // The requestAnimationFrame deferral is load-bearing, not cosmetic: on mount, CorkBoard's own
+  // state→scroll layout effect independently "corrects" the default panX/panY = 0 into whatever
+  // pan value matches wherever the browser actually clamped scrollLeft/Top (since 0,0 maps to an
+  // out-of-range negative scroll position at this board's bounds). Calling handleViewportChange
+  // in the same tick races that correction — whichever write lands last in the same commit wins,
+  // and it was inconsistently CorkBoard's stale correction. Waiting a frame lets that initial
+  // self-correction fully settle first, so this is the only update in flight when it runs.
+  useEffect(() => {
+    if (isLoading || !needsInitialCenterRef.current) return;
+    const el = corkBoardScrollRef.current;
+    if (!el) return;
+    needsInitialCenterRef.current = false;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const { scrollWidth, scrollHeight } = corkScrollInnerLayout(
+      canvasBounds.canvasWidth,
+      canvasBounds.canvasHeight,
+      zoom,
+      contentMinX,
+      contentMinY,
+    );
+    const targetScrollLeft = (scrollWidth - el.clientWidth) / 2;
+    const targetScrollTop = (scrollHeight - el.clientHeight) / 2;
+    const { panX: newPanX, panY: newPanY } = corkScrollToPan(targetScrollLeft, targetScrollTop, zoom, contentMinX, contentMinY);
+    requestAnimationFrame(() => {
+      handleViewportChange(zoom, newPanX, newPanY);
+    });
+  }, [isLoading]);
 
   // Persist viewport to localStorage (debounced); flush on cleanup and pagehide so last view is not lost
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -579,22 +628,6 @@ export function NoteBoardPage() {
     },
     [currentUserId],
   );
-  const handleCursorPosition = useCallback((userId: string, x: number, y: number) => {
-    if (x < 0 || y < 0) {
-      setRemoteCursors((prev) => {
-        const next = new Map(prev);
-        next.delete(userId);
-        return next;
-      });
-      return;
-    }
-    setRemoteCursors((prev) => {
-      const next = new Map(prev);
-      next.set(userId, { x, y, color: getColorForUserId(userId) });
-      return next;
-    });
-  }, []);
-
   const handleTextCursorPosition = useCallback((userId: string, itemType: string, itemId: string, field: "title" | "content", position: number) => {
     if (currentUserId != null && userId === currentUserId) return;
     setRemoteTextCursors((prev) => {
@@ -614,24 +647,12 @@ export function NoteBoardPage() {
       next.delete(userId);
       return next;
     });
-    setRemoteCursors((prev) => {
-      const next = new Map(prev);
-      next.delete(userId);
-      return next;
-    });
   }, []);
 
   const handlePresenceUpdate = useCallback((users: BoardPresenceUser[]) => {
     setBoardPresence(users);
     const presentIds = new Set(users.map((u) => u.userId));
     setRemoteTextCursors((prev) => {
-      const toRemove = [...prev.keys()].filter((uid) => !presentIds.has(uid));
-      if (toRemove.length === 0) return prev;
-      const next = new Map(prev);
-      for (const uid of toRemove) next.delete(uid);
-      return next;
-    });
-    setRemoteCursors((prev) => {
       const toRemove = [...prev.keys()].filter((uid) => !presentIds.has(uid));
       if (toRemove.length === 0) return prev;
       const next = new Map(prev);
@@ -725,13 +746,12 @@ export function NoteBoardPage() {
     setConnections((prev) => prev.filter((c) => c.fromItemId !== cardId && c.toItemId !== cardId));
   }, []);
 
-  const { sendFocus, sendCursor, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onIndexCardUpdated: mergeCardPayload,
     onPresenceUpdate: handlePresenceUpdate,
     onUserFocusingItem: handleUserFocusingItem,
-    onCursorPosition: handleCursorPosition,
     onTextCursorPosition: handleTextCursorPosition,
     onUserLeft: handleUserLeft,
     onNoteDeleted: handleNoteDeleted,
@@ -748,19 +768,6 @@ export function NoteBoardPage() {
     else if (primaryCard) sendFocus("card", primaryCard);
     else sendFocus("note", null);
   }, [editingNoteIds, editingCardIds, sendFocus]);
-
-  const handleBoardMouseMove = useCallback(
-    (x: number, y: number) => {
-      const now = Date.now();
-      if (now - cursorThrottleRef.current.last < CURSOR_THROTTLE_MS) return;
-      cursorThrottleRef.current.last = now;
-      sendCursor(x, y);
-    },
-    [sendCursor],
-  );
-  const handleBoardMouseLeave = useCallback(() => {
-    sendCursor(-1, -1);
-  }, [sendCursor]);
 
   const DRAG_THROTTLE_MS = 120;
   type DragPending = { x: number; y: number; timer: ReturnType<typeof setTimeout> };
@@ -2508,8 +2515,6 @@ export function NoteBoardPage() {
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
-              onBoardMouseMove={handleBoardMouseMove}
-              onBoardMouseLeave={handleBoardMouseLeave}
               onBoardClick={(e) => {
                 if (!(e.target as Element).closest("[data-board-item]")) {
                   setEditingNoteIds(new Set());
@@ -2530,27 +2535,6 @@ export function NoteBoardPage() {
               contentMinX={canvasBounds.contentMinX}
               contentMinY={canvasBounds.contentMinY}
             >
-          {/* Remote cursors layer (board-space coords, same transform as canvas) */}
-          <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
-            {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
-              <div
-                key={userId}
-                className="absolute z-[9999] flex items-center gap-1 overflow-visible"
-                style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 32 32"
-                  width="32"
-                  height="32"
-                  className="drop-shadow-lg"
-                >
-                  <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
-                </svg>
-              </div>
-            ))}
-          </div>
-
           <RedStringLayer
             ref={redStringSvgRef}
             connections={connections}

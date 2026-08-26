@@ -478,16 +478,6 @@ export function BoardMenuBar({
         {hasChalkTools || showCompactBoardTools ? (
           <div className="relative min-w-0 w-full">
             <div className="flex min-w-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={goToPrevChalkToolsPage}
-                disabled={chalkToolsPage === 0}
-                title="Previous tools"
-                aria-label="Previous tools"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
               <div
                 className="min-w-0 flex-1 overflow-hidden touch-pan-x"
                 onTouchStart={handleChalkToolsTouchStart}
@@ -558,19 +548,19 @@ export function BoardMenuBar({
                   )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={goToNextChalkToolsPage}
-                disabled={chalkToolsPage === maxChalkToolsPage}
-                title="Next tools"
-                aria-label="Next tools"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
             </div>
             {toolsSlidesCount > 1 ? (
               <div className="mt-1 flex items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={goToPrevChalkToolsPage}
+                  disabled={chalkToolsPage === 0}
+                  title="Previous tools"
+                  aria-label="Previous tools"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
                 {Array.from({ length: toolsSlidesCount }).map((_, idx) => (
                   <button
                     key={idx}
@@ -586,6 +576,16 @@ export function BoardMenuBar({
                     ].join(" ")}
                   />
                 ))}
+                <button
+                  type="button"
+                  onClick={goToNextChalkToolsPage}
+                  disabled={chalkToolsPage === maxChalkToolsPage}
+                  title="Next tools"
+                  aria-label="Next tools"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground/65 transition-colors hover:bg-foreground/10 hover:text-foreground disabled:cursor-default disabled:opacity-35"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             ) : null}
             {showCompactBoardTools && openMenu ? (

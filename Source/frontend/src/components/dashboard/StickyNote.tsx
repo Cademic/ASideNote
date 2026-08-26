@@ -663,6 +663,14 @@ function StickyNoteComponent({
           zIndex,
         }}
         onMouseDown={() => onBringToFront?.(note.id)}
+        onDragStart={(e) => {
+          // Selected text inside the note is natively draggable in the browser. Without
+          // this, grabbing the drag handle while text is highlighted starts a native
+          // text-drag instead of react-draggable's mouse-based drag: the note never
+          // receives the mousemove/mouseup pair it needs, so it appears to stick to the
+          // cursor until the next click forces react-draggable's stale drag state to end.
+          e.preventDefault();
+        }}
         onContextMenu={(e) => {
           const target = e.target as Element;
           const inEditable = target.closest('[contenteditable="true"]');
