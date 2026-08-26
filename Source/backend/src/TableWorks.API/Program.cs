@@ -52,7 +52,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, loggerConfiguration) =>
 {
     loggerConfiguration.ReadFrom.Configuration(context.Configuration);
-    loggerConfiguration.WriteTo.Console();
 });
 
 // ---------------------------------------------------------------------------

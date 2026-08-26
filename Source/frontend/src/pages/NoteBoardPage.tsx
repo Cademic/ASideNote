@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
@@ -52,13 +52,11 @@ import {
 } from "../lib/boardExport";
 import { importBoardReplacingExisting } from "../lib/boardImport";
 import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
-import { corkPanDeltaForContentMinShift, corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
+import { corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { useFileImport } from "../hooks/useFileImport";
 import { ContextMenu } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
-
-let nextTempCardId = 1;
 
 export function NoteBoardPage() {
   const { boardId } = useParams<{ boardId: string }>();
@@ -183,53 +181,35 @@ export function NoteBoardPage() {
   /** CorkBoard scroll viewport — center for menu/zoom matches visible canvas (not outer wrapper). */
   const corkBoardScrollRef = useRef<HTMLDivElement>(null);
 
-  // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
-  const CANVAS_PADDING = 300;
-  const DEFAULT_CANVAS_SIZE = 2000;
+  // Fixed-size board: a firm boundary instead of a canvas that grows to fit wherever content
+  // has been dragged. A single stray/corrupted position used to be able to blow the shared
+  // canvas out to hundreds of thousands of pixels, degrading drag precision for every item on
+  // the board (see the dsadasd incident) — the API also rejects positions outside this range
+  // (see BoardBoundsConstants on the backend; keep both in sync if this changes).
+  const BOARD_MIN_X = -10000;
+  const BOARD_MIN_Y = -10000;
+  const BOARD_MAX_X = 10000;
+  const BOARD_MAX_Y = 10000;
   const INDEX_CARD_DEFAULT_W = 450;
   const INDEX_CARD_DEFAULT_H = 300;
   const IMAGE_CARD_DEFAULT_W = 200;
   const IMAGE_CARD_DEFAULT_H = 150;
   const POSITION_DEFAULT = 20;
 
-  const canvasBounds = useMemo(() => {
-    let minX = 0;
-    let minY = 0;
-    let maxX = DEFAULT_CANVAS_SIZE;
-    let maxY = DEFAULT_CANVAS_SIZE;
-    const update = (x: number, y: number, w: number, h: number) => {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
+  const canvasBounds = {
+    contentMinX: BOARD_MIN_X,
+    contentMinY: BOARD_MIN_Y,
+    canvasWidth: BOARD_MAX_X - BOARD_MIN_X,
+    canvasHeight: BOARD_MAX_Y - BOARD_MIN_Y,
+  };
+
+  /** Clamp a newly-placed item's position so its full extent stays within the fixed board. */
+  function clampToBoardBounds(x: number, y: number, width: number, height: number) {
+    return {
+      x: Math.min(Math.max(x, BOARD_MIN_X), BOARD_MAX_X - width),
+      y: Math.min(Math.max(y, BOARD_MIN_Y), BOARD_MAX_Y - height),
     };
-    for (const n of notes) {
-      const x = n.positionX ?? POSITION_DEFAULT;
-      const y = n.positionY ?? POSITION_DEFAULT;
-      const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
-      const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
-      update(x, y, w, h);
-    }
-    for (const c of indexCards) {
-      const x = c.positionX ?? POSITION_DEFAULT;
-      const y = c.positionY ?? POSITION_DEFAULT;
-      const w = c.width ?? INDEX_CARD_DEFAULT_W;
-      const h = c.height ?? INDEX_CARD_DEFAULT_H;
-      update(x, y, w, h);
-    }
-    for (const img of imageCards) {
-      const x = img.positionX ?? POSITION_DEFAULT;
-      const y = img.positionY ?? POSITION_DEFAULT;
-      const w = img.width ?? IMAGE_CARD_DEFAULT_W;
-      const h = img.height ?? IMAGE_CARD_DEFAULT_H;
-      update(x, y, w, h);
-    }
-    const contentMinX = minX - CANVAS_PADDING;
-    const contentMinY = minY - CANVAS_PADDING;
-    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
-    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
-    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
-  }, [notes, indexCards, imageCards]);
+  }
 
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
@@ -253,31 +233,6 @@ export function NoteBoardPage() {
   panXRef.current = panX;
   panYRef.current = panY;
 
-  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump.
-  // Skip until the board has finished loading so placeholder bounds → real notes don't erase restored pan/zoom.
-  const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
-  useEffect(() => {
-    if (isLoading) return;
-    const prev = prevContentMinRef.current;
-    if (prev === null) {
-      prevContentMinRef.current = {
-        contentMinX: canvasBounds.contentMinX,
-        contentMinY: canvasBounds.contentMinY,
-      };
-      return;
-    }
-    const dx = canvasBounds.contentMinX - prev.contentMinX;
-    const dy = canvasBounds.contentMinY - prev.contentMinY;
-    prevContentMinRef.current = {
-      contentMinX: canvasBounds.contentMinX,
-      contentMinY: canvasBounds.contentMinY,
-    };
-    if (dx === 0 && dy === 0) return;
-    const { dPanX, dPanY } = corkPanDeltaForContentMinShift(dx, dy, zoom);
-    setPanX((p) => p + dPanX);
-    setPanY((p) => p + dPanY);
-  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom, isLoading]);
-
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<
@@ -294,10 +249,9 @@ export function NoteBoardPage() {
   const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
   const CURSOR_THROTTLE_MS = 60;
 
-  // Restore viewport from localStorage on mount; reset bounds ref so pan compensation seeds for this board
+  // Restore viewport from localStorage on mount
   useEffect(() => {
     if (!boardId) return;
-    prevContentMinRef.current = null;
     const { zoom: z, panX: px, panY: py } = readBoardViewport(boardId);
     if (z !== undefined) setZoom(z);
     if (px !== undefined) setPanX(px);
@@ -448,17 +402,45 @@ export function NoteBoardPage() {
             return next.size === prev.size ? prev : next;
           });
         }
-        setNotes(notesRes.value.items);
+        // Preserve the live position of a note currently being dragged: a refetch (e.g.
+        // triggered by another collaborator's SignalR event) would otherwise overwrite it
+        // with the last-persisted server position, snapping the note backward mid-drag.
+        const draggingId = noteDragGuardRef.current?.id ?? null;
+        const localDraggingNote = draggingId ? notesRef.current.find((n) => n.id === draggingId) : undefined;
+        setNotes(
+          localDraggingNote
+            ? notesRes.value.items.map((n) =>
+                n.id === draggingId ? { ...n, positionX: localDraggingNote.positionX, positionY: localDraggingNote.positionY } : n,
+              )
+            : notesRes.value.items,
+        );
       }
       if (cardsRes.status === "fulfilled") {
-        setIndexCards(cardsRes.value.items);
+        const draggingCardId = cardDragGuardRef.current?.id ?? null;
+        const localDraggingCard = draggingCardId ? indexCardsRef.current.find((c) => c.id === draggingCardId) : undefined;
+        setIndexCards(
+          localDraggingCard
+            ? cardsRes.value.items.map((c) =>
+                c.id === draggingCardId ? { ...c, positionX: localDraggingCard.positionX, positionY: localDraggingCard.positionY } : c,
+              )
+            : cardsRes.value.items,
+        );
       }
       if (connsRes.status === "fulfilled") {
         setConnections(connsRes.value);
       }
       if (imagesRes.status === "fulfilled") {
         const deleted = deletedImageIdsRef.current;
-        setImageCards(imagesRes.value.filter((img) => !deleted.has(img.id)));
+        const draggingImageId = draggingImageIdRef.current;
+        const localDraggingImage = draggingImageId ? imageCardsRef.current.find((img) => img.id === draggingImageId) : undefined;
+        const filtered = imagesRes.value.filter((img) => !deleted.has(img.id));
+        setImageCards(
+          localDraggingImage
+            ? filtered.map((img) =>
+                img.id === draggingImageId ? { ...img, positionX: localDraggingImage.positionX, positionY: localDraggingImage.positionY } : img,
+              )
+            : filtered,
+        );
       }
 
       // Only show error if all failed
@@ -484,9 +466,17 @@ export function NoteBoardPage() {
     if (isAuthenticated) fetchData();
   }, [fetchData, isAuthenticated]);
 
-  const draggingNoteIdRef = useRef<string | null>(null);
-  const draggingCardIdRef = useRef<string | null>(null);
+  // While actively dragging, `expected` is null and every echo is skipped unconditionally.
+  // After drop, `expected` holds the position we just set locally; echoes are skipped until
+  // one arrives matching it (confirming the drop landed), or a safety-net timeout releases the
+  // guard. This avoids a fixed short timeout letting *stale* mid-drag echoes (still working
+  // their way back from a long/fast drag's throttled PATCH calls) overwrite the note after drop.
+  type DragGuard = { id: string; expected: { x: number; y: number } | null };
+  const noteDragGuardRef = useRef<DragGuard | null>(null);
+  const cardDragGuardRef = useRef<DragGuard | null>(null);
   const draggingImageIdRef = useRef<string | null>(null);
+  const DRAG_ECHO_SAFETY_NET_MS = 5000;
+  const POSITION_ECHO_EPSILON = 0.5;
   const RESIZE_ECHO_IGNORE_MS = 400;
   const lastResizedImageRef = useRef<{ id: string; at: number } | null>(null);
   const lastResizedNoteRef = useRef<{ id: string; at: number } | null>(null);
@@ -494,7 +484,22 @@ export function NoteBoardPage() {
 
   const mergeNotePayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingNoteIdRef.current;
+    let skipPosition = false;
+    const guard = noteDragGuardRef.current;
+    if (guard?.id === id) {
+      if (!guard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - guard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - guard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        noteDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedNoteRef.current?.id === id &&
       Date.now() - lastResizedNoteRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -516,7 +521,22 @@ export function NoteBoardPage() {
   }, []);
   const mergeCardPayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingCardIdRef.current;
+    let skipPosition = false;
+    const cardGuard = cardDragGuardRef.current;
+    if (cardGuard?.id === id) {
+      if (!cardGuard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - cardGuard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - cardGuard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        cardDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedCardRef.current?.id === id &&
       Date.now() - lastResizedCardRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -1371,8 +1391,12 @@ export function NoteBoardPage() {
     if (!boardId) return;
     try {
       const center = getViewportCenterInBoardCoords();
-      const positionX = center.x - STICKY_NOTE_DEFAULT_SIZE / 2;
-      const positionY = center.y - STICKY_NOTE_DEFAULT_SIZE / 2;
+      const { x: positionX, y: positionY } = clampToBoardBounds(
+        center.x - STICKY_NOTE_DEFAULT_SIZE / 2,
+        center.y - STICKY_NOTE_DEFAULT_SIZE / 2,
+        STICKY_NOTE_DEFAULT_SIZE,
+        STICKY_NOTE_DEFAULT_SIZE,
+      );
 
       const created = await createNote({
         content: "",
@@ -1403,9 +1427,8 @@ export function NoteBoardPage() {
     return tutorial.registerAction("add-note", handleQuickAddNote);
   });
 
-  const DRAG_ECHO_IGNORE_MS = 280;
   function handleNoteDragStart(id: string) {
-    draggingNoteIdRef.current = id;
+    noteDragGuardRef.current = { id, expected: null };
   }
   async function handleDragStop(id: string, x: number, y: number) {
     const pending = noteDragMapRef.current.get(id);
@@ -1430,10 +1453,13 @@ export function NoteBoardPage() {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, positionX: x, positionY: y } : n)),
     );
-    // Keep treating this id as "just dragged" so we ignore echo broadcasts (our own PATCH or late throttle)
+    // Keep ignoring echoes for this note until the one matching our final drop position
+    // arrives (stale mid-drag echoes queued up during the drag may still be in flight).
+    // Safety net: release the guard regardless after a while in case that echo is ever lost.
+    noteDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingNoteIdRef.current === id) draggingNoteIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (noteDragGuardRef.current?.id === id) noteDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
 
     try {
       // Defer to next macrotask so handleDelete (from click-after-mouseup) can run first
@@ -1458,6 +1484,10 @@ export function NoteBoardPage() {
       return next;
     });
 
+    // Deleting a note while it's mid-edit unmounts it, which flushes this same save path —
+    // skip it, the note is already gone server-side (patching it 500s).
+    if (deletedNoteIdsRef.current.has(id)) return;
+
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, title: title || null, content } : n,
@@ -1476,6 +1506,9 @@ export function NoteBoardPage() {
   }
 
   async function handleNoteContentChange(id: string, title: string, content: string) {
+    // See handleSave — deleting a note mid-edit flushes the autosave-on-unmount path too.
+    if (deletedNoteIdsRef.current.has(id)) return;
+
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, title: title || null, content } : n,
@@ -1636,31 +1669,7 @@ export function NoteBoardPage() {
         positionY = (tutorialNote.positionY ?? 0) + (tutorialNote.height ?? STICKY_NOTE_DEFAULT_SIZE) + 40;
       }
     }
-    const tempId = `temp-card-${nextTempCardId++}`;
-    const now = new Date().toISOString();
-
-    const optimisticCard: IndexCardSummaryDto = {
-      id: tempId,
-      title: null,
-      content: "",
-      folderId: null,
-      projectId: null,
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-      positionX,
-      positionY,
-      width: null,
-      height: null,
-      color: null,
-      rotation: null,
-    };
-
-    setIndexCards((prev) => [...prev, optimisticCard]);
-    setEditingCardIds((prev) => new Set(prev).add(tempId));
-    primaryEditingCardIdRef.current = tempId;
-    setEditingNoteIds(new Set());
-    primaryEditingNoteIdRef.current = null;
+    ({ x: positionX, y: positionY } = clampToBoardBounds(positionX, positionY, INDEX_CARD_DEFAULT_W, INDEX_CARD_DEFAULT_H));
 
     try {
       const created = await createIndexCard({
@@ -1672,25 +1681,16 @@ export function NoteBoardPage() {
 
       boardRedoStackRef.current = [];
       boardUndoStackRef.current.push({ type: "card-create", card: created });
-      // A concurrent realtime refetch can land between the optimistic push and this
-      // resolving, replacing state wholesale and dropping the temp entry before we get
-      // here — so reconcile idempotently instead of assuming `tempId` is still present.
-      setIndexCards((prev) => {
-        const withoutTemp = prev.filter((c) => c.id !== tempId);
-        return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
-      });
-      setEditingCardIds((prev) => {
-        const next = new Set(prev);
-        next.delete(tempId);
-        next.add(created.id);
-        return next;
-      });
+      setIndexCards((prev) => [...prev, created]);
+      setEditingCardIds((prev) => new Set(prev).add(created.id));
       primaryEditingCardIdRef.current = created.id;
+      setEditingNoteIds(new Set());
+      primaryEditingNoteIdRef.current = null;
       if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
         tutorial.cardCreated(created.id);
       }
     } catch {
-      // Card stays in local state with temp ID
+      // Silently fail - user can retry
     }
   }
 
@@ -1699,7 +1699,7 @@ export function NoteBoardPage() {
   });
 
   function handleCardDragStart(id: string) {
-    draggingCardIdRef.current = id;
+    cardDragGuardRef.current = { id, expected: null };
   }
   async function handleCardDragStop(id: string, x: number, y: number) {
     const pending = cardDragMapRef.current.get(id);
@@ -1722,9 +1722,10 @@ export function NoteBoardPage() {
     setIndexCards((prev) =>
       prev.map((c) => (c.id === id ? { ...c, positionX: x, positionY: y } : c)),
     );
+    cardDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingCardIdRef.current === id) draggingCardIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (cardDragGuardRef.current?.id === id) cardDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
 
     try {
       if (deletedCardIdsRef.current.has(id) || !indexCardsRef.current.some((c) => c.id === id)) return;
@@ -1744,6 +1745,10 @@ export function NoteBoardPage() {
       return next;
     });
 
+    // Deleting a card while it's mid-edit unmounts it, which flushes this same save path —
+    // skip it, the card is already gone server-side (patching it 500s).
+    if (deletedCardIdsRef.current.has(id)) return;
+
     setIndexCards((prev) =>
       prev.map((c) =>
         c.id === id ? { ...c, title: title || null, content } : c,
@@ -1762,6 +1767,9 @@ export function NoteBoardPage() {
   }
 
   async function handleCardContentChange(id: string, title: string, content: string) {
+    // See handleCardSave — deleting a card mid-edit flushes the autosave-on-unmount path too.
+    if (deletedCardIdsRef.current.has(id)) return;
+
     setIndexCards((prev) =>
       prev.map((c) =>
         c.id === id ? { ...c, title: title || null, content } : c,
@@ -1852,6 +1860,7 @@ export function NoteBoardPage() {
       positionX = center.x - IMAGE_CARD_DEFAULT_W / 2;
       positionY = center.y - IMAGE_CARD_DEFAULT_H / 2;
     }
+    ({ x: positionX, y: positionY } = clampToBoardBounds(positionX, positionY, IMAGE_CARD_DEFAULT_W, IMAGE_CARD_DEFAULT_H));
     setPendingImageDrop(null);
 
     uploadBoardImage(boardId, file)
@@ -2008,12 +2017,18 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        (note.positionX ?? 0) + DUPLICATE_OFFSET,
+        (note.positionY ?? 0) + DUPLICATE_OFFSET,
+        note.width ?? STICKY_NOTE_DEFAULT_SIZE,
+        note.height ?? STICKY_NOTE_DEFAULT_SIZE,
+      );
       const created = await createNote({
         boardId,
         title: note.title ?? undefined,
         content: note.content ?? "",
-        positionX: (note.positionX ?? 0) + DUPLICATE_OFFSET,
-        positionY: (note.positionY ?? 0) + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: note.width ?? undefined,
         height: note.height ?? undefined,
         color: note.color ?? undefined,
@@ -2030,12 +2045,18 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        (card.positionX ?? 0) + DUPLICATE_OFFSET,
+        (card.positionY ?? 0) + DUPLICATE_OFFSET,
+        card.width ?? INDEX_CARD_DEFAULT_W,
+        card.height ?? INDEX_CARD_DEFAULT_H,
+      );
       const created = await createIndexCard({
         boardId,
         title: card.title ?? undefined,
         content: card.content ?? "",
-        positionX: (card.positionX ?? 0) + DUPLICATE_OFFSET,
-        positionY: (card.positionY ?? 0) + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: card.width ?? undefined,
         height: card.height ?? undefined,
         color: card.color ?? undefined,
@@ -2052,10 +2073,16 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        image.positionX + DUPLICATE_OFFSET,
+        image.positionY + DUPLICATE_OFFSET,
+        image.width ?? IMAGE_CARD_DEFAULT_W,
+        image.height ?? IMAGE_CARD_DEFAULT_H,
+      );
       const created = await createBoardImageCard(boardId, {
         imageUrl: image.imageUrl,
-        positionX: image.positionX + DUPLICATE_OFFSET,
-        positionY: image.positionY + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: image.width ?? undefined,
         height: image.height ?? undefined,
         rotation: image.rotation ?? undefined,
@@ -2209,11 +2236,12 @@ export function NoteBoardPage() {
 
     if (type === "sticky-note") {
       try {
+        const clamped = clampToBoardBounds(x, y, STICKY_NOTE_DEFAULT_SIZE, STICKY_NOTE_DEFAULT_SIZE);
         const created = await createNote({
           content: "",
           boardId,
-          positionX: x,
-          positionY: y,
+          positionX: clamped.x,
+          positionY: clamped.y,
           width: STICKY_NOTE_DEFAULT_SIZE,
           height: STICKY_NOTE_DEFAULT_SIZE,
         });
@@ -2231,62 +2259,30 @@ export function NoteBoardPage() {
         // Silently fail
       }
     } else if (type === "image-card") {
-      setPendingImageDrop({ x, y });
+      const clamped = clampToBoardBounds(x, y, IMAGE_CARD_DEFAULT_W, IMAGE_CARD_DEFAULT_H);
+      setPendingImageDrop(clamped);
       triggerImageFileInput();
     } else if (type === "index-card") {
-      const tempId = `temp-card-${nextTempCardId++}`;
-      const now = new Date().toISOString();
-
-      const optimisticCard: IndexCardSummaryDto = {
-        id: tempId,
-        title: null,
-        content: "",
-        folderId: null,
-        projectId: null,
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-        positionX: x,
-        positionY: y,
-        width: null,
-        height: null,
-        color: null,
-        rotation: null,
-      };
-
-      setIndexCards((prev) => [...prev, optimisticCard]);
-      setEditingCardIds((prev) => new Set(prev).add(tempId));
-      primaryEditingCardIdRef.current = tempId;
-      setEditingNoteIds(new Set());
-      primaryEditingNoteIdRef.current = null;
-
+      const { x: cardX, y: cardY } = clampToBoardBounds(x, y, INDEX_CARD_DEFAULT_W, INDEX_CARD_DEFAULT_H);
       try {
         const created = await createIndexCard({
           content: "",
           boardId,
-          positionX: x,
-          positionY: y,
+          positionX: cardX,
+          positionY: cardY,
         });
         boardRedoStackRef.current = [];
         boardUndoStackRef.current.push({ type: "card-create", card: created });
-        // See handleQuickAddCard — reconcile idempotently in case a concurrent realtime
-        // refetch already replaced state before this optimistic entry got swapped in.
-        setIndexCards((prev) => {
-          const withoutTemp = prev.filter((c) => c.id !== tempId);
-          return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
-        });
-        setEditingCardIds((prev) => {
-          const next = new Set(prev);
-          next.delete(tempId);
-          next.add(created.id);
-          return next;
-        });
+        setIndexCards((prev) => [...prev, created]);
+        setEditingCardIds((prev) => new Set(prev).add(created.id));
         primaryEditingCardIdRef.current = created.id;
+        setEditingNoteIds(new Set());
+        primaryEditingNoteIdRef.current = null;
         if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
           tutorial.cardCreated(created.id);
         }
       } catch {
-        // Card stays in local state with temp ID
+        // Silently fail
       }
     }
   }
@@ -2603,6 +2599,10 @@ export function NoteBoardPage() {
               isLinking={linkingFrom !== null}
               zoom={zoom}
               onRichTextToolbarChange={handleRichTextToolbarChange}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
 
@@ -2620,6 +2620,10 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "image", image: img })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
 
@@ -2652,6 +2656,10 @@ export function NoteBoardPage() {
               isLinking={linkingFrom !== null}
               zoom={zoom}
               onRichTextToolbarChange={handleRichTextToolbarChange}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
 

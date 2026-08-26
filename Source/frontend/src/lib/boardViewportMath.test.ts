@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { corkPanToCenterWorldPoint, corkScreenToWorld, corkWorldToScreen } from "./boardViewportMath";
+import {
+  corkPanToCenterWorldPoint,
+  corkScreenToWorld,
+  corkWorldToScreen,
+  screenDeltaToWorldDelta,
+} from "./boardViewportMath";
 
 describe("boardViewportMath", () => {
   const zooms = [0.25, 0.5, 1, 1.5, 2.0];
@@ -72,5 +77,25 @@ describe("boardViewportMath", () => {
     );
     expect(world.x).toBeCloseTo(targetWorldX, 6);
     expect(world.y).toBeCloseTo(targetWorldY, 6);
+  });
+
+  it("screenDeltaToWorldDelta matches the delta of corkScreenToWorld at a fixed zoom", () => {
+    const screenX = 250;
+    const screenY = 180;
+    const dx = 37;
+    const dy = -52;
+
+    for (const zoom of zooms) {
+      for (const { panX, panY } of pans) {
+        for (const { contentMinX, contentMinY } of contentMins) {
+          const before = corkScreenToWorld(screenX, screenY, zoom, panX, panY, contentMinX, contentMinY);
+          const after = corkScreenToWorld(screenX + dx, screenY + dy, zoom, panX, panY, contentMinX, contentMinY);
+          const delta = screenDeltaToWorldDelta(dx, dy, zoom);
+
+          expect(delta.x).toBeCloseTo(after.x - before.x, 6);
+          expect(delta.y).toBeCloseTo(after.y - before.y, 6);
+        }
+      }
+    }
   });
 });

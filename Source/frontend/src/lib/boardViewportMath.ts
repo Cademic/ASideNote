@@ -52,18 +52,15 @@ export function corkWorldToScreen(
 }
 
 /**
- * Pan delta needed to keep the on-screen position stable when contentMin shifts
- * (e.g. after a note moves and the canvas bounding box grows/shrinks).
+ * Convert a screen-pixel movement delta to a board (world) movement delta at a fixed zoom.
+ *
+ * This is the constant-zoom derivative of corkScreenToWorld/corkWorldToScreen: the
+ * `contentMinX * (zoom + 1)` term is constant when zoom doesn't change, so it cancels out of
+ * any delta, leaving plain `delta / zoom`. Centralizes the "screen delta -> world delta" formula
+ * used by item dragging/resizing and board panning so it isn't re-derived at each call site.
  */
-export function corkPanDeltaForContentMinShift(
-  dContentMinX: number,
-  dContentMinY: number,
-  zoom: number,
-): { dPanX: number; dPanY: number } {
-  return {
-    dPanX: (dContentMinX * (zoom + 1)) / zoom,
-    dPanY: (dContentMinY * (zoom + 1)) / zoom,
-  };
+export function screenDeltaToWorldDelta(dx: number, dy: number, zoom: number): BoardPoint {
+  return { x: dx / zoom, y: dy / zoom };
 }
 
 /**

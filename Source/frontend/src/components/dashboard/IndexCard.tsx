@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -24,6 +25,7 @@ import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 import { sanitizeHtml } from "../../utils/sanitize-html";
+import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -66,6 +68,11 @@ interface IndexCardProps {
   /** When true, visually scale the card when editing (for better readability) */
   enlargeWhenEditing?: boolean;
   onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
+  /** Fixed board boundary (world coords) the card cannot be dragged past. */
+  boardMinX?: number;
+  boardMinY?: number;
+  boardMaxX?: number;
+  boardMaxY?: number;
 }
 
 const DEFAULT_WIDTH = 450;
@@ -76,8 +83,6 @@ const MAX_WIDTH = 800;
 const MAX_HEIGHT = 600;
 const MAX_CONTENT_LENGTH = 10000;
 const MAX_TITLE_LENGTH = 100;
-
-type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 const CURSOR_MAP: Record<ResizeDir, string> = {
   n: "cursor-ns-resize",
@@ -125,6 +130,10 @@ function IndexCardComponent({
   zoom = 1,
   enlargeWhenEditing = false,
   onRichTextToolbarChange,
+  boardMinX = -Infinity,
+  boardMinY = -Infinity,
+  boardMaxX = Infinity,
+  boardMaxY = Infinity,
 }: IndexCardProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastDragEndRef = useRef<number>(0);
@@ -354,7 +363,12 @@ function IndexCardComponent({
   }, [card.content, card.title, card.tags, isEditing, card.height, card.positionY, isResizing]);
 
   const handleDragStop: DraggableEventHandler = (_e, data) => {
-    setPosition({ x: data.x, y: data.y });
+    // react-draggable reads props.position right after this callback returns and, in
+    // controlled mode, snaps back to it if it hasn't updated yet — flushSync forces the
+    // new position to commit synchronously so it doesn't revert-then-flash to the old spot.
+    flushSync(() => {
+      setPosition({ x: data.x, y: data.y });
+    });
     lastDragEndRef.current = Date.now();
     onDragStop(card.id, data.x, data.y);
   };
@@ -404,141 +418,22 @@ function IndexCardComponent({
     };
   }, [onRichTextToolbarChange, card.id]);
 
-  // --- Resize logic ---
-  const resizeRef = useRef<{
-    dir: ResizeDir;
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-    startPosX: number;
-    startPosY: number;
-    boardW: number;
-    boardH: number;
-  } | null>(null);
-
-  const listenersRef = useRef<{
-    move: (e: MouseEvent) => void;
-    up: (e: MouseEvent) => void;
-  } | null>(null);
-
-  function startResize(dir: ResizeDir) {
-    return (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-      }
-
-      const parent = nodeRef.current?.parentElement;
-      const boardW = parent?.clientWidth ?? 9999;
-      const boardH = parent?.clientHeight ?? 9999;
-
-      resizeRef.current = {
-        dir,
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: size.width,
-        startH: size.height,
-        startPosX: position.x,
-        startPosY: position.y,
-        boardW,
-        boardH,
-      };
-
-      setIsResizing(true);
-
-      function onMove(ev: MouseEvent) {
-        const rs = resizeRef.current;
-        if (!rs) return;
-
-        const dx = (ev.clientX - rs.startX) / zoom;
-        const dy = (ev.clientY - rs.startY) / zoom;
-
-        let newW = rs.startW;
-        let newH = rs.startH;
-        let newX = rs.startPosX;
-        let newY = rs.startPosY;
-
-        if (rs.dir === "e" || rs.dir === "ne" || rs.dir === "se") {
-          newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rs.startW + dx));
-        }
-        if (rs.dir === "w" || rs.dir === "nw" || rs.dir === "sw") {
-          const proposed = rs.startW - dx;
-          if (proposed >= MIN_WIDTH && proposed <= MAX_WIDTH) {
-            newW = proposed;
-            newX = rs.startPosX + dx;
-          } else if (proposed < MIN_WIDTH) {
-            newW = MIN_WIDTH;
-            newX = rs.startPosX + (rs.startW - MIN_WIDTH);
-          } else {
-            newW = MAX_WIDTH;
-            newX = rs.startPosX + (rs.startW - MAX_WIDTH);
-          }
-        }
-        if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, rs.startH + dy));
-        }
-        if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
-          const proposed = rs.startH - dy;
-          if (proposed >= MIN_HEIGHT && proposed <= MAX_HEIGHT) {
-            newH = proposed;
-            newY = rs.startPosY + dy;
-          } else if (proposed < MIN_HEIGHT) {
-            newH = MIN_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MIN_HEIGHT);
-          } else {
-            newH = MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MAX_HEIGHT);
-          }
-        }
-
-        newW = Math.max(MIN_WIDTH, newW);
-        newH = Math.max(MIN_HEIGHT, newH);
-
-        setSize({ width: newW, height: newH });
-        setPosition({ x: newX, y: newY });
-      }
-
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        listenersRef.current = null;
-        resizeRef.current = null;
-        setIsResizing(false);
-
-        setSize((finalSize) => {
-          const w = Math.round(finalSize.width);
-          const h = Math.round(finalSize.height);
-          setTimeout(() => onResizeRef.current(card.id, w, h), 0);
-          return finalSize;
-        });
-        setPosition((finalPos) => {
-          const x = Math.round(finalPos.x);
-          const y = Math.round(finalPos.y);
-          setTimeout(() => onDragStopRef.current(card.id, x, y), 0);
-          return finalPos;
-        });
-      }
-
-      listenersRef.current = { move: onMove, up: onUp };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
-  }
-
-  // Cleanup only on unmount
-  useEffect(() => {
-    return () => {
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-        listenersRef.current = null;
-      }
-    };
-  }, []);
+  const { startResize } = useBoardItemResize({
+    size,
+    position,
+    zoom,
+    minWidth: MIN_WIDTH,
+    maxWidth: MAX_WIDTH,
+    minHeight: MIN_HEIGHT,
+    maxHeight: MAX_HEIGHT,
+    setSize,
+    setPosition,
+    setIsResizing,
+    onResizeEnd: (final) => {
+      setTimeout(() => onResizeRef.current(card.id, final.width, final.height), 0);
+      setTimeout(() => onDragStopRef.current(card.id, final.x, final.y), 0);
+    },
+  });
 
   const edgeThickness = 6;
 
@@ -567,6 +462,7 @@ function IndexCardComponent({
       cancel=".index-card-action-area, .index-card-action-btn, .index-card-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
+      bounds={{ left: boardMinX, top: boardMinY, right: boardMaxX - size.width, bottom: boardMaxY - size.height }}
     >
       {/* Outer positioning wrapper */}
       <div

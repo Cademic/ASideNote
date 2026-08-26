@@ -2,6 +2,16 @@ import axios from "axios";
 
 const resolvedBaseUrl = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
+/** Dispatched on `window` whenever this interceptor silently rotates the access token, so consumers holding a copy of it (e.g. AuthContext, SignalR hooks) can resync instead of keeping a stale/expired value. */
+export const AUTH_TOKEN_REFRESHED_EVENT = "asidenote:auth-token-refreshed";
+/** Dispatched when refresh itself fails (refresh token missing/expired) and the interceptor is forcing a logout. */
+export const AUTH_SESSION_EXPIRED_EVENT = "asidenote:auth-session-expired";
+
+export interface AuthTokenRefreshedDetail {
+  token: string;
+  refreshToken: string;
+}
+
 export const apiClient = axios.create({
   baseURL: resolvedBaseUrl,
   timeout: 10000,
@@ -65,6 +75,7 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
         window.localStorage.removeItem("asidenote.access_token");
         window.localStorage.removeItem("asidenote.refresh_token");
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT));
         window.location.href = "/login";
         return Promise.reject(error);
       }
@@ -76,6 +87,11 @@ apiClient.interceptors.response.use(
 
         window.localStorage.setItem("asidenote.access_token", newToken);
         window.localStorage.setItem("asidenote.refresh_token", newRefreshToken);
+        window.dispatchEvent(
+          new CustomEvent<AuthTokenRefreshedDetail>(AUTH_TOKEN_REFRESHED_EVENT, {
+            detail: { token: newToken, refreshToken: newRefreshToken },
+          }),
+        );
 
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         processQueue(null, newToken);
@@ -85,6 +101,7 @@ apiClient.interceptors.response.use(
         processQueue(refreshError, null);
         window.localStorage.removeItem("asidenote.access_token");
         window.localStorage.removeItem("asidenote.refresh_token");
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT));
         window.location.href = "/login";
         return Promise.reject(refreshError);
       } finally {

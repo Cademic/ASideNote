@@ -696,7 +696,18 @@ export function ChalkBoardPage() {
           }
           return n;
         });
-        setNotes(migrated);
+        // Preserve the live position of a note currently being dragged: a refetch (e.g.
+        // triggered by another collaborator's SignalR event) would otherwise overwrite it
+        // with the last-persisted server position, snapping the note backward mid-drag.
+        const draggingId = noteDragGuardRef.current?.id ?? null;
+        const localDraggingNote = draggingId ? notesRef.current.find((n) => n.id === draggingId) : undefined;
+        setNotes(
+          localDraggingNote
+            ? migrated.map((n) =>
+                n.id === draggingId ? { ...n, positionX: localDraggingNote.positionX, positionY: localDraggingNote.positionY } : n,
+              )
+            : migrated,
+        );
       }
 
       if (
@@ -715,12 +726,35 @@ export function ChalkBoardPage() {
     fetchData();
   }, [fetchData]);
 
-  const draggingNoteIdRef = useRef<string | null>(null);
+  // While actively dragging, `expected` is null and every echo is skipped unconditionally.
+  // After drop, `expected` holds the position we just set locally; echoes are skipped until
+  // one arrives matching it (confirming the drop landed), or a safety-net timeout releases the
+  // guard. This avoids a fixed short timeout letting *stale* mid-drag echoes (still working
+  // their way back from a long/fast drag's throttled PATCH calls) overwrite the note after drop.
+  type DragGuard = { id: string; expected: { x: number; y: number } | null };
+  const noteDragGuardRef = useRef<DragGuard | null>(null);
+  const DRAG_ECHO_SAFETY_NET_MS = 5000;
+  const POSITION_ECHO_EPSILON = 0.5;
   const RESIZE_ECHO_IGNORE_MS = 400;
   const lastResizedNoteRef = useRef<{ id: string; at: number } | null>(null);
   const mergeNotePayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingNoteIdRef.current;
+    let skipPosition = false;
+    const guard = noteDragGuardRef.current;
+    if (guard?.id === id) {
+      if (!guard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - guard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - guard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        noteDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedNoteRef.current?.id === id &&
       Date.now() - lastResizedNoteRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -1148,9 +1182,8 @@ export function ChalkBoardPage() {
   }
 
   function handleNoteDragStart(id: string) {
-    draggingNoteIdRef.current = id;
+    noteDragGuardRef.current = { id, expected: null };
   }
-  const DRAG_ECHO_IGNORE_MS = 280;
   async function handleDragStop(id: string, x: number, y: number) {
     const pending = noteDragMapRef.current.get(id);
     if (pending) {
@@ -1172,9 +1205,13 @@ export function ChalkBoardPage() {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, positionX: x, positionY: y } : n)),
     );
+    // Keep ignoring echoes for this note until the one matching our final drop position
+    // arrives (stale mid-drag echoes queued up during the drag may still be in flight).
+    // Safety net: release the guard regardless after a while in case that echo is ever lost.
+    noteDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingNoteIdRef.current === id) draggingNoteIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (noteDragGuardRef.current?.id === id) noteDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
     try {
       if (deletedNoteIdsRef.current.has(id) || !notesRef.current.some((n) => n.id === id)) return;
       await patchNote(id, { positionX: x, positionY: y });
