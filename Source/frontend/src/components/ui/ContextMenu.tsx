@@ -24,7 +24,11 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
 
   const items = rawItems.flatMap((item, i) => {
     if (item.divider && i > 0) {
-      return [{ divider: true as const }, item];
+      // Only the synthetic marker below should render as a separator line — strip `divider`
+      // off the real item so it isn't also mistaken for one in the render loop.
+      const rest: ContextMenuItem = { ...item };
+      delete rest.divider;
+      return [{ divider: true as const }, rest];
     }
     return [item];
   });

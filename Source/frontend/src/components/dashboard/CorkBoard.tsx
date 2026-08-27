@@ -281,8 +281,15 @@ export function CorkBoard({
 
   // ---- Pan (right-click drag, middle-click drag, or space + left-click drag) ----
 
-  // Track whether right-click was used for panning so we can suppress the context menu
-  const didRightPanRef = useRef(false);
+  // A right-click only pans once the cursor actually moves past this threshold while held —
+  // below it, releasing the button is treated as a click and opens the board context menu
+  // instead (see onContextMenu below).
+  const RIGHT_CLICK_DRAG_THRESHOLD_PX = 4;
+  // True while the right mouse button is down (from mousedown until its contextmenu/mouseup).
+  const rightMouseDownRef = useRef(false);
+  // True once real movement past the threshold has occurred during that right-button hold —
+  // this (not merely pressing the button) is what suppresses the resulting context menu.
+  const rightDragOccurredRef = useRef(false);
 
   function handleMouseDown(e: React.MouseEvent) {
     // Don't start pan when right-clicking on a board item (let item show context menu)
@@ -291,7 +298,10 @@ export function CorkBoard({
     if (e.button === 2 || e.button === 1 || (e.button === 0 && isSpaceHeld)) {
       e.preventDefault();
       setIsPanning(true);
-      didRightPanRef.current = e.button === 2;
+      if (e.button === 2) {
+        rightMouseDownRef.current = true;
+        rightDragOccurredRef.current = false;
+      }
       panStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -307,6 +317,10 @@ export function CorkBoard({
     function onMouseMove(e: MouseEvent) {
       const start = panStartRef.current;
       if (!start) return;
+      if (rightMouseDownRef.current && !rightDragOccurredRef.current) {
+        const movedPx = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (movedPx > RIGHT_CLICK_DRAG_THRESHOLD_PX) rightDragOccurredRef.current = true;
+      }
       const { x: dx, y: dy } = screenDeltaToWorldDelta(e.clientX - start.x, e.clientY - start.y, zoom);
       onViewportChange(zoom, start.panX + dx, start.panY + dy);
     }
@@ -324,15 +338,18 @@ export function CorkBoard({
     };
   }, [isPanning, zoom, onViewportChange]);
 
-  // Suppress context menu after right-click panning; show board menu on empty-area right-click
+  // Suppress context menu only after an actual right-click drag (pan); a plain right-click
+  // (press + release with no meaningful movement) opens the board menu instead.
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
     function onContextMenu(e: MouseEvent) {
-      if (didRightPanRef.current) {
+      const wasDrag = rightDragOccurredRef.current;
+      rightMouseDownRef.current = false;
+      rightDragOccurredRef.current = false;
+      if (wasDrag) {
         e.preventDefault();
-        didRightPanRef.current = false;
         return;
       }
       if ((e.target as Element).closest("[data-board-item]")) return;

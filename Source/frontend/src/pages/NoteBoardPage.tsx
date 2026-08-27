@@ -55,7 +55,7 @@ import { corkZoomAroundScreenPoint, corkScrollInnerLayout, corkScrollToPan } fro
 import { corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { useFileImport } from "../hooks/useFileImport";
-import { ContextMenu } from "../components/ui/ContextMenu";
+import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
 export function NoteBoardPage() {
@@ -1309,6 +1309,14 @@ export function NoteBoardPage() {
     return corkScreenToWorld(centerScreenX, centerScreenY, zoom, panX, panY, contentMinX, contentMinY);
   }
 
+  /** Convert a right-click's viewport-relative client coordinates into board (world) coordinates. */
+  function boardPointToWorld(clientX: number, clientY: number) {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) return getViewportCenterInBoardCoords();
+    const { contentMinX, contentMinY } = canvasBounds;
+    return corkScreenToWorld(clientX - rect.left, clientY - rect.top, zoom, panX, panY, contentMinX, contentMinY);
+  }
+
   function panViewportToBoardPoint(centerX: number, centerY: number) {
     const rect = boardViewportRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -1394,10 +1402,10 @@ export function NoteBoardPage() {
     navigateRelativeNote(1);
   }
 
-  async function handleQuickAddNote() {
+  async function handleQuickAddNote(at?: { x: number; y: number }) {
     if (!boardId) return;
     try {
-      const center = getViewportCenterInBoardCoords();
+      const center = at ?? getViewportCenterInBoardCoords();
       const { x: positionX, y: positionY } = clampToBoardBounds(
         center.x - STICKY_NOTE_DEFAULT_SIZE / 2,
         center.y - STICKY_NOTE_DEFAULT_SIZE / 2,
@@ -1660,9 +1668,9 @@ export function NoteBoardPage() {
   // Index Card handlers
   // =============================================
 
-  async function handleQuickAddCard() {
+  async function handleQuickAddCard(at?: { x: number; y: number }) {
     if (!boardId) return;
-    const center = getViewportCenterInBoardCoords();
+    const center = at ?? getViewportCenterInBoardCoords();
     let positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
     let positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
     // During the "add a card" tour step, nudge away from the tutorial's sticky note
@@ -1848,9 +1856,9 @@ export function NoteBoardPage() {
     }
   }, []);
 
-  async function handleQuickAddImage() {
+  async function handleQuickAddImage(at?: { x: number; y: number }) {
     if (!boardId) return;
-    setPendingImageDrop(null);
+    setPendingImageDrop(at ?? null);
     triggerImageFileInput();
   }
 
@@ -2101,14 +2109,14 @@ export function NoteBoardPage() {
     }
   }
 
-  function buildItemContextMenuItems(): import("../components/ui/ContextMenu").ContextMenuItem[] {
+  function buildItemContextMenuItems(): ContextMenuItem[] {
     if (!itemContextMenu) return [];
     if (itemContextMenu.type === "note") {
       const { note } = itemContextMenu;
       return [
         { label: "Edit", icon: Pencil, onClick: () => handleStartEdit(note.id) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateNote(note) },
-        { label: "Bring to front", icon: Layers, onClick: () => bringToFront(note.id) },
+        { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(note.id) },
         {
           label: "Delete",
           icon: Trash2,
@@ -2125,14 +2133,14 @@ export function NoteBoardPage() {
       return [
         { label: "Edit", icon: Pencil, onClick: () => handleCardStartEdit(card.id) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateCard(card) },
-        { label: "Bring to front", icon: Layers, onClick: () => bringToFront(card.id) },
+        { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(card.id) },
         { label: "Delete", icon: Trash2, onClick: () => handleCardDelete(card.id), divider: true },
       ];
     }
     const { image } = itemContextMenu;
     return [
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateImage(image) },
-      { label: "Bring to front", icon: Layers, onClick: () => bringToFront(image.id) },
+      { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(image.id) },
       { label: "Delete", icon: Trash2, onClick: () => handleImageDelete(image.id), divider: true },
     ];
   }
@@ -2673,9 +2681,9 @@ export function NoteBoardPage() {
             x={boardContextMenu.x}
             y={boardContextMenu.y}
             items={[
-              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: handleQuickAddNote },
-              { label: "Add Index Card", icon: CreditCard, onClick: handleQuickAddCard },
-              { label: "Add Image", icon: ImageIcon, onClick: handleQuickAddImage },
+              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: () => handleQuickAddNote(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
+              { label: "Add Index Card", icon: CreditCard, onClick: () => handleQuickAddCard(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
+              { label: "Add Image", icon: ImageIcon, onClick: () => handleQuickAddImage(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
               { label: "Undo", onClick: triggerMenuUndo, disabled: boardUndoStackRef.current.length === 0, divider: true },
               { label: "Redo", onClick: triggerMenuRedo, disabled: boardRedoStackRef.current.length === 0 },
             ]}

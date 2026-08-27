@@ -138,7 +138,11 @@ export function ChalkBoardPage() {
   /** Ignore scroll events while applying scrollLeft/Top from React pan state (mirrors CorkBoard). */
   const syncingScrollFromPanRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const didRightPanRef = useRef(false);
+  // True while the right mouse button is down (from mousedown until its contextmenu/mouseup).
+  const rightMouseDownRef = useRef(false);
+  // True once real movement past the threshold has occurred during that right-button hold —
+  // this (not merely pressing the button) is what suppresses the resulting context menu.
+  const rightDragOccurredRef = useRef(false);
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<{ x: number; y: number; note: NoteSummaryDto } | null>(null);
 
@@ -454,12 +458,20 @@ export function ChalkBoardPage() {
   }, [zoom, panX, panY]);
 
   // --- Pan (right-click, middle-click, space+left drag) ---
+  // A right-click only pans once the cursor actually moves past this threshold while held —
+  // below it, releasing the button is treated as a click and opens the board context menu
+  // instead (see onContextMenu below).
+  const RIGHT_CLICK_DRAG_THRESHOLD_PX = 4;
+
   function handleViewportMouseDown(e: React.MouseEvent) {
     if (e.button === 2 && (e.target as Element).closest("[data-board-item]")) return;
     if (e.button === 2 || e.button === 1 || (e.button === 0 && isSpaceHeld)) {
       e.preventDefault();
       setIsPanning(true);
-      didRightPanRef.current = e.button === 2;
+      if (e.button === 2) {
+        rightMouseDownRef.current = true;
+        rightDragOccurredRef.current = false;
+      }
       panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
 
       // Temporarily disable drawing while panning
@@ -475,6 +487,10 @@ export function ChalkBoardPage() {
     function onMouseMove(e: MouseEvent) {
       const start = panStartRef.current;
       if (!start) return;
+      if (rightMouseDownRef.current && !rightDragOccurredRef.current) {
+        const movedPx = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (movedPx > RIGHT_CLICK_DRAG_THRESHOLD_PX) rightDragOccurredRef.current = true;
+      }
       const dx = RESOLUTION_FACTOR * (e.clientX - start.x) / zoom;
       const dy = RESOLUTION_FACTOR * (e.clientY - start.y) / zoom;
       handleViewportChange(zoom, start.panX + dx, start.panY + dy);
@@ -510,9 +526,11 @@ export function ChalkBoardPage() {
     if (!viewport) return;
 
     function onContextMenu(e: MouseEvent) {
-      if (didRightPanRef.current) {
+      const wasDrag = rightDragOccurredRef.current;
+      rightMouseDownRef.current = false;
+      rightDragOccurredRef.current = false;
+      if (wasDrag) {
         e.preventDefault();
-        didRightPanRef.current = false;
         return;
       }
       if ((e.target as Element).closest("[data-board-item]")) return;
@@ -1205,6 +1223,21 @@ export function ChalkBoardPage() {
     await handleAddStickyNoteAt(positionX, positionY);
   }
 
+  /** Convert a right-click's viewport-relative client coordinates into board (world) coordinates. */
+  function boardPointToWorld(clientX: number, clientY: number) {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 400, y: 300 };
+    return {
+      x: (RESOLUTION_FACTOR * (clientX - rect.left)) / zoom - panX,
+      y: (RESOLUTION_FACTOR * (clientY - rect.top)) / zoom - panY,
+    };
+  }
+
+  /** Add a sticky note centered on a right-click point (board/world coordinates). */
+  async function handleAddStickyNoteAtPoint(worldX: number, worldY: number) {
+    await handleAddStickyNoteAt(worldX - NOTE_DEFAULT_SIZE / 2, worldY - NOTE_DEFAULT_SIZE / 2);
+  }
+
   async function handleAddStickyNoteAt(rawPositionX: number, rawPositionY: number) {
     if (!boardId) return;
     const { x: positionX, y: positionY } = clampToChalkBoardBounds(
@@ -1448,7 +1481,7 @@ export function ChalkBoardPage() {
     return [
       { label: "Edit", icon: Pencil, onClick: () => handleStartEdit(note.id) },
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateNote(note) },
-      { label: "Bring to front", icon: Layers, onClick: () => bringToFront(note.id) },
+      { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(note.id) },
       { label: "Delete", icon: Trash2, onClick: () => handleDelete(note.id), divider: true },
     ];
   }
@@ -1679,7 +1712,14 @@ export function ChalkBoardPage() {
             x={boardContextMenu.x}
             y={boardContextMenu.y}
             items={[
-              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: handleAddStickyNote },
+              {
+                label: "Add Sticky Note",
+                icon: StickyNoteIcon,
+                onClick: () => {
+                  const { x, y } = boardPointToWorld(boardContextMenu.x, boardContextMenu.y);
+                  handleAddStickyNoteAtPoint(x, y);
+                },
+              },
               {
                 label: "Undo",
                 onClick: triggerMenuUndo,
