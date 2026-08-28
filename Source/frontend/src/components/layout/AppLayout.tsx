@@ -6,6 +6,7 @@ import { getPinnedProjects, toggleProjectPin } from "../../api/projects";
 import { getPinnedNotebooks, toggleNotebookPin } from "../../api/notebooks";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
+import { SidebarProvider, useSidebar } from "./sidebar-primitives";
 import { useSidebarWorkspaceActions } from "./useSidebarWorkspaceActions";
 import { useAuth } from "../../context/AuthContext";
 import { usePreferences } from "../../context/PreferencesContext";
@@ -16,9 +17,6 @@ import type { BoardPresenceUser } from "../../hooks/useBoardRealtime";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 
 export type { BoardPresenceUser };
-
-/** Tailwind `lg` breakpoint — below this: sidebar becomes hamburger drawer */
-const SIDEBAR_BREAKPOINT = 1024;
 
 /** Must match mobile drawer `duration-300` so the open-arrow waits for slide-out to finish */
 const MOBILE_DRAWER_TRANSITION_MS = 300;
@@ -41,11 +39,19 @@ export interface AppLayoutContext {
   refreshPinnedProjects: () => void;
   openNotebook: (id: string) => void;
   refreshPinnedNotebooks: () => void;
-  /** Desktop only: true when sidebar is expanded (w-60), false when collapsed (w-16). */
+  /** Desktop only: true when sidebar is expanded (user-resizable width), false when collapsed (w-16). */
   isSidebarOpen: boolean;
 }
 
 export function AppLayout() {
+  return (
+    <SidebarProvider>
+      <AppLayoutInner />
+    </SidebarProvider>
+  );
+}
+
+function AppLayoutInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -53,8 +59,7 @@ export function AppLayout() {
   const { preferences, isLoading: preferencesLoading } = usePreferences();
   const tutorial = useTutorial();
   const tutorialTriggeredRef = useRef(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= SIDEBAR_BREAKPOINT);
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < SIDEBAR_BREAKPOINT);
+  const { open: isSidebarOpen, openMobile, setOpenMobile, isMobile, toggleSidebar } = useSidebar();
   const [boardName, setBoardName] = useState<string | null>(null);
   const [connectedUsers, setBoardPresence] = useState<BoardPresenceUser[]>([]);
   const [openedBoards, setOpenedBoards] = useState<OpenedBoard[]>([]);
@@ -62,34 +67,14 @@ export function AppLayout() {
   const [pinnedProjects, setPinnedProjects] = useState<ProjectSummaryDto[]>([]);
   const [pinnedNotebooks, setPinnedNotebooks] = useState<NotebookSummaryDto[]>([]);
 
-  /** Track whether the user has manually toggled the sidebar since the last
-   *  automatic resize change. When the breakpoint triggers we reset this flag
-   *  so the auto-behaviour takes over again on the next cross. */
-  const userToggledRef = useRef(false);
   /** For board-page open-arrow: delay showing until drawer close animation ends */
-  const prevSidebarOpenForArrowRef = useRef(isSidebarOpen);
+  const prevSidebarOpenForArrowRef = useRef(openMobile);
   const [boardOpenArrowVisible, setBoardOpenArrowVisible] = useState(true);
-
-  /* ── Mobile vs desktop: hamburger drawer vs inline sidebar ──────────── */
-  useEffect(() => {
-    const mql = window.matchMedia(`(min-width: ${SIDEBAR_BREAKPOINT}px)`);
-
-    function handleChange(e: MediaQueryListEvent | MediaQueryList) {
-      const desktop = e.matches;
-      setIsMobile(!desktop);
-      userToggledRef.current = false;
-      setIsSidebarOpen(desktop);
-    }
-
-    handleChange(mql);
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
-  }, []);
 
   /* ── Close mobile drawer on route change ──────────── */
   useEffect(() => {
-    if (isMobile) setIsSidebarOpen(false);
-  }, [isMobile, location.pathname]);
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, location.pathname, setOpenMobile]);
 
   /* ── Board page: show chevron only after drawer finishes sliding closed ─ */
   useEffect(() => {
@@ -99,11 +84,11 @@ export function AppLayout() {
 
     if (!onBoardDetail || !isMobile) {
       setBoardOpenArrowVisible(true);
-      prevSidebarOpenForArrowRef.current = isSidebarOpen;
+      prevSidebarOpenForArrowRef.current = openMobile;
       return;
     }
 
-    if (isSidebarOpen) {
+    if (openMobile) {
       setBoardOpenArrowVisible(false);
       prevSidebarOpenForArrowRef.current = true;
       return;
@@ -119,12 +104,7 @@ export function AppLayout() {
 
     prevSidebarOpenForArrowRef.current = false;
     setBoardOpenArrowVisible(true);
-  }, [isMobile, isSidebarOpen, location.pathname]);
-
-  function handleToggleSidebar() {
-    userToggledRef.current = true;
-    setIsSidebarOpen((value) => !value);
-  }
+  }, [isMobile, openMobile, location.pathname]);
 
   const openBoard = useCallback((board: OpenedBoard) => {
     setOpenedBoards((prev) => {
@@ -259,10 +239,10 @@ export function AppLayout() {
   useEffect(() => {
     if (!tutorial.isActive) return;
     if (tutorial.currentStep?.id !== "add-note" && tutorial.currentStep?.id !== "add-card") return;
-    if (isMobile && !isSidebarOpen) {
-      setIsSidebarOpen(true);
+    if (isMobile && !openMobile) {
+      setOpenMobile(true);
     }
-  }, [tutorial, isMobile, isSidebarOpen]);
+  }, [tutorial, isMobile, openMobile, setOpenMobile]);
 
   const outletContext: AppLayoutContext = {
     setBoardName,
@@ -290,8 +270,6 @@ export function AppLayout() {
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
       {!isMobile && (
         <Sidebar
-          isOpen={isSidebarOpen}
-          onToggle={handleToggleSidebar}
           isDrawer={false}
           openedBoards={openedBoards}
           onCloseBoard={closeBoard}
@@ -313,22 +291,20 @@ export function AppLayout() {
             type="button"
             tabIndex={-1}
             className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
-              isSidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+              openMobile ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
             }`}
-            onClick={handleToggleSidebar}
+            onClick={toggleSidebar}
             aria-label="Close menu"
           />
           <div
             className={`fixed left-0 top-0 bottom-0 z-50 w-60 shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none ${
-              isSidebarOpen
+              openMobile
                 ? "translate-x-0 pointer-events-auto"
                 : "-translate-x-full pointer-events-none"
             }`}
-            aria-hidden={!isSidebarOpen}
+            aria-hidden={!openMobile}
           >
             <Sidebar
-              isOpen={isSidebarOpen}
-              onToggle={handleToggleSidebar}
               isDrawer
               openedBoards={openedBoards}
               onCloseBoard={closeBoard}
@@ -351,7 +327,7 @@ export function AppLayout() {
           <Navbar
             boardName={boardName}
             connectedUsers={connectedUsers}
-            onToggleSidebar={isMobile ? handleToggleSidebar : undefined}
+            onToggleSidebar={isMobile ? toggleSidebar : undefined}
             showMenuButton={isMobile}
           />
         )}
@@ -361,7 +337,7 @@ export function AppLayout() {
               ? isNoteBoardRoute
                 ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4"
                 : "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-              : "flex-1 overflow-auto p-4 bg-background bg-dots"
+              : "flex-1 overflow-auto p-4 bg-background"
           }
         >
           {isBoardDetailRoute ? (
@@ -375,7 +351,7 @@ export function AppLayout() {
         {isBoardDetailRoute && isMobile && boardOpenArrowVisible && (
           <button
             type="button"
-            onClick={handleToggleSidebar}
+            onClick={toggleSidebar}
             className="fixed left-0 top-1/2 z-[100] flex -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-foreground/15 bg-background/95 py-3 pl-px pr-1 text-foreground/80 shadow-sm backdrop-blur-sm transition-opacity duration-200 hover:bg-foreground/5"
             aria-label="Open sidebar"
           >

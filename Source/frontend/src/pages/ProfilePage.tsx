@@ -763,7 +763,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
+    <div className="h-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* ── Profile header (notepad card) ───────────────── */}
         <div className="notepad-card mb-8">
@@ -900,7 +900,7 @@ export function ProfilePage() {
             <Users className="h-5 w-5 text-foreground/50" />
             <h2 className="text-base font-semibold text-foreground">Friends</h2>
           </div>
-          <div className="rounded-xl border border-border/60 bg-surface p-4">
+          <div>
             {otherUserFriends.length === 0 ? (
               <p className="text-center text-sm text-foreground/50">
                 No friends yet.
@@ -943,7 +943,7 @@ export function ProfilePage() {
             <User className="h-5 w-5 text-foreground/50" />
             <h2 className="text-base font-semibold text-foreground">About</h2>
           </div>
-          <div className="rounded-xl border border-border/60 bg-surface p-6">
+          <div>
             <dl className="grid gap-3 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wider text-foreground/40">
@@ -1040,7 +1040,7 @@ export function ProfilePage() {
             </div>
           )}
 
-          <div className="rounded-xl border border-border/60 bg-surface p-4">
+          <div>
             {friends.length === 0 ? (
               <p className="text-center text-sm text-foreground/50">
                 No friends yet. Use &quot;Add friend&quot; to search by username or email.

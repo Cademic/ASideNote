@@ -82,7 +82,7 @@ export function ChalkBoardsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
+    <div className="h-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">

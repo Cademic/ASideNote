@@ -86,7 +86,8 @@ export function CreateEventDialog({
       setTitle("");
       setDescription("");
       setStartDate(initialDate ?? toLocalDateStr(new Date()));
-      setEndDate("");
+      // Inside a project calendar, default the end date to the project's end date
+      setEndDate(projectEndDate ? formatDateForInput(projectEndDate) : "");
       setStartHour("09");
       setEndHour("10");
       setIsAllDay(true);
@@ -96,7 +97,7 @@ export function CreateEventDialog({
       setRecurrenceInterval(1);
       setRecurrenceEndDate("");
     }
-  }, [isOpen, editEvent, initialDate]);
+  }, [isOpen, editEvent, initialDate, projectEndDate]);
 
   // Compute date boundaries when inside a project calendar
   const minDate = projectStartDate ? formatDateForInput(projectStartDate) : undefined;
@@ -108,10 +109,14 @@ export function CreateEventDialog({
     e.preventDefault();
     if (!title.trim()) return;
 
-    // Enforce project date boundaries
+    // Enforce project date boundaries — events must not extend past the project's end date
     if (minDate && startDate < minDate) return;
     if (maxDate && startDate > maxDate) return;
     if (maxDate && endDate && endDate > maxDate) return;
+    if (maxDate && recurrenceFrequency) {
+      // A repeating event inside a project must terminate on or before the project end date
+      if (!recurrenceEndDate || recurrenceEndDate > maxDate) return;
+    }
 
     onSave({
       title: title.trim(),

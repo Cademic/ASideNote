@@ -219,7 +219,7 @@ export function NotebookCard({
         <div
           role="button"
           tabIndex={0}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md"
+          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
           onClick={() => onOpen(notebook.id)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -228,7 +228,7 @@ export function NotebookCard({
             }
           }}
         >
-          {notebook.isPinned && (
+          {notebook.isPinned && sidebarShowLabel && (
             <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-sky-400" />
           )}
           <BookOpen
@@ -268,7 +268,7 @@ export function NotebookCard({
         ref={menuRef}
         className={
           isSidebarRow
-            ? "relative z-10 shrink-0"
+            ? `relative z-10 shrink-0${sidebarShowLabel ? "" : " hidden"}`
             : "absolute right-3 top-3 z-10"
         }
         onClick={(e) => e.stopPropagation()}

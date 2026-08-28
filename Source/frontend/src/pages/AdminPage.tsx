@@ -235,7 +235,7 @@ export function AdminPage() {
     : 1;
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
+    <div className="h-full overflow-y-auto bg-background">
       {/* Admin header strip - distinct but on-theme */}
       <div className="border-b border-border/60 bg-gradient-to-r from-slate-100 to-violet-50/50 dark:from-slate-900/80 dark:to-violet-950/20">
         <div className="mx-auto max-w-[1600px] px-6 py-6">

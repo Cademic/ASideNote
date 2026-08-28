@@ -536,20 +536,6 @@ body {
   margin-bottom: 3.4cqw;
 }
 
-/* Comic-style halftone dot backdrop — applied to page-level background containers.
-   background-attachment: local scrolls the pattern with the element's own content
-   when that element is itself the scroll container (e.g. AppLayout's <main>) —
-   the default "scroll" attachment pins it to the element's box instead. */
-.bg-dots {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px);
-  background-size: 18px 18px;
-  background-attachment: local;
-}
-
-.dark .bg-dots {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1.1px, transparent 1.1px);
-}
-
 /* Cork Board Styles */
 .corkboard-frame {
   position: relative;
@@ -1612,6 +1598,28 @@ body {
   height: 3px;
   border-radius: 1px;
   opacity: 0.6;
+}
+
+/* Edge-toggle rail — supplements the chevron button with a larger click target */
+.sidebar-rail {
+  background: transparent;
+  transition: background-color 150ms ease-out;
+}
+
+.sidebar-rail:hover {
+  background: hsl(var(--color-primary) / 0.15);
+}
+
+/* Collapsed-mode nav tooltip */
+.sidebar-tooltip {
+  background: hsl(var(--color-surface));
+  color: hsl(var(--color-foreground));
+  border: 1px solid hsl(var(--color-border) / 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dark .sidebar-tooltip {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* ========================================

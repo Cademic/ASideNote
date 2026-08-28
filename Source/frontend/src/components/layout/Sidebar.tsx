@@ -18,15 +18,15 @@ import {
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useThemeContext } from "../../context/ThemeContext";
 import type { OpenedBoard } from "./AppLayout";
 import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 import { ProjectCard } from "../projects/ProjectCard";
 import { BoardCard } from "../dashboard/BoardCard";
 import { NotebookCard } from "../notebooks/NotebookCard";
+import { SidebarMenuList, SidebarRail, useSidebar, type SidebarMenuItemDef } from "./sidebar-primitives";
 
 interface SidebarProps {
-  isOpen: boolean;
-  onToggle: () => void;
   /** When true, sidebar is shown as overlay drawer (mobile); no collapse chevron, show close button */
   isDrawer?: boolean;
   openedBoards: OpenedBoard[];
@@ -62,7 +62,7 @@ interface SidebarProps {
   resolveBoardDto: (id: string) => BoardSummaryDto | undefined;
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: SidebarMenuItemDef[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/calendar", icon: Calendar, label: "Calendar" },
   { to: "/projects", icon: FolderOpen, label: "Projects" },
@@ -106,8 +106,6 @@ function getBoardPath(board: OpenedBoard): string {
 }
 
 export function Sidebar({
-  isOpen,
-  onToggle,
   isDrawer = false,
   openedBoards,
   onCloseBoard,
@@ -125,6 +123,8 @@ export function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { effectiveTheme } = useThemeContext();
+  const { state, toggleSidebar, width, isResizing } = useSidebar();
 
   const isOnBoardPage = location.pathname.startsWith("/boards/");
   const isOnChalkBoardPage = location.pathname.startsWith("/chalkboards/") && location.pathname !== "/chalkboards";
@@ -156,14 +156,22 @@ export function Sidebar({
     }
   }
 
-  const expanded = isDrawer || isOpen;
+  const expanded = isDrawer || state === "expanded";
+
+  // Desktop expanded width is user-adjustable via <SidebarRail> (drag the right edge).
+  // The drawer stays a fixed w-60; the collapsed rail stays w-16.
+  const useCustomWidth = expanded && !isDrawer;
 
   return (
     <aside
       className={[
-        "sidebar-surface relative flex h-screen flex-col transition-[width] duration-200 ease-out-smooth motion-reduce:transition-none",
-        expanded ? "w-60" : "w-16",
-      ].join(" ")}
+        "sidebar-surface relative flex h-screen flex-col motion-reduce:transition-none",
+        isResizing ? "" : "transition-[width] duration-200 ease-out-smooth",
+        isDrawer ? "w-60" : expanded ? "" : "w-16",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={useCustomWidth ? { width: `${width}px` } : undefined}
     >
       {/* Brand — logo + close (drawer) */}
       <div
@@ -178,15 +186,21 @@ export function Sidebar({
           title="ASideNote"
         >
           <img
-            src={expanded ? "/asidenote-logo.webp" : "/asidenote-logo-square.png"}
+            src={
+              expanded
+                ? effectiveTheme === "dark"
+                  ? "/ASideNotTextDark.webp"
+                  : "/ASideNoteText.webp"
+                : "/asidenote-logo-square.png"
+            }
             alt="ASideNote"
-            className={["shrink-0 object-contain", expanded ? "h-14 w-auto" : "h-12 w-12"].join(" ")}
+            className={["shrink-0 object-contain", expanded ? "h-8 w-auto" : "h-12 w-12"].join(" ")}
           />
         </Link>
         {isDrawer && (
           <button
             type="button"
-            onClick={onToggle}
+            onClick={toggleSidebar}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 transition-colors hover:bg-foreground/10 hover:text-foreground"
             aria-label="Close menu"
           >
@@ -195,57 +209,16 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex flex-col gap-0.5 p-3">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.to);
-          return (
-            <Link
-              key={item.label}
-              to={item.to}
-              title={item.label}
-              className={[
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
-                active
-                  ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
-                  : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-                !expanded && "justify-center",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <item.icon
-                className={`h-5 w-5 flex-shrink-0 ${
-                  active ? "text-amber-600 dark:text-sky-400" : ""
-                }`}
-              />
-              {expanded && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
-        {user?.role === "Admin" && (
-          <Link
-            to="/admin"
-            title="Admin"
-            className={[
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
-              isActive("/admin")
-                ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
-                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
-              !expanded && "justify-center",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <ShieldCheck
-              className={`h-5 w-5 flex-shrink-0 ${
-                isActive("/admin") ? "text-amber-600 dark:text-sky-400" : ""
-              }`}
-            />
-            {expanded && <span>Admin</span>}
-          </Link>
-        )}
-      </nav>
+      {/* Navigation — animated hover highlight glides between items (see SidebarMenuList) */}
+      <SidebarMenuList
+        items={
+          user?.role === "Admin"
+            ? [...NAV_ITEMS, { to: "/admin", icon: ShieldCheck, label: "Admin" }]
+            : NAV_ITEMS
+        }
+        isActive={isActive}
+        expanded={expanded}
+      />
 
       {/* Pinned (projects, notebooks, boards) */}
       {(pinnedProjects.length > 0 || pinnedNotebooks.length > 0 || pinnedBoards.length > 0) && (
@@ -256,7 +229,7 @@ export function Sidebar({
               Pinned
             </span>
           )}
-          {!isOpen && !isDrawer && (
+          {!expanded && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               <Pin className="mx-auto h-3 w-3" />
             </span>
@@ -361,7 +334,7 @@ export function Sidebar({
               Opened
             </span>
           )}
-          {!isOpen && !isDrawer && (
+          {!expanded && (
             <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-foreground/30 flex-shrink-0">
               Open
             </span>
@@ -517,18 +490,21 @@ export function Sidebar({
 
       {/* Collapse toggle — desktop only; drawer uses X in brand area */}
       {!isDrawer && (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-colors duration-150 hover:bg-amber-100 hover:text-amber-800 dark:bg-sky-950/60 dark:text-sky-400/60 dark:hover:bg-sky-900/50 dark:hover:text-sky-300 motion-reduce:transition-none"
-          aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-        >
-          {isOpen ? (
-            <ChevronLeft className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </button>
+        <>
+          <SidebarRail />
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border/50 bg-amber-50 text-amber-700/60 shadow-sm transition-colors duration-150 hover:bg-amber-100 hover:text-amber-800 dark:bg-sky-950/60 dark:text-sky-400/60 dark:hover:bg-sky-900/50 dark:hover:text-sky-300 motion-reduce:transition-none"
+            aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          >
+            {expanded ? (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </>
       )}
     </aside>
   );

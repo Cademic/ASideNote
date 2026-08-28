@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
 
 /** US Letter width at 96dpi – must match PaperShell so scale-to-fit is correct. */
@@ -18,7 +18,7 @@ interface ZoomablePaperShellProps {
   zoom?: number;
   /** Callback when zoom changes (use with zoom for controlled mode) */
   onZoomChange?: (zoom: number) => void;
-  /** When true, sidebar is expanded (w-60); position zoom controls to clear it. When false, position next to collapsed sidebar (w-16). Desktop (lg) only. */
+  /** Fallback for the first paint before the sidebar publishes `--sidebar-width`: true assumes an expanded sidebar, false a collapsed one. Desktop (lg) only. */
   sidebarExpanded?: boolean;
 }
 
@@ -151,11 +151,12 @@ export function ZoomablePaperShell({
         {children}
       </div>
       
-      {/* Zoom controls: near bottom-left; on desktop (lg) offset so they don't overlap sidebar (w-60 expanded, w-16 collapsed). Hidden when printing. */}
+      {/* Zoom controls: near bottom-left; on desktop (lg) offset by the live sidebar width
+          (`--sidebar-width`, published by SidebarProvider) so they clear a resized sidebar.
+          Hidden when printing. */}
       <div
-        className={`notebook-zoom-controls fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-lg transition-[left] duration-200 ${
-          sidebarExpanded ? "lg:left-[17rem]" : "lg:left-[5rem]"
-        }`}
+        className="notebook-zoom-controls fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-lg transition-[left] duration-200 lg:left-[calc(var(--sidebar-width,var(--zoom-sidebar-fallback))_+_1rem)]"
+        style={{ "--zoom-sidebar-fallback": sidebarExpanded ? "15rem" : "4rem" } as CSSProperties}
       >
         <button
           type="button"
