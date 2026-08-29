@@ -17,25 +17,21 @@ interface DashboardCanvasZoneProps {
 export function DashboardCanvasZone({ board, onOpenBoard, onCreate }: DashboardCanvasZoneProps) {
   return (
     <section className="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-[var(--land-paper)]">
-      <div className="flex items-center gap-2 border-b border-[var(--land-rule)] px-4 py-3">
-        <span className="editorial-label shrink-0">Active Canvas</span>
-        {board && (
-          <>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--land-ink)]">
-              {" · "}
-              {board.name}
-            </span>
-            <button
-              type="button"
-              onClick={onOpenBoard}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--land-rule)] bg-[var(--land-paper)] px-2.5 py-1 text-xs font-semibold text-[var(--land-ink)] transition-colors hover:bg-[var(--land-cream)]"
-            >
-              <Maximize2 className="h-3.5 w-3.5 shrink-0 text-[var(--land-ink-3)]" />
-              Open board
-            </button>
-          </>
-        )}
-      </div>
+      {board && (
+        <div className="flex items-center gap-2 border-b border-[var(--land-rule)] px-4 py-3">
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--land-ink)]">
+            {board.name}
+          </span>
+          <button
+            type="button"
+            onClick={onOpenBoard}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--land-rule)] bg-[var(--land-paper)] px-2.5 py-1 text-xs font-semibold text-[var(--land-ink)] transition-colors hover:bg-[var(--land-cream)]"
+          >
+            <Maximize2 className="h-3.5 w-3.5 shrink-0 text-[var(--land-ink-3)]" />
+            Open board
+          </button>
+        </div>
+      )}
 
       <div className="relative min-h-0 w-full min-w-0 flex-1 overflow-hidden">
         {board ? (

@@ -186,7 +186,7 @@ export function BoardMenuBar({
     }`;
 
   const dropdownClass =
-    "absolute left-0 top-full z-50 mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
+    "absolute left-0 top-full z-[110] mt-1 min-w-[200px] max-w-[min(280px,calc(100vw-1rem))] overflow-visible rounded-lg border border-border bg-background py-1 shadow-xl";
   const hasChalkTools = boardType === "ChalkBoard" && Boolean(chalkTools);
   const showCompactBoardTools =
     isCompactToolsViewport && (boardType === "NoteBoard" || hasChalkTools);
@@ -212,7 +212,7 @@ export function BoardMenuBar({
       : "max-h-[min(70vh,28rem)] overflow-visible opacity-100",
   ].join(" ");
   const compactDropdownClass =
-    "pointer-events-auto absolute left-0 right-0 top-full z-50 mt-2 rounded-lg border border-border bg-background py-1 shadow-xl";
+    "pointer-events-auto absolute left-0 right-0 top-full z-[110] mt-2 rounded-lg border border-border bg-background py-1 shadow-xl";
 
   return (
     <div
