@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTutorial } from "../../context/TutorialContext";
 import { getAvatarUrl } from "../../constants/avatars";
 import { getColorForUserId } from "../../lib/presenceColors";
+import { GlobalSearch } from "./GlobalSearch";
 import type { BoardPresenceUser } from "./AppLayout";
 
 interface NavbarProps {
@@ -119,7 +120,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex shrink-0 items-center justify-center rounded-lg p-2 text-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+            className="flex shrink-0 items-center justify-center rounded-lg p-2 text-[var(--land-ink-2)] transition-colors hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]"
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
@@ -136,15 +137,15 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 className={`flex items-center gap-1.5 min-w-0 ${isLast ? "flex-1 overflow-hidden" : "shrink-0"}`}
               >
                 {i > 0 && (
-                  <span className="text-sm text-foreground/20 select-none shrink-0">/</span>
+                  <span className="text-sm text-[var(--land-ink-3)] select-none shrink-0">/</span>
                 )}
                 <button
                   type="button"
                   onClick={() => navigate(seg.path)}
                   className={`rounded-lg px-2 py-1 text-sm transition-colors duration-150 truncate text-left motion-reduce:transition-none ${
                     isLast
-                      ? "min-w-0 flex-1 font-semibold text-foreground hover:bg-foreground/5"
-                      : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground max-w-[100px] sm:max-w-none"
+                      ? "min-w-0 flex-1 font-semibold text-[var(--land-ink)] hover:bg-[var(--land-cream)]"
+                      : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] max-w-[100px] sm:max-w-none"
                   }`}
                   aria-current={isLast ? "page" : undefined}
                   title={seg.label}
@@ -164,10 +165,17 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
         </nav>
       </div>
 
+      {/* Center: global workspace search */}
+      <div className="mx-2 hidden min-w-0 flex-1 justify-center sm:flex md:mx-6">
+        <div className="w-full max-w-md">
+          <GlobalSearch />
+        </div>
+      </div>
+
       {/* Center/Right: Connected users (on board) then User menu */}
       {showConnectedUsers && (
         <div
-          className="flex items-center gap-2 overflow-hidden rounded-lg border border-border/50 bg-background/80 px-2 py-1.5"
+          className="flex items-center gap-2 overflow-hidden rounded-lg border border-[var(--land-rule)] bg-[var(--land-paper)] px-2 py-1.5"
           aria-label="Connected users on this board"
         >
           {connectedUsers.map((u) => (
@@ -181,7 +189,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 style={{ backgroundColor: getColorForUserId(u.userId) }}
                 aria-hidden
               />
-              <span className="truncate text-xs text-foreground/80">{u.displayName}</span>
+              <span className="truncate text-xs text-[var(--land-ink-2)]">{u.displayName}</span>
             </div>
           ))}
         </div>
@@ -192,7 +200,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
         <button
           type="button"
           onClick={() => setDropdownOpen((open) => !open)}
-          className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-foreground/5"
+          className="flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-[var(--land-cream)]"
           aria-expanded={dropdownOpen}
           aria-haspopup="true"
           aria-label="User menu"
@@ -201,20 +209,20 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
             <img
               src={avatarUrl}
               alt=""
-              className="h-8 w-8 rounded-full object-cover ring-1 ring-border/50"
+              className="h-8 w-8 rounded-full object-cover ring-1 ring-[var(--land-rule)]"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--land-yellow)] text-xs font-bold text-[var(--land-ink)]">
               {userInitial}
             </div>
           )}
           {user && (
-            <span className="hidden text-xs font-medium text-foreground/50 sm:block">
+            <span className="hidden text-xs font-medium text-[var(--land-ink-2)] sm:block">
               {user.username}
             </span>
           )}
           <ChevronDown
-            className={`h-3.5 w-3.5 text-foreground/40 transition-transform duration-150 ease-out-smooth motion-reduce:transition-none ${dropdownOpen ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 text-[var(--land-ink-3)] transition-transform duration-150 ease-out-smooth motion-reduce:transition-none ${dropdownOpen ? "rotate-180" : ""}`}
             aria-hidden
           />
         </button>
@@ -222,7 +230,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
         {dropdownOpen && (
           <div
             ref={userMenuPanelRef}
-            className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,calc(100vh-2rem))] min-w-[160px] max-w-[min(16rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
+            className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,calc(100vh-2rem))] min-w-[160px] max-w-[min(16rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-[var(--land-rule)] bg-[var(--land-paper)] py-1"
             role="menu"
           >
             <button
@@ -232,9 +240,9 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 setDropdownOpen(false);
                 navigate(user?.username ? `/profile/${encodeURIComponent(user.username)}` : "/profile");
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-foreground/5"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--land-ink)] hover:bg-[var(--land-cream)]"
             >
-              <User className="h-4 w-4 text-foreground/60" />
+              <User className="h-4 w-4 text-[var(--land-ink-3)]" />
               Profile
             </button>
             <button
@@ -244,9 +252,9 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 setDropdownOpen(false);
                 navigate("/settings");
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-foreground/5"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--land-ink)] hover:bg-[var(--land-cream)]"
             >
-              <Settings className="h-4 w-4 text-foreground/60" />
+              <Settings className="h-4 w-4 text-[var(--land-ink-3)]" />
               Settings
             </button>
             <button
@@ -257,9 +265,9 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 if (location.pathname !== "/boards") navigate("/boards");
                 tutorial.start();
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-foreground/5"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--land-ink)] hover:bg-[var(--land-cream)]"
             >
-              <Compass className="h-4 w-4 text-foreground/60" />
+              <Compass className="h-4 w-4 text-[var(--land-ink-3)]" />
               Take a tour
             </button>
             <button
@@ -270,7 +278,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
                 logout();
                 navigate("/", { replace: true });
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 dark:text-red-400"
+              className="editorial-danger-hover flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 dark:text-red-400"
             >
               <LogOut className="h-4 w-4" />
               Logout

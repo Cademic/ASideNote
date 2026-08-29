@@ -3,8 +3,10 @@ import type { DragEvent } from "react";
 export const PROJECT_ITEM_DRAG_MIME = "application/x-asidenote-project-item";
 
 export interface ProjectItemDragPayload {
-  kind: "board" | "notebook";
+  kind: "board" | "notebook" | "folder";
   id: string;
+  /** Project the item currently belongs to (null for a board/notebook not in any project). */
+  sourceProjectId?: string | null;
 }
 
 export function setProjectItemDragData(e: DragEvent, payload: ProjectItemDragPayload) {
@@ -17,7 +19,7 @@ export function getProjectItemDragPayload(e: DragEvent): ProjectItemDragPayload 
     const raw = e.dataTransfer.getData(PROJECT_ITEM_DRAG_MIME);
     if (!raw) return null;
     const p = JSON.parse(raw) as ProjectItemDragPayload;
-    if (p.kind !== "board" && p.kind !== "notebook") return null;
+    if (p.kind !== "board" && p.kind !== "notebook" && p.kind !== "folder") return null;
     if (typeof p.id !== "string" || !p.id) return null;
     return p;
   } catch {

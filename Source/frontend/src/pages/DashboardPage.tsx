@@ -1,96 +1,68 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import type { AppLayoutContext } from "../components/layout/AppLayout";
-import {
-  Plus,
-  ClipboardList,
-  Calendar,
-  CalendarDays,
-  FolderOpen,
-  BookOpen,
-  Clock,
-  PencilLine,
-  ArrowRight,
-  Users,
-} from "lucide-react";
 import axios from "axios";
-import { getBoards, createBoard, deleteBoard, updateBoard, toggleBoardPin } from "../api/boards";
+import type { AppLayoutContext } from "../components/layout/AppLayout";
+import { getBoards, createBoard } from "../api/boards";
+import { getProjects, getProjectById, createProject } from "../api/projects";
+import { getNotebooks, createNotebook } from "../api/notebooks";
 import {
-  getProjects,
-  createProject,
-  addBoardToProject,
-  addNotebookToProject,
-  removeBoardFromProject,
-  removeNotebookFromProject,
-  setBoardProjectFolder,
-  setNotebookProjectFolder,
-  updateProject,
-  toggleProjectPin,
-  deleteProject,
-  leaveProject,
-} from "../api/projects";
-import { getNotebooks, createNotebook, deleteNotebook, updateNotebook, toggleNotebookPin } from "../api/notebooks";
-import { getFriends, getProfile } from "../api/users";
-import {
-  createCalendarEvent,
   deleteCalendarEvent,
   getCalendarEvents,
-  updateCalendarEvent,
 } from "../api/calendar-events";
-import { BoardCard } from "../components/dashboard/BoardCard";
-import { MiniCalendar } from "../components/dashboard/MiniCalendar";
-import { ProjectCard } from "../components/projects/ProjectCard";
-import { NotebookCard } from "../components/notebooks/NotebookCard";
-import { CreateNotebookDialog } from "../components/notebooks/CreateNotebookDialog";
-import { ConfirmDialog } from "../components/dashboard/ConfirmDialog";
+import {
+  saveCalendarEventFromForm,
+  type CalendarEventFormData,
+} from "../utils/calendar-event-save";
 import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
 import { CreateEventDialog } from "../components/calendar/CreateEventDialog";
 import { EventDetailsPopup } from "../components/calendar/EventDetailsPopup";
-import { useAuth } from "../context/AuthContext";
-import type { BoardSummaryDto, CalendarEventDto, FriendDto, NotebookSummaryDto, ProjectSummaryDto } from "../types";
+import { DashboardLayout } from "../components/dashboard/dashboard-home/DashboardLayout";
+import type {
+  BoardSummaryDto,
+  CalendarEventDto,
+  NotebookSummaryDto,
+  ProjectFolderDto,
+  ProjectSummaryDto,
+} from "../types";
 import { resolveEventProjectName } from "../utils/calendar-event-project-name";
-import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
-import { formatElapsedSincePreviousSessionEnd } from "../utils/format-last-active";
+import { buildUpcomingItems } from "../utils/dashboard-upcoming";
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function formatTodaySticky(): string {
-  return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+/**
+ * Merge two lists by `id`, keeping the entry from `base` when both contain the
+ * same id. Used to fold project-scoped boards/notebooks (which may be owned by
+ * other members) into the current user's own boards/notebooks without dropping
+ * the richer owned copy.
+ */
+function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
+  const map = new Map(base.map((item) => [item.id, item]));
+  for (const item of extra) {
+    if (!map.has(item.id)) map.set(item.id, item);
+  }
+  return [...map.values()];
 }
 
 export function DashboardPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const { closeBoard, refreshPinnedBoards, refreshPinnedProjects, openNotebook, refreshPinnedNotebooks } = useOutletContext<AppLayoutContext>();
+  const {
+    setDashboardBoardActive,
+    createNonce,
+    consumeCreate,
+  } = useOutletContext<AppLayoutContext>();
+
   const [boards, setBoards] = useState<BoardSummaryDto[]>([]);
   const [activeProjects, setActiveProjects] = useState<ProjectSummaryDto[]>([]);
   const [notebooks, setNotebooks] = useState<NotebookSummaryDto[]>([]);
+  // Boards / notebooks linked to accessible projects — includes items shared by
+  // other project members that /boards and /notebooks (own-items-only) omit.
+  const [projectBoards, setProjectBoards] = useState<BoardSummaryDto[]>([]);
+  const [projectNotebooks, setProjectNotebooks] = useState<NotebookSummaryDto[]>([]);
+  const [projectFolders, setProjectFolders] = useState<ProjectFolderDto[]>([]);
   const [totalNotebooks, setTotalNotebooks] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<BoardSummaryDto | null>(null);
-  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [projectRenameTarget, setProjectRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [projectRenameValue, setProjectRenameValue] = useState("");
-  const [projectDeleteTarget, setProjectDeleteTarget] = useState<ProjectSummaryDto | null>(null);
-  const [projectLeaveTarget, setProjectLeaveTarget] = useState<ProjectSummaryDto | null>(null);
-  const [isCreateNotebookOpen, setIsCreateNotebookOpen] = useState(false);
   const [createNotebookError, setCreateNotebookError] = useState<string | null>(null);
-  const [notebookRenameTarget, setNotebookRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [notebookRenameValue, setNotebookRenameValue] = useState("");
-  const [notebookDeleteTarget, setNotebookDeleteTarget] = useState<NotebookSummaryDto | null>(null);
-  const [friends, setFriends] = useState<FriendDto[]>([]);
-  const [lastSessionEndedAt, setLastSessionEndedAt] = useState<string | null>(null);
-  /** Bumps on an interval and when the tab becomes visible so elapsed time is always relative to "now". */
-  const [lastActiveTick, setLastActiveTick] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
   const [calendarEventDialogOpen, setCalendarEventDialogOpen] = useState(false);
@@ -113,7 +85,7 @@ export function DashboardPage() {
     }
   }, []);
 
-  const fetchBoards = useCallback(async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setError(null);
       const [boardResult, projectResult, notebookResult] = await Promise.all([
@@ -125,50 +97,100 @@ export function DashboardPage() {
       setActiveProjects(projectResult);
       setNotebooks(notebookResult.items);
       setTotalNotebooks(notebookResult.total ?? 0);
+
+      // One detail call per accessible project: it carries the project's folders
+      // plus every board and notebook linked to it — including ones owned by other
+      // members — so the tree can show shared boards, not just the user's own.
+      const projectDetails = await Promise.all(
+        projectResult.map((p) => getProjectById(p.id).catch(() => null)),
+      );
+      setProjectFolders(projectDetails.flatMap((d) => d?.folders ?? []));
+      setProjectBoards(projectDetails.flatMap((d) => d?.boards ?? []));
+      setProjectNotebooks(projectDetails.flatMap((d) => d?.notebooks ?? []));
     } catch {
-      setError("Failed to load boards.");
+      setError("Failed to load your workspace.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  /** After project prefs change (e.g. personal calendar visibility), reload projects and calendar events so the dashboard mini-calendar updates immediately. */
-  const refreshProjectsAndCalendar = useCallback(async () => {
-    await fetchBoards();
-    await refreshCalendarEvents();
-  }, [fetchBoards, refreshCalendarEvents]);
-
   useEffect(() => {
-    fetchBoards();
-  }, [fetchBoards]);
-
-  useEffect(() => {
-    getFriends().then(setFriends).catch(() => setFriends([]));
-    getProfile()
-      .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
-      .catch(() => setLastSessionEndedAt(null));
-  }, []);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setLastActiveTick((t) => t + 1), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    function onVisible() {
-      if (document.visibilityState !== "visible") return;
-      void getProfile()
-        .then((p) => setLastSessionEndedAt(p.lastSessionEndAt ?? null))
-        .catch(() => {});
-      setLastActiveTick((t) => t + 1);
-    }
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   useEffect(() => {
     void refreshCalendarEvents();
   }, [refreshCalendarEvents]);
+
+  /** Boards, most-recently-updated first. */
+  const allBoards = useMemo(
+    () => [...boards].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    [boards],
+  );
+
+  /** The board shown in the Active Canvas: the user's most-recently-updated note board. */
+  const activeCanvasBoard = useMemo(
+    () => allBoards.find((b) => b.boardType === "NoteBoard") ?? null,
+    [allBoards],
+  );
+
+  /**
+   * Boards / notebooks for the projects tree: the user's own items plus any
+   * shared items linked to projects they can access. Kept separate from `boards`
+   * so the Active Canvas still tracks only the user's own note boards.
+   */
+  const treeBoards = useMemo(
+    () => mergeById(boards, projectBoards),
+    [boards, projectBoards],
+  );
+  const treeNotebooks = useMemo(
+    () => mergeById(notebooks, projectNotebooks),
+    [notebooks, projectNotebooks],
+  );
+
+  /** Projects, most-recently-created first — feeds the middle column. */
+  const activeProjectsSorted = useMemo(
+    () =>
+      [...activeProjects].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [activeProjects],
+  );
+
+  const upcoming = useMemo(
+    () => buildUpcomingItems(calendarEvents, activeProjects),
+    [calendarEvents, activeProjects],
+  );
+
+  const projectNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of activeProjects) map[p.id] = p.name;
+    return map;
+  }, [activeProjects]);
+
+  // Tell the sidebar a live board is mounted so it shows the sticky-note / index-card / image tools.
+  useEffect(() => {
+    setDashboardBoardActive(activeCanvasBoard != null);
+    return () => setDashboardBoardActive(false);
+  }, [activeCanvasBoard, setDashboardBoardActive]);
+
+  // The rail "Create" button bumps createNonce — open the create dialog, then consume the
+  // request so it doesn't re-fire when the dashboard remounts after navigating away and back.
+  useEffect(() => {
+    if (createNonce > 0) {
+      setIsCreateOpen(true);
+      consumeCreate();
+    }
+  }, [createNonce, consumeCreate]);
+
+  function handleOpenNotebook(id: string) {
+    navigate(`/notebooks/${id}`);
+  }
+
+  function handleOpenUpcoming(item: { event?: CalendarEventDto; project?: ProjectSummaryDto }) {
+    if (item.event) setDetailsEvent(item.event);
+    else if (item.project) navigate(`/projects/${item.project.id}`);
+  }
 
   function handleEditFromEventDetails() {
     if (!detailsEvent) return;
@@ -178,68 +200,9 @@ export function DashboardPage() {
     setCalendarEventDialogOpen(true);
   }
 
-  async function handleCalendarEventSave(data: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-    isAllDay: boolean;
-    color: string;
-    eventType: string;
-    startHour: string;
-    endHour: string;
-    recurrenceFrequency: string;
-    recurrenceInterval: number;
-    recurrenceEndDate: string;
-  }) {
+  async function handleCalendarEventSave(data: CalendarEventFormData) {
     try {
-      const toDateUtc = (dateStr: string, hour: string, allDay: boolean) =>
-        allDay ? `${dateStr}T12:00:00.000Z` : `${dateStr}T${hour}:00:00.000Z`;
-
-      const startIso = toDateUtc(data.startDate, data.startHour, data.isAllDay);
-      const endIso = data.endDate
-        ? toDateUtc(data.endDate, data.endHour, data.isAllDay)
-        : undefined;
-
-      const recurrence = data.recurrenceFrequency
-        ? {
-            recurrenceFrequency: data.recurrenceFrequency,
-            recurrenceInterval: data.recurrenceInterval,
-            recurrenceEndDate: data.recurrenceEndDate
-              ? `${data.recurrenceEndDate}T12:00:00.000Z`
-              : undefined,
-          }
-        : {
-            recurrenceFrequency: undefined,
-            recurrenceInterval: 1,
-            recurrenceEndDate: undefined,
-          };
-
-      const eventId = editingCalendarEvent?.recurrenceSourceId ?? editingCalendarEvent?.id;
-
-      if (editingCalendarEvent && eventId) {
-        await updateCalendarEvent(eventId, {
-          title: data.title,
-          description: data.description || undefined,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      } else {
-        await createCalendarEvent({
-          title: data.title,
-          description: data.description || undefined,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      }
+      await saveCalendarEventFromForm(data, { editEvent: editingCalendarEvent });
       setCalendarEventDialogOpen(false);
       setEditingCalendarEvent(null);
       await refreshCalendarEvents();
@@ -264,17 +227,11 @@ export function DashboardPage() {
   async function handleCreateBoard(name: string, description: string, boardType: string) {
     try {
       setCreateBoardError(null);
-      const created = await createBoard({
-        name,
-        description: description || undefined,
-        boardType,
-      });
+      const created = await createBoard({ name, description: description || undefined, boardType });
       setBoards((prev) => [created, ...prev]);
       setIsCreateOpen(false);
       const path =
-        created.boardType === "ChalkBoard"
-          ? `/chalkboards/${created.id}`
-          : `/boards/${created.id}`;
+        created.boardType === "ChalkBoard" ? `/chalkboards/${created.id}` : `/boards/${created.id}`;
       navigate(path);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
@@ -304,8 +261,8 @@ export function DashboardPage() {
         endDate: endDate || undefined,
         deadline: deadline || undefined,
       });
-      navigate(`/projects/${created.id}`);
       setIsCreateOpen(false);
+      navigate(`/projects/${created.id}`);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         setCreateBoardError(err.response.data?.message ?? "A project with that name already exists.");
@@ -316,265 +273,18 @@ export function DashboardPage() {
     }
   }
 
-  function handleDelete(id: string) {
-    const board = boards.find((b) => b.id === id) ?? null;
-    if (board) setDeleteTarget(board);
-  }
-
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    const id = deleteTarget.id;
-    setDeleteTarget(null);
-    setBoards((prev) => prev.filter((b) => b.id !== id));
-    closeBoard(id);
-    try {
-      await deleteBoard(id);
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  function handleRename(id: string, currentName: string) {
-    setRenameTarget({ id, name: currentName });
-    setRenameValue(currentName);
-  }
-
-  async function confirmRename() {
-    if (!renameTarget || !renameValue.trim()) return;
-    const { id } = renameTarget;
-    const newName = renameValue.trim();
-    setRenameTarget(null);
-    setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, name: newName } : b)));
-    try {
-      await updateBoard(id, { name: newName });
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  async function handleMoveToProject(boardId: string, projectId: string, folderId?: string) {
-    const board = boards.find((b) => b.id === boardId);
-    if (folderId !== undefined) {
-      if (board?.projectId === projectId) {
-        try {
-          await setBoardProjectFolder(projectId, boardId, { folderId });
-          setBoards((prev) =>
-            prev.map((b) =>
-              b.id === boardId ? { ...b, projectFolderId: folderId } : b,
-            ),
-          );
-        } catch {
-          console.error("Failed to set board folder");
-          fetchBoards();
-        }
-        return;
-      }
-      try {
-        await addBoardToProject(projectId, boardId);
-        await setBoardProjectFolder(projectId, boardId, { folderId });
-        setBoards((prev) =>
-          prev.map((b) =>
-            b.id === boardId ? { ...b, projectId, projectFolderId: folderId } : b,
-          ),
-        );
-      } catch {
-        console.error("Failed to move board to project folder");
-        fetchBoards();
-      }
-      return;
-    }
-    if (board?.projectId === projectId) {
-      try {
-        await removeBoardFromProject(projectId, boardId);
-        setBoards((prev) =>
-          prev.map((b) =>
-            b.id === boardId ? { ...b, projectId: null, projectFolderId: null } : b,
-          ),
-        );
-      } catch {
-        console.error("Failed to remove board from project");
-      }
-      return;
-    }
-    try {
-      await addBoardToProject(projectId, boardId);
-      await setBoardProjectFolder(projectId, boardId, { folderId: null });
-      setBoards((prev) =>
-        prev.map((b) =>
-          b.id === boardId ? { ...b, projectId, projectFolderId: null } : b,
-        ),
-      );
-    } catch {
-      console.error("Failed to move board to project");
-      fetchBoards();
-    }
-  }
-
-  async function handleAddNotebookToProject(
-    notebookId: string,
-    projectId: string,
-    folderId?: string,
-  ) {
-    const notebook = notebooks.find((n) => n.id === notebookId);
-    if (folderId !== undefined) {
-      if (notebook?.projectId === projectId) {
-        try {
-          await setNotebookProjectFolder(projectId, notebookId, { folderId });
-          setNotebooks((prev) =>
-            prev.map((n) =>
-              n.id === notebookId ? { ...n, projectFolderId: folderId } : n,
-            ),
-          );
-        } catch {
-          console.error("Failed to set notebook folder");
-          fetchBoards();
-        }
-        return;
-      }
-      try {
-        await addNotebookToProject(projectId, notebookId);
-        await setNotebookProjectFolder(projectId, notebookId, { folderId });
-        setNotebooks((prev) =>
-          prev.map((n) =>
-            n.id === notebookId ? { ...n, projectId, projectFolderId: folderId } : n,
-          ),
-        );
-      } catch {
-        console.error("Failed to add notebook to project folder");
-        fetchBoards();
-      }
-      return;
-    }
-    if (notebook?.projectId === projectId) {
-      try {
-        await removeNotebookFromProject(projectId, notebookId);
-        setNotebooks((prev) =>
-          prev.map((n) =>
-            n.id === notebookId ? { ...n, projectId: null, projectFolderId: null } : n,
-          ),
-        );
-      } catch {
-        console.error("Failed to remove notebook from project");
-      }
-      return;
-    }
-    try {
-      await addNotebookToProject(projectId, notebookId);
-      await setNotebookProjectFolder(projectId, notebookId, { folderId: null });
-      setNotebooks((prev) =>
-        prev.map((n) =>
-          n.id === notebookId ? { ...n, projectId, projectFolderId: null } : n,
-        ),
-      );
-    } catch {
-      console.error("Failed to add notebook to project");
-      fetchBoards();
-    }
-  }
-
-  async function handleTogglePin(id: string, isPinned: boolean) {
-    setBoards((prev) =>
-      prev.map((b) =>
-        b.id === id ? { ...b, isPinned, pinnedAt: isPinned ? new Date().toISOString() : null } : b,
-      ),
-    );
-    try {
-      await toggleBoardPin(id, isPinned);
-      refreshPinnedBoards();
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  function handleRenameProject(id: string, currentName: string) {
-    setProjectRenameTarget({ id, name: currentName });
-    setProjectRenameValue(currentName);
-  }
-
-  async function confirmRenameProject() {
-    if (!projectRenameTarget || !projectRenameValue.trim()) return;
-    const { id } = projectRenameTarget;
-    const newName = projectRenameValue.trim();
-    const project = activeProjects.find((p) => p.id === id);
-    setProjectRenameTarget(null);
-    setActiveProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name: newName } : p)),
-    );
-    try {
-      await updateProject(id, {
-        name: newName,
-        status: project?.status ?? "Active",
-        progress: project?.progress ?? 0,
-      });
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  async function handleToggleProjectPin(id: string, isPinned: boolean) {
-    setActiveProjects((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, isPinned, pinnedAt: isPinned ? new Date().toISOString() : undefined }
-          : p,
-      ),
-    );
-    try {
-      await toggleProjectPin(id, isPinned);
-      await refreshPinnedProjects();
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  function handleDeleteProject(id: string) {
-    const project = activeProjects.find((p) => p.id === id) ?? null;
-    if (project) setProjectDeleteTarget(project);
-  }
-
-  async function confirmDeleteProject() {
-    if (!projectDeleteTarget) return;
-    const id = projectDeleteTarget.id;
-    setProjectDeleteTarget(null);
-    setActiveProjects((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await deleteProject(id);
-      refreshPinnedProjects();
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  function handleLeaveProject(id: string) {
-    const project = activeProjects.find((p) => p.id === id) ?? null;
-    if (project) setProjectLeaveTarget(project);
-  }
-
-  async function confirmLeaveProject() {
-    if (!projectLeaveTarget) return;
-    const id = projectLeaveTarget.id;
-    setProjectLeaveTarget(null);
-    setActiveProjects((prev) => prev.filter((p) => p.id !== id));
-    try {
-      await leaveProject(id);
-      refreshPinnedProjects();
-    } catch {
-      fetchBoards();
-    }
-  }
-
   async function handleCreateNotebook(name: string) {
     try {
       setCreateNotebookError(null);
       const created = await createNotebook({ name });
-      setNotebooks((prev) => [created, ...prev]);
       setTotalNotebooks((t) => t + 1);
-      setIsCreateNotebookOpen(false);
-      setIsCreateOpen(false); // close Get Started modal if it was used
-      openNotebook(created.id);
+      setIsCreateOpen(false);
+      navigate(`/notebooks/${created.id}`);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        setCreateNotebookError(err.response.data?.message ?? "Maximum 5 notebooks allowed. Delete one to create another.");
+        setCreateNotebookError(
+          err.response.data?.message ?? "Maximum 5 notebooks allowed. Delete one to create another.",
+        );
       } else {
         setCreateNotebookError("Failed to create notebook. Please try again.");
         console.error("Failed to create notebook:", err);
@@ -582,139 +292,12 @@ export function DashboardPage() {
     }
   }
 
-  function handleRenameNotebook(id: string, currentName: string) {
-    setNotebookRenameTarget({ id, name: currentName });
-    setNotebookRenameValue(currentName);
-  }
-
-  async function confirmRenameNotebook() {
-    if (!notebookRenameTarget || !notebookRenameValue.trim()) return;
-    const { id } = notebookRenameTarget;
-    const newName = notebookRenameValue.trim();
-    setNotebookRenameTarget(null);
-    setNotebooks((prev) => prev.map((n) => (n.id === id ? { ...n, name: newName } : n)));
-    try {
-      await updateNotebook(id, { name: newName });
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  async function handleToggleNotebookPin(id: string, isPinned: boolean) {
-    setNotebooks((prev) =>
-      prev.map((n) =>
-        n.id === id ? { ...n, isPinned, pinnedAt: isPinned ? new Date().toISOString() : null } : n,
-      ),
-    );
-    try {
-      await toggleNotebookPin(id, isPinned);
-      refreshPinnedNotebooks();
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  function handleDeleteNotebook(id: string) {
-    const notebook = notebooks.find((n) => n.id === id) ?? null;
-    if (notebook) setNotebookDeleteTarget(notebook);
-  }
-
-  async function confirmDeleteNotebook() {
-    if (!notebookDeleteTarget) return;
-    const id = notebookDeleteTarget.id;
-    setNotebookDeleteTarget(null);
-    setNotebooks((prev) => prev.filter((n) => n.id !== id));
-    setTotalNotebooks((t) => Math.max(0, t - 1));
-    try {
-      await deleteNotebook(id);
-      refreshPinnedNotebooks();
-    } catch {
-      fetchBoards();
-    }
-  }
-
-  /** Boards sorted by last updated (opened recently) */
-  const allBoards = useMemo(
-    () => [...boards].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-    [boards],
-  );
-
-  /** Projects sorted by most recently created/updated (opened recently) */
-  const activeProjectsSorted = useMemo(
-    () =>
-      [...activeProjects].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [activeProjects],
-  );
-
-  const projectsOnCalendar = useMemo(
-    () => activeProjectsSorted.filter(isProjectVisibleOnUserCalendar),
-    [activeProjectsSorted],
-  );
-
-  /** Notebooks sorted by last updated */
-  const notebooksSorted = useMemo(
-    () => [...notebooks].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-    [notebooks],
-  );
-
-  const nextUpcoming = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayMs = todayStart.getTime();
-
-    type Candidate = { startMs: number; title: string; event?: CalendarEventDto; project?: ProjectSummaryDto };
-    const candidates: Candidate[] = [];
-
-    for (const ev of calendarEvents) {
-      const start = new Date(ev.startDate).getTime();
-      if (start >= todayMs) {
-        candidates.push({ startMs: start, title: ev.title, event: ev });
-      }
-    }
-    for (const proj of activeProjects) {
-      if (!isProjectVisibleOnUserCalendar(proj)) continue;
-      if (proj.startDate) {
-        const start = new Date(proj.startDate).getTime();
-        if (start >= todayMs) {
-          candidates.push({ startMs: start, title: proj.name, project: proj });
-        }
-      }
-    }
-
-    if (candidates.length === 0) return { display: "No upcoming events", event: undefined, project: undefined };
-    candidates.sort((a, b) => a.startMs - b.startMs);
-    const first = candidates[0];
-    return { display: first.title, event: first.event, project: first.project };
-  }, [calendarEvents, activeProjects]);
-
-  const friendsOnline = useMemo(
-    () => friends.filter((f) => f.presenceStatus === "active" || f.presenceStatus === "idle").length,
-    [friends],
-  );
-
-  const projectNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const p of activeProjects) {
-      map[p.id] = p.name;
-    }
-    return map;
-  }, [activeProjects]);
-
-  const lastActiveDisplay = useMemo(() => {
-    void lastActiveTick;
-    if (!lastSessionEndedAt) return "—";
-    return formatElapsedSincePreviousSessionEnd(lastSessionEndedAt);
-  }, [lastSessionEndedAt, lastActiveTick]);
-
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="dashboard-editorial flex h-full items-center justify-center bg-[var(--land-cream)]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <span className="text-sm text-foreground/60">Loading your workspace...</span>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--land-amber)] border-t-transparent" />
+          <span className="text-sm text-[var(--land-ink-2)]">Loading your workspace...</span>
         </div>
       </div>
     );
@@ -722,13 +305,13 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="dashboard-editorial flex h-full items-center justify-center bg-[var(--land-cream)]">
         <div className="text-center">
-          <p className="mb-2 text-sm text-red-500">{error}</p>
+          <p className="mb-2 text-sm text-red-600">{error}</p>
           <button
             type="button"
-            onClick={fetchBoards}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            onClick={fetchDashboard}
+            className="rounded-lg bg-[var(--land-amber)] px-4 py-2 text-sm font-medium text-[var(--land-on-accent)] hover:brightness-95"
           >
             Retry
           </button>
@@ -738,227 +321,22 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
-      <div className="mx-auto max-w-[1600px] px-6 py-8">
-        {/* ── Welcome Notepad ───────────────────────────── */}
-        <div className="notepad-card mb-8">
-          <div className="notepad-spiral-strip" />
-          <div className="notepad-body relative px-8 py-6 sm:px-12">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {getGreeting()}, {user?.username ?? "there"}
-                </h1>
-                <p className="notepad-ruled-line mt-2 max-w-md pb-1.5 text-sm text-foreground/50">
-                  Your workspace is ready. What would you like to create today?
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateOpen(true)}
-                className="flex flex-shrink-0 items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Get Started</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Quick Stats — Sticky Notes ─────────────────── */}
-        <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatSticky
-            color="purple"
-            icon={CalendarDays}
-            label="Today's Date"
-            value={formatTodaySticky()}
-            rotation={-2}
-            onClick={() => navigate("/calendar")}
-          />
-          <StatSticky
-            color="rose"
-            icon={Calendar}
-            label="Next Up"
-            value={nextUpcoming.display}
-            rotation={1.5}
-            onClick={
-              nextUpcoming.event
-                ? () => setDetailsEvent(nextUpcoming.event!)
-                : nextUpcoming.project
-                  ? () => navigate(`/projects/${nextUpcoming.project!.id}`)
-                  : undefined
-            }
-          />
-          <StatSticky
-            color="sky"
-            icon={Users}
-            label="Friends Online"
-            value={friendsOnline.toString()}
-            rotation={-1}
-            onClick={() => navigate("/profile")}
-          />
-          <StatSticky
-            color="green"
-            icon={Clock}
-            label="Last Active"
-            value={lastActiveDisplay}
-            valueTooltip={
-              lastSessionEndedAt
-                ? `Previous session ended: ${new Date(lastSessionEndedAt).toLocaleString()}`
-                : undefined
-            }
-            rotation={2}
-          />
-        </div>
-
-        {/* ── Calendar ──────────────────────────────────── */}
-        <NotebookSection
-          icon={Calendar}
-          title="Calendar"
-          count={0}
-          accentColor="sky"
-        >
-          <MiniCalendar projects={projectsOnCalendar} onEventsChanged={refreshCalendarEvents} />
-        </NotebookSection>
-
-        {/* ── Active Projects ────────────────────────────── */}
-        <NotebookSection
-          icon={FolderOpen}
-          title="Projects"
-          count={activeProjectsSorted.length}
-          accentColor="violet"
-        >
-          {activeProjectsSorted.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-                <FolderOpen className="h-5 w-5 text-foreground/30" />
-              </div>
-              <p className="mb-4 text-sm text-foreground/40">
-                No active projects yet
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate("/projects")}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Create your first project
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {activeProjectsSorted.slice(0, 3).map((project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    onRename={handleRenameProject}
-                    onTogglePin={handleToggleProjectPin}
-                    onDelete={handleDeleteProject}
-                    onLeave={handleLeaveProject}
-                    onProjectUpdated={refreshProjectsAndCalendar}
-                  />
-                ))}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => navigate("/projects")}
-                  className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-violet-400 hover:text-violet-600 hover:shadow-sm dark:hover:text-violet-400 motion-reduce:transition-none"
-                >
-                  View All Projects
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </>
-          )}
-        </NotebookSection>
-
-        {/* ── Notebooks ─────────────────────────────────── */}
-        <NotebookSection
-          icon={BookOpen}
-          title="Notebooks"
-          count={notebooksSorted.length}
-          accentColor="amber"
-        >
-          {notebooksSorted.length === 0 ? (
-            <BlankPageEmpty
-              message="No notebooks yet"
-              actionLabel="Create your first notebook"
-              onAction={() => navigate("/notebooks")}
-            />
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {notebooksSorted.slice(0, 6).map((notebook) => (
-                  <NotebookCard
-                    key={notebook.id}
-                    notebook={notebook}
-                    onOpen={openNotebook}
-                    onRename={handleRenameNotebook}
-                    onTogglePin={handleToggleNotebookPin}
-                    onDelete={handleDeleteNotebook}
-                    onAddToProject={handleAddNotebookToProject}
-                    activeProjects={activeProjectsSorted}
-                  />
-                ))}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => navigate("/notebooks")}
-                  className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-amber-400 hover:text-amber-900 hover:border-amber-400/50 dark:hover:bg-amber-500/20 dark:hover:text-amber-300 dark:hover:border-amber-500/30"
-                >
-                  View all Notebooks
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </>
-          )}
-        </NotebookSection>
-
-        {/* ── Boards (Note + Chalk) ─────────────────────── */}
-        <NotebookSection
-          icon={ClipboardList}
-          title="Boards"
-          count={allBoards.length}
-          accentColor="amber"
-        >
-          {allBoards.length === 0 ? (
-            <BlankPageEmpty
-              message="No boards yet"
-              actionLabel="Create your first board"
-              onAction={() => setIsCreateOpen(true)}
-            />
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {allBoards.slice(0, 6).map((board) => (
-                  <BoardCard
-                    key={board.id}
-                    board={board}
-                    onDelete={handleDelete}
-                    onRename={handleRename}
-                    onMoveToProject={handleMoveToProject}
-                    onTogglePin={handleTogglePin}
-                    activeProjects={activeProjectsSorted}
-                  />
-                ))}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => navigate("/boards")}
-                  className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-amber-400 hover:text-amber-900 hover:border-amber-400/50 dark:hover:bg-amber-500/20 dark:hover:text-amber-300 dark:hover:border-amber-500/30"
-                >
-                  View All Boards
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </>
-          )}
-        </NotebookSection>
-      </div>
+    <div className="dashboard-editorial h-full min-h-0 w-full min-w-0 overflow-hidden bg-[var(--land-cream)]">
+      <DashboardLayout
+        projects={activeProjectsSorted}
+        folders={projectFolders}
+        boards={treeBoards}
+        notebooks={treeNotebooks}
+        upcoming={upcoming}
+        activeBoard={activeCanvasBoard}
+        onOpenNotebook={handleOpenNotebook}
+        onOpenUpcoming={handleOpenUpcoming}
+        onOpenActiveBoard={() => {
+          if (activeCanvasBoard) navigate(`/boards/${activeCanvasBoard.id}`);
+        }}
+        onWorkspaceChanged={fetchDashboard}
+        onCreate={() => setIsCreateOpen(true)}
+      />
 
       <CreateBoardDialog
         isOpen={isCreateOpen}
@@ -973,57 +351,6 @@ export function DashboardPage() {
         onCreateBoard={handleCreateBoard}
         onCreateProject={handleCreateProject}
         onCreateNotebook={handleCreateNotebook}
-      />
-
-      <CreateNotebookDialog
-        isOpen={isCreateNotebookOpen}
-        error={createNotebookError}
-        onClose={() => { setIsCreateNotebookOpen(false); setCreateNotebookError(null); }}
-        onCreate={handleCreateNotebook}
-      />
-
-      <ConfirmDialog
-        isOpen={deleteTarget !== null}
-        title="Delete Board"
-        message={`Are you sure you want to delete "${deleteTarget?.name ?? "this board"}"? All notes and index cards inside will be permanently removed.`}
-        confirmLabel="Delete"
-        cancelLabel="Keep It"
-        variant="danger"
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
-      />
-
-      <ConfirmDialog
-        isOpen={projectDeleteTarget !== null}
-        title="Delete Project"
-        message={`Are you sure you want to delete "${projectDeleteTarget?.name ?? "this project"}"? All boards will be unlinked but not deleted.`}
-        confirmLabel="Delete"
-        cancelLabel="Keep It"
-        variant="danger"
-        onConfirm={confirmDeleteProject}
-        onCancel={() => setProjectDeleteTarget(null)}
-      />
-
-      <ConfirmDialog
-        isOpen={projectLeaveTarget !== null}
-        title="Leave Project"
-        message={`Are you sure you want to leave "${projectLeaveTarget?.name ?? "this project"}"? You can be re-invited to rejoin later.`}
-        confirmLabel="Leave Project"
-        cancelLabel="Stay"
-        variant="danger"
-        onConfirm={confirmLeaveProject}
-        onCancel={() => setProjectLeaveTarget(null)}
-      />
-
-      <ConfirmDialog
-        isOpen={notebookDeleteTarget !== null}
-        title="Delete Notebook"
-        message={`Are you sure you want to delete "${notebookDeleteTarget?.name ?? "this notebook"}"? All pages will be permanently removed.`}
-        confirmLabel="Delete"
-        cancelLabel="Keep It"
-        variant="danger"
-        onConfirm={confirmDeleteNotebook}
-        onCancel={() => setNotebookDeleteTarget(null)}
       />
 
       {detailsEvent && (
@@ -1047,273 +374,6 @@ export function DashboardPage() {
         initialDate={calendarEventDialogDate}
         editEvent={editingCalendarEvent}
       />
-
-      {/* Rename Board Dialog */}
-      {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setRenameTarget(null)} />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Board</h2>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRename();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRename}
-                disabled={!renameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rename Project Dialog */}
-      {projectRenameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setProjectRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Project</h2>
-            <input
-              type="text"
-              value={projectRenameValue}
-              onChange={(e) => setProjectRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRenameProject();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setProjectRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRenameProject}
-                disabled={!projectRenameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rename Notebook Dialog */}
-      {notebookRenameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setNotebookRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Notebook</h2>
-            <input
-              type="text"
-              value={notebookRenameValue}
-              onChange={(e) => setNotebookRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmRenameNotebook();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setNotebookRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmRenameNotebook}
-                disabled={!notebookRenameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-/* ─── Sub-components ───────────────────────────────────── */
-
-/* -- Stat Sticky Note ----------------------------------------- */
-
-const STICKY_BG: Record<string, string> = {
-  yellow: "bg-amber-100 dark:bg-amber-950",
-  rose: "bg-rose-100 dark:bg-rose-950",
-  sky: "bg-sky-100 dark:bg-sky-950",
-  green: "bg-emerald-100 dark:bg-emerald-950",
-  purple: "bg-purple-100 dark:bg-purple-950",
-};
-
-const STICKY_ACCENT: Record<string, string> = {
-  yellow: "text-amber-700 dark:text-amber-300",
-  rose: "text-rose-700 dark:text-rose-300",
-  sky: "text-sky-700 dark:text-sky-300",
-  green: "text-emerald-700 dark:text-emerald-300",
-  purple: "text-purple-700 dark:text-purple-300",
-};
-
-interface StatStickyProps {
-  color: "yellow" | "rose" | "sky" | "green" | "purple";
-  icon: typeof BookOpen;
-  label: string;
-  value: string;
-  rotation: number;
-  onClick?: () => void;
-  /** Shown on hover when the value is visually clipped */
-  valueTooltip?: string;
-}
-
-function StatSticky({ color, icon: Icon, label, value, rotation, onClick, valueTooltip }: StatStickyProps) {
-  const baseClassName = `stat-sticky flex min-h-[7.5rem] w-full min-w-0 flex-col items-center justify-center overflow-hidden px-3 py-5 sm:px-4 ${STICKY_BG[color]}`;
-  const style = { "--stat-rotate": `${rotation}deg` } as React.CSSProperties;
-  const tip = valueTooltip ?? value;
-  const content = (
-    <>
-      <Icon className={`mb-1.5 h-4 w-4 shrink-0 ${STICKY_ACCENT[color]}`} />
-      <span
-        className={`line-clamp-2 w-full min-w-0 max-w-full break-words px-0.5 text-center text-lg font-bold leading-tight sm:text-xl md:text-2xl ${STICKY_ACCENT[color]}`}
-      >
-        {value}
-      </span>
-      <span className="mt-1 max-w-full truncate px-0.5 text-center text-[11px] font-medium text-foreground/60 dark:text-foreground/75">
-        {label}
-      </span>
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        title={tip.length > 0 ? tip : undefined}
-        className={`${baseClassName} cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2`}
-        style={style}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className={baseClassName} style={style} title={tip.length > 0 ? tip : undefined}>
-      {content}
-    </div>
-  );
-}
-
-/* -- Notebook Section ----------------------------------------- */
-
-const SECTION_ACCENT: Record<string, string> = {
-  amber: "border-l-amber-400 dark:border-l-amber-500",
-  violet: "border-l-violet-400 dark:border-l-violet-500",
-  emerald: "border-l-emerald-400 dark:border-l-emerald-500",
-  sky: "border-l-sky-400 dark:border-l-sky-500",
-};
-
-interface NotebookSectionProps {
-  icon: typeof ClipboardList;
-  title: string;
-  count: number;
-  accentColor: string;
-  badge?: string;
-  children: React.ReactNode;
-}
-
-function NotebookSection({
-  icon: Icon,
-  title,
-  count,
-  accentColor,
-  badge,
-  children,
-}: NotebookSectionProps) {
-  return (
-    <section className="mb-10">
-      <div
-        className={`mb-4 flex items-center gap-2.5 border-l-[3px] pl-3 ${
-          SECTION_ACCENT[accentColor] ?? ""
-        }`}
-      >
-        <Icon className="h-5 w-5 text-foreground/50" />
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <span className="rounded-full bg-foreground/5 px-2 py-0.5 text-xs font-medium text-foreground/40">
-          {count}
-        </span>
-        {badge && (
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-            {badge}
-          </span>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/* -- Blank Page Empty State ----------------------------------- */
-
-interface BlankPageEmptyProps {
-  message: string;
-  actionLabel: string;
-  onAction: () => void;
-}
-
-function BlankPageEmpty({ message, actionLabel, onAction }: BlankPageEmptyProps) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-        <PencilLine className="h-5 w-5 text-foreground/30" />
-      </div>
-      <p className="mb-4 text-sm text-foreground/40">{message}</p>
-      <button
-        type="button"
-        onClick={onAction}
-        className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        {actionLabel}
-      </button>
-    </div>
-  );
-}
-

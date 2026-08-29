@@ -5,19 +5,19 @@ namespace ASideNote.API.Services;
 public sealed class BoardPresenceService : IBoardPresenceService
 {
     private readonly object _lock = new();
-    private readonly Dictionary<string, (Guid UserId, string DisplayName, string Role, HashSet<Guid> BoardIds)> _byConnection = new();
+    private readonly Dictionary<string, (Guid UserId, string DisplayName, string Role, string? ProfilePictureKey, HashSet<Guid> BoardIds)> _byConnection = new();
 
-    public void AddPresence(Guid boardId, string connectionId, Guid userId, string displayName, string role)
+    public void AddPresence(Guid boardId, string connectionId, Guid userId, string displayName, string role, string? profilePictureKey)
     {
         lock (_lock)
         {
             if (!_byConnection.TryGetValue(connectionId, out var entry))
             {
-                entry = (userId, displayName, role, new HashSet<Guid>());
+                entry = (userId, displayName, role, profilePictureKey, new HashSet<Guid>());
                 _byConnection[connectionId] = entry;
             }
             entry.BoardIds.Add(boardId);
-            _byConnection[connectionId] = (entry.UserId, entry.DisplayName, role, entry.BoardIds);
+            _byConnection[connectionId] = (entry.UserId, entry.DisplayName, role, profilePictureKey, entry.BoardIds);
         }
     }
 
@@ -31,16 +31,16 @@ public sealed class BoardPresenceService : IBoardPresenceService
         }
     }
 
-    public IReadOnlyList<(Guid UserId, string DisplayName, string Role)> GetPresence(Guid boardId)
+    public IReadOnlyList<(Guid UserId, string DisplayName, string Role, string? ProfilePictureKey)> GetPresence(Guid boardId)
     {
         lock (_lock)
         {
             var seen = new HashSet<Guid>();
-            var list = new List<(Guid, string, string)>();
-            foreach (var (userId, displayName, role, boardIds) in _byConnection.Values)
+            var list = new List<(Guid, string, string, string?)>();
+            foreach (var (userId, displayName, role, profilePictureKey, boardIds) in _byConnection.Values)
             {
                 if (boardIds.Contains(boardId) && seen.Add(userId))
-                    list.Add((userId, displayName, role));
+                    list.Add((userId, displayName, role, profilePictureKey));
             }
             return list;
         }

@@ -10,6 +10,11 @@ import {
 } from "react";
 import { postLogin, postLogout, postRegister, postGoogleLogin, postResendVerification, postVerifyEmail } from "../api/auth";
 import { getProfile } from "../api/users";
+import {
+  AUTH_TOKEN_REFRESHED_EVENT,
+  AUTH_SESSION_EXPIRED_EVENT,
+  type AuthTokenRefreshedDetail,
+} from "../api/client";
 import type { AuthUser } from "../types";
 
 interface AuthContextValue {
@@ -60,6 +65,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setIsLoading(false);
+  }, []);
+
+  // Resync with tokens the axios interceptor rotates/clears silently (e.g. on 401 refresh),
+  // so consumers reading accessToken from context (SignalR hooks) don't hold a stale/expired value.
+  useEffect(() => {
+    const handleTokenRefreshed = (event: Event) => {
+      const detail = (event as CustomEvent<AuthTokenRefreshedDetail>).detail;
+      if (detail?.token) setAccessToken(detail.token);
+    };
+    const handleSessionExpired = () => {
+      setAccessToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, handleTokenRefreshed);
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(AUTH_TOKEN_REFRESHED_EVENT, handleTokenRefreshed);
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
   }, []);
 
   // Refetch profile when authenticated so role is set (e.g. on page reload)

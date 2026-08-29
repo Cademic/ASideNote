@@ -24,9 +24,8 @@ public sealed class TokenService : ITokenService
     public string GenerateAccessToken(User user)
     {
         var jwtSection = _configuration.GetSection("Jwt");
-        var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
-            ?? jwtSection["Secret"]
-            ?? "CHANGE_ME_IN_DEVELOPMENT_AND_PRODUCTION";
+        var secret = jwtSection["Secret"]
+            ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

@@ -3,10 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar } from "lucide-react";
 import {
   getCalendarEvents,
-  createCalendarEvent,
-  updateCalendarEvent,
   deleteCalendarEvent,
 } from "../api/calendar-events";
+import {
+  saveCalendarEventFromForm,
+  type CalendarEventFormData,
+} from "../utils/calendar-event-save";
 import { getProjects } from "../api/projects";
 import { CalendarHeader, type CalendarLayout } from "../components/calendar/CalendarHeader";
 import { CalendarGrid } from "../components/calendar/CalendarGrid";
@@ -131,69 +133,9 @@ export function CalendarsPage() {
     setDialogOpen(true);
   }
 
-  async function handleSave(data: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-    isAllDay: boolean;
-    color: string;
-    eventType: string;
-    startHour: string;
-    endHour: string;
-    recurrenceFrequency: string;
-    recurrenceInterval: number;
-    recurrenceEndDate: string;
-  }) {
+  async function handleSave(data: CalendarEventFormData) {
     try {
-      const toDateUtc = (dateStr: string, hour: string, allDay: boolean) =>
-        allDay ? `${dateStr}T12:00:00.000Z` : `${dateStr}T${hour}:00:00.000Z`;
-
-      const startIso = toDateUtc(data.startDate, data.startHour, data.isAllDay);
-      const endIso = data.endDate
-        ? toDateUtc(data.endDate, data.endHour, data.isAllDay)
-        : undefined;
-
-      const recurrence = data.recurrenceFrequency
-        ? {
-            recurrenceFrequency: data.recurrenceFrequency,
-            recurrenceInterval: data.recurrenceInterval,
-            recurrenceEndDate: data.recurrenceEndDate
-              ? `${data.recurrenceEndDate}T12:00:00.000Z`
-              : undefined,
-          }
-        : {
-            recurrenceFrequency: undefined,
-            recurrenceInterval: 1,
-            recurrenceEndDate: undefined,
-          };
-
-      // For recurring event instances, edit/delete the source event
-      const eventId = editingEvent?.recurrenceSourceId ?? editingEvent?.id;
-
-      if (editingEvent && eventId) {
-        await updateCalendarEvent(eventId, {
-          title: data.title,
-          description: data.description || undefined,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      } else {
-        await createCalendarEvent({
-          title: data.title,
-          description: data.description || undefined,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      }
+      await saveCalendarEventFromForm(data, { editEvent: editingEvent });
       setDialogOpen(false);
       setEditingEvent(null);
       fetchData();
@@ -235,7 +177,7 @@ export function CalendarsPage() {
 
   if (isLoading) {
     return (
-      <div className="h-full overflow-y-auto bg-background bg-dots">
+      <div className="h-full overflow-y-auto bg-background">
         <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="mb-6 flex items-center justify-between">
             <div className="skeleton h-8 w-32" />
@@ -257,12 +199,12 @@ export function CalendarsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
+    <div className="h-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-6">
         {/* Page header */}
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-950/40">
-            <Calendar className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-900">
+            <Calendar className="h-5 w-5 text-sky-600 dark:text-sky-200" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground">Calendar</h1>

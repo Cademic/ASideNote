@@ -30,17 +30,6 @@ public sealed class CreateCalendarEventRequestValidator : AbstractValidator<Crea
             .WithMessage("End date must be on or after start date.")
             .When(x => x.EndDate.HasValue);
 
-        // Hourly constraints: when not all-day, start and end must be on whole-hour boundaries
-        RuleFor(x => x.StartDate)
-            .Must(d => d.Minute == 0 && d.Second == 0 && d.Millisecond == 0)
-            .WithMessage("Start time must be on a whole-hour boundary.")
-            .When(x => !x.IsAllDay);
-
-        RuleFor(x => x.EndDate)
-            .Must(d => d!.Value.Minute == 0 && d.Value.Second == 0 && d.Value.Millisecond == 0)
-            .WithMessage("End time must be on a whole-hour boundary.")
-            .When(x => !x.IsAllDay && x.EndDate.HasValue);
-
         // Recurrence validation
         RuleFor(x => x.RecurrenceFrequency)
             .Must(f => ValidFrequencies.Contains(f))

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useParams, useOutletContext, useSearchParams } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
   BoardMenuBar,
@@ -51,17 +51,26 @@ import {
   parseBoardExportFile,
 } from "../lib/boardExport";
 import { importBoardReplacingExisting } from "../lib/boardImport";
-import { corkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
-import { corkPanDeltaForContentMinShift, corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
+import { corkZoomAroundScreenPoint, corkScrollInnerLayout, corkScrollToPan } from "../lib/boardViewportScroll";
+import { corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
 import { useFileImport } from "../hooks/useFileImport";
-import { ContextMenu } from "../components/ui/ContextMenu";
+import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
-let nextTempCardId = 1;
+interface NoteBoardPageProps {
+  /** When provided, overrides the route param — used when the board is embedded (e.g. dashboard Active Canvas). */
+  boardId?: string;
+  /** "route" (default) = full-screen board page; "embedded" = mounted inside another page's layout. */
+  variant?: "route" | "embedded";
+  /** Skip the SignalR board hub + presence broadcast (used for the read-only dashboard embed). */
+  disableRealtime?: boolean;
+}
 
-export function NoteBoardPage() {
-  const { boardId } = useParams<{ boardId: string }>();
+export function NoteBoardPage({ boardId: boardIdProp, variant = "route", disableRealtime = false }: NoteBoardPageProps = {}) {
+  const { boardId: routeBoardId } = useParams<{ boardId: string }>();
+  const boardId = boardIdProp ?? routeBoardId;
+  const isEmbedded = variant === "embedded";
   const { setBoardName, openBoard, setBoardPresence, connectedUsers } =
     useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
@@ -183,53 +192,35 @@ export function NoteBoardPage() {
   /** CorkBoard scroll viewport — center for menu/zoom matches visible canvas (not outer wrapper). */
   const corkBoardScrollRef = useRef<HTMLDivElement>(null);
 
-  // Fixed-size canvas that expands when content is placed or dragged outside current bounds.
-  const CANVAS_PADDING = 300;
-  const DEFAULT_CANVAS_SIZE = 2000;
+  // Fixed-size board: a firm boundary instead of a canvas that grows to fit wherever content
+  // has been dragged. A single stray/corrupted position used to be able to blow the shared
+  // canvas out to hundreds of thousands of pixels, degrading drag precision for every item on
+  // the board (see the dsadasd incident) — the API also rejects positions outside this range
+  // (see BoardBoundsConstants on the backend; keep both in sync if this changes).
+  const BOARD_MIN_X = -10000;
+  const BOARD_MIN_Y = -10000;
+  const BOARD_MAX_X = 10000;
+  const BOARD_MAX_Y = 10000;
   const INDEX_CARD_DEFAULT_W = 450;
   const INDEX_CARD_DEFAULT_H = 300;
   const IMAGE_CARD_DEFAULT_W = 200;
   const IMAGE_CARD_DEFAULT_H = 150;
   const POSITION_DEFAULT = 20;
 
-  const canvasBounds = useMemo(() => {
-    let minX = 0;
-    let minY = 0;
-    let maxX = DEFAULT_CANVAS_SIZE;
-    let maxY = DEFAULT_CANVAS_SIZE;
-    const update = (x: number, y: number, w: number, h: number) => {
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
+  const canvasBounds = {
+    contentMinX: BOARD_MIN_X,
+    contentMinY: BOARD_MIN_Y,
+    canvasWidth: BOARD_MAX_X - BOARD_MIN_X,
+    canvasHeight: BOARD_MAX_Y - BOARD_MIN_Y,
+  };
+
+  /** Clamp a newly-placed item's position so its full extent stays within the fixed board. */
+  function clampToBoardBounds(x: number, y: number, width: number, height: number) {
+    return {
+      x: Math.min(Math.max(x, BOARD_MIN_X), BOARD_MAX_X - width),
+      y: Math.min(Math.max(y, BOARD_MIN_Y), BOARD_MAX_Y - height),
     };
-    for (const n of notes) {
-      const x = n.positionX ?? POSITION_DEFAULT;
-      const y = n.positionY ?? POSITION_DEFAULT;
-      const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
-      const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
-      update(x, y, w, h);
-    }
-    for (const c of indexCards) {
-      const x = c.positionX ?? POSITION_DEFAULT;
-      const y = c.positionY ?? POSITION_DEFAULT;
-      const w = c.width ?? INDEX_CARD_DEFAULT_W;
-      const h = c.height ?? INDEX_CARD_DEFAULT_H;
-      update(x, y, w, h);
-    }
-    for (const img of imageCards) {
-      const x = img.positionX ?? POSITION_DEFAULT;
-      const y = img.positionY ?? POSITION_DEFAULT;
-      const w = img.width ?? IMAGE_CARD_DEFAULT_W;
-      const h = img.height ?? IMAGE_CARD_DEFAULT_H;
-      update(x, y, w, h);
-    }
-    const contentMinX = minX - CANVAS_PADDING;
-    const contentMinY = minY - CANVAS_PADDING;
-    const canvasWidth = maxX - contentMinX + CANVAS_PADDING;
-    const canvasHeight = maxY - contentMinY + CANVAS_PADDING;
-    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
-  }, [notes, indexCards, imageCards]);
+  }
 
   const linkingFromRef = useRef<string | null>(null);
   const connectionsRef = useRef(connections);
@@ -253,30 +244,11 @@ export function NoteBoardPage() {
   panXRef.current = panX;
   panYRef.current = panY;
 
-  // When canvas bounds (contentMin) change (e.g. after moving a note), adjust pan so the view doesn't jump.
-  // Skip until the board has finished loading so placeholder bounds → real notes don't erase restored pan/zoom.
-  const prevContentMinRef = useRef<{ contentMinX: number; contentMinY: number } | null>(null);
-  useEffect(() => {
-    if (isLoading) return;
-    const prev = prevContentMinRef.current;
-    if (prev === null) {
-      prevContentMinRef.current = {
-        contentMinX: canvasBounds.contentMinX,
-        contentMinY: canvasBounds.contentMinY,
-      };
-      return;
-    }
-    const dx = canvasBounds.contentMinX - prev.contentMinX;
-    const dy = canvasBounds.contentMinY - prev.contentMinY;
-    prevContentMinRef.current = {
-      contentMinX: canvasBounds.contentMinX,
-      contentMinY: canvasBounds.contentMinY,
-    };
-    if (dx === 0 && dy === 0) return;
-    const { dPanX, dPanY } = corkPanDeltaForContentMinShift(dx, dy, zoom);
-    setPanX((p) => p + dPanX);
-    setPanY((p) => p + dPanY);
-  }, [canvasBounds.contentMinX, canvasBounds.contentMinY, zoom, isLoading]);
+  // --- Deep-link focus: /boards/:id?focus=<noteOrCardId> (from global search) ---
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusItemId = searchParams.get("focus");
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
+  const focusHandledRef = useRef<string | null>(null);
 
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -287,27 +259,78 @@ export function NoteBoardPage() {
     | null
   >(null);
 
-  // --- Board presence: who is focusing which item, remote cursors ---
+  // --- Board presence: who is focusing which item, remote text cursors ---
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
-  const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
   const [remoteTextCursors, setRemoteTextCursors] = useState<Map<string, { itemType: string; itemId: string; field: "title" | "content"; position: number; color: string }>>(new Map());
-  const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
-  const CURSOR_THROTTLE_MS = 60;
 
-  // Restore viewport from localStorage on mount; reset bounds ref so pan compensation seeds for this board
+  // Whether this board has never been opened before (nothing saved for it yet) — decided once,
+  // during the very first render, before any effect gets a chance to run. Must NOT be computed
+  // inside an effect: the viewport-persistence effect below flushes a default
+  // {zoom:1,panX:0,panY:0} to localStorage from its cleanup function unconditionally, and in
+  // dev StrictMode's mount→unmount→mount double-invoke that cleanup runs between two effect
+  // passes here, so an effect-based check would see its own default value written back and
+  // wrongly conclude a viewport was already saved.
+  const needsInitialCenterRef = useRef<boolean | null>(null);
+  if (needsInitialCenterRef.current === null) {
+    const initial = boardId ? readBoardViewport(boardId) : {};
+    needsInitialCenterRef.current = initial.panX === undefined && initial.panY === undefined;
+  }
+
+  // Restore viewport from localStorage on mount.
   useEffect(() => {
     if (!boardId) return;
-    prevContentMinRef.current = null;
     const { zoom: z, panX: px, panY: py } = readBoardViewport(boardId);
     if (z !== undefined) setZoom(z);
     if (px !== undefined) setPanX(px);
     if (py !== undefined) setPanY(py);
   }, [boardId]);
 
+  // If this board has never been opened before, center the view on the board instead of
+  // leaving the default panX/panY = 0, which lands on the board's top-left corner
+  // (contentMinX/Y are negative — see canvasBounds — so pan 0,0 is not the board's center).
+  // Deferred until loading finishes: while isLoading is true the board renders a placeholder
+  // instead of the real viewport, so corkBoardScrollRef isn't attached yet.
+  //
+  // Computes the target pan from the scroll midpoint (scrollWidth/2, scrollHeight/2 — the
+  // fixed board spans exactly [0, scrollWidth] x [0, scrollHeight] in scroll coordinates, so
+  // that midpoint *is* the board's center by construction) and pushes it through
+  // handleViewportChange to update panX/panY state.
+  //
+  // The requestAnimationFrame deferral is load-bearing, not cosmetic: on mount, CorkBoard's own
+  // state→scroll layout effect independently "corrects" the default panX/panY = 0 into whatever
+  // pan value matches wherever the browser actually clamped scrollLeft/Top (since 0,0 maps to an
+  // out-of-range negative scroll position at this board's bounds). Calling handleViewportChange
+  // in the same tick races that correction — whichever write lands last in the same commit wins,
+  // and it was inconsistently CorkBoard's stale correction. Waiting a frame lets that initial
+  // self-correction fully settle first, so this is the only update in flight when it runs.
+  useEffect(() => {
+    if (isLoading || !needsInitialCenterRef.current) return;
+    const el = corkBoardScrollRef.current;
+    if (!el) return;
+    needsInitialCenterRef.current = false;
+    const { contentMinX, contentMinY } = canvasBounds;
+    const { scrollWidth, scrollHeight } = corkScrollInnerLayout(
+      canvasBounds.canvasWidth,
+      canvasBounds.canvasHeight,
+      zoom,
+      contentMinX,
+      contentMinY,
+    );
+    const targetScrollLeft = (scrollWidth - el.clientWidth) / 2;
+    const targetScrollTop = (scrollHeight - el.clientHeight) / 2;
+    const { panX: newPanX, panY: newPanY } = corkScrollToPan(targetScrollLeft, targetScrollTop, zoom, contentMinX, contentMinY);
+    requestAnimationFrame(() => {
+      handleViewportChange(zoom, newPanX, newPanY);
+    });
+  }, [isLoading]);
+
   // Persist viewport to localStorage (debounced); flush on cleanup and pagehide so last view is not lost
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (boardId === undefined || boardId === "") return;
+    // Embedded (dashboard) mounts seed from the saved viewport but never write it back, so the
+    // smaller panel view can't clobber the value the full-screen /boards/:id route relies on.
+    if (isEmbedded) return;
     const id = boardId;
     function flush() {
       persistBoardViewport(id, zoomRef.current, panXRef.current, panYRef.current);
@@ -320,7 +343,41 @@ export function NoteBoardPage() {
       if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
       flush();
     };
-  }, [boardId, zoom, panX, panY]);
+  }, [boardId, zoom, panX, panY, isEmbedded]);
+
+  // Once the board's items are loaded, pan to the deep-linked item and pulse a
+  // ring around it. Runs once per distinct ?focus= id, then strips the param so a
+  // refresh or Back doesn't re-trigger it.
+  useEffect(() => {
+    if (isLoading || isEmbedded || !focusItemId) return;
+    if (focusHandledRef.current === focusItemId) return;
+
+    const note = notes.find((n) => n.id === focusItemId);
+    const card = indexCards.find((c) => c.id === focusItemId);
+    if (!note && !card) return; // data not in yet, or item isn't on this board
+
+    focusHandledRef.current = focusItemId;
+    const center = note ? getStickyNoteCenter(note) : getIndexCardCenter(card!);
+
+    const jump = setTimeout(() => {
+      panViewportToBoardPoint(center.x, center.y);
+      bringToFront(focusItemId);
+      setHighlightItemId(focusItemId);
+    }, 80);
+    const clear = setTimeout(() => setHighlightItemId(null), 3000);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    return () => {
+      clearTimeout(jump);
+      clearTimeout(clear);
+    };
+    // panViewportToBoardPoint is re-created each render; the focusHandledRef guard
+    // makes this a run-once-per-id effect keyed on the data becoming available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isEmbedded, focusItemId, notes, indexCards]);
 
   // Sync backgroundTheme and autoEnlargeNotes from localStorage when boardId changes
   useEffect(() => {
@@ -448,17 +505,45 @@ export function NoteBoardPage() {
             return next.size === prev.size ? prev : next;
           });
         }
-        setNotes(notesRes.value.items);
+        // Preserve the live position of a note currently being dragged: a refetch (e.g.
+        // triggered by another collaborator's SignalR event) would otherwise overwrite it
+        // with the last-persisted server position, snapping the note backward mid-drag.
+        const draggingId = noteDragGuardRef.current?.id ?? null;
+        const localDraggingNote = draggingId ? notesRef.current.find((n) => n.id === draggingId) : undefined;
+        setNotes(
+          localDraggingNote
+            ? notesRes.value.items.map((n) =>
+                n.id === draggingId ? { ...n, positionX: localDraggingNote.positionX, positionY: localDraggingNote.positionY } : n,
+              )
+            : notesRes.value.items,
+        );
       }
       if (cardsRes.status === "fulfilled") {
-        setIndexCards(cardsRes.value.items);
+        const draggingCardId = cardDragGuardRef.current?.id ?? null;
+        const localDraggingCard = draggingCardId ? indexCardsRef.current.find((c) => c.id === draggingCardId) : undefined;
+        setIndexCards(
+          localDraggingCard
+            ? cardsRes.value.items.map((c) =>
+                c.id === draggingCardId ? { ...c, positionX: localDraggingCard.positionX, positionY: localDraggingCard.positionY } : c,
+              )
+            : cardsRes.value.items,
+        );
       }
       if (connsRes.status === "fulfilled") {
         setConnections(connsRes.value);
       }
       if (imagesRes.status === "fulfilled") {
         const deleted = deletedImageIdsRef.current;
-        setImageCards(imagesRes.value.filter((img) => !deleted.has(img.id)));
+        const draggingImageId = draggingImageIdRef.current;
+        const localDraggingImage = draggingImageId ? imageCardsRef.current.find((img) => img.id === draggingImageId) : undefined;
+        const filtered = imagesRes.value.filter((img) => !deleted.has(img.id));
+        setImageCards(
+          localDraggingImage
+            ? filtered.map((img) =>
+                img.id === draggingImageId ? { ...img, positionX: localDraggingImage.positionX, positionY: localDraggingImage.positionY } : img,
+              )
+            : filtered,
+        );
       }
 
       // Only show error if all failed
@@ -484,9 +569,17 @@ export function NoteBoardPage() {
     if (isAuthenticated) fetchData();
   }, [fetchData, isAuthenticated]);
 
-  const draggingNoteIdRef = useRef<string | null>(null);
-  const draggingCardIdRef = useRef<string | null>(null);
+  // While actively dragging, `expected` is null and every echo is skipped unconditionally.
+  // After drop, `expected` holds the position we just set locally; echoes are skipped until
+  // one arrives matching it (confirming the drop landed), or a safety-net timeout releases the
+  // guard. This avoids a fixed short timeout letting *stale* mid-drag echoes (still working
+  // their way back from a long/fast drag's throttled PATCH calls) overwrite the note after drop.
+  type DragGuard = { id: string; expected: { x: number; y: number } | null };
+  const noteDragGuardRef = useRef<DragGuard | null>(null);
+  const cardDragGuardRef = useRef<DragGuard | null>(null);
   const draggingImageIdRef = useRef<string | null>(null);
+  const DRAG_ECHO_SAFETY_NET_MS = 5000;
+  const POSITION_ECHO_EPSILON = 0.5;
   const RESIZE_ECHO_IGNORE_MS = 400;
   const lastResizedImageRef = useRef<{ id: string; at: number } | null>(null);
   const lastResizedNoteRef = useRef<{ id: string; at: number } | null>(null);
@@ -494,7 +587,22 @@ export function NoteBoardPage() {
 
   const mergeNotePayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingNoteIdRef.current;
+    let skipPosition = false;
+    const guard = noteDragGuardRef.current;
+    if (guard?.id === id) {
+      if (!guard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - guard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - guard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        noteDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedNoteRef.current?.id === id &&
       Date.now() - lastResizedNoteRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -516,7 +624,22 @@ export function NoteBoardPage() {
   }, []);
   const mergeCardPayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingCardIdRef.current;
+    let skipPosition = false;
+    const cardGuard = cardDragGuardRef.current;
+    if (cardGuard?.id === id) {
+      if (!cardGuard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - cardGuard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - cardGuard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        cardDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedCardRef.current?.id === id &&
       Date.now() - lastResizedCardRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -559,22 +682,6 @@ export function NoteBoardPage() {
     },
     [currentUserId],
   );
-  const handleCursorPosition = useCallback((userId: string, x: number, y: number) => {
-    if (x < 0 || y < 0) {
-      setRemoteCursors((prev) => {
-        const next = new Map(prev);
-        next.delete(userId);
-        return next;
-      });
-      return;
-    }
-    setRemoteCursors((prev) => {
-      const next = new Map(prev);
-      next.set(userId, { x, y, color: getColorForUserId(userId) });
-      return next;
-    });
-  }, []);
-
   const handleTextCursorPosition = useCallback((userId: string, itemType: string, itemId: string, field: "title" | "content", position: number) => {
     if (currentUserId != null && userId === currentUserId) return;
     setRemoteTextCursors((prev) => {
@@ -594,24 +701,12 @@ export function NoteBoardPage() {
       next.delete(userId);
       return next;
     });
-    setRemoteCursors((prev) => {
-      const next = new Map(prev);
-      next.delete(userId);
-      return next;
-    });
   }, []);
 
   const handlePresenceUpdate = useCallback((users: BoardPresenceUser[]) => {
     setBoardPresence(users);
     const presentIds = new Set(users.map((u) => u.userId));
     setRemoteTextCursors((prev) => {
-      const toRemove = [...prev.keys()].filter((uid) => !presentIds.has(uid));
-      if (toRemove.length === 0) return prev;
-      const next = new Map(prev);
-      for (const uid of toRemove) next.delete(uid);
-      return next;
-    });
-    setRemoteCursors((prev) => {
       const toRemove = [...prev.keys()].filter((uid) => !presentIds.has(uid));
       if (toRemove.length === 0) return prev;
       const next = new Map(prev);
@@ -705,13 +800,12 @@ export function NoteBoardPage() {
     setConnections((prev) => prev.filter((c) => c.fromItemId !== cardId && c.toItemId !== cardId));
   }, []);
 
-  const { sendFocus, sendCursor, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
-    enabled: !!board?.projectId,
+  const { sendFocus, sendTextCursor, isHubConnected } = useBoardRealtime(disableRealtime ? undefined : (boardId ?? undefined), fetchData, {
+    enabled: !!board?.projectId && !disableRealtime,
     onNoteUpdated: mergeNotePayload,
     onIndexCardUpdated: mergeCardPayload,
     onPresenceUpdate: handlePresenceUpdate,
     onUserFocusingItem: handleUserFocusingItem,
-    onCursorPosition: handleCursorPosition,
     onTextCursorPosition: handleTextCursorPosition,
     onUserLeft: handleUserLeft,
     onNoteDeleted: handleNoteDeleted,
@@ -728,19 +822,6 @@ export function NoteBoardPage() {
     else if (primaryCard) sendFocus("card", primaryCard);
     else sendFocus("note", null);
   }, [editingNoteIds, editingCardIds, sendFocus]);
-
-  const handleBoardMouseMove = useCallback(
-    (x: number, y: number) => {
-      const now = Date.now();
-      if (now - cursorThrottleRef.current.last < CURSOR_THROTTLE_MS) return;
-      cursorThrottleRef.current.last = now;
-      sendCursor(x, y);
-    },
-    [sendCursor],
-  );
-  const handleBoardMouseLeave = useCallback(() => {
-    sendCursor(-1, -1);
-  }, [sendCursor]);
 
   const DRAG_THROTTLE_MS = 120;
   type DragPending = { x: number; y: number; timer: ReturnType<typeof setTimeout> };
@@ -790,11 +871,12 @@ export function NoteBoardPage() {
     }
   }, []);
 
-  // Push the board name up to the navbar
+  // Push the board name up to the navbar — skipped when embedded so the breadcrumb stays "Dashboard"
   useEffect(() => {
+    if (isEmbedded) return;
     setBoardName(board?.name ?? null);
     return () => setBoardName(null);
-  }, [board?.name, setBoardName]);
+  }, [board?.name, setBoardName, isEmbedded]);
 
   // Register this board in the "Opened Boards" sidebar section
   useEffect(() => {
@@ -1282,6 +1364,14 @@ export function NoteBoardPage() {
     return corkScreenToWorld(centerScreenX, centerScreenY, zoom, panX, panY, contentMinX, contentMinY);
   }
 
+  /** Convert a right-click's viewport-relative client coordinates into board (world) coordinates. */
+  function boardPointToWorld(clientX: number, clientY: number) {
+    const rect = boardViewportRef.current?.getBoundingClientRect();
+    if (!rect) return getViewportCenterInBoardCoords();
+    const { contentMinX, contentMinY } = canvasBounds;
+    return corkScreenToWorld(clientX - rect.left, clientY - rect.top, zoom, panX, panY, contentMinX, contentMinY);
+  }
+
   function panViewportToBoardPoint(centerX: number, centerY: number) {
     const rect = boardViewportRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -1305,6 +1395,14 @@ export function NoteBoardPage() {
     const y = n.positionY ?? POSITION_DEFAULT;
     const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
     const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function getIndexCardCenter(c: IndexCardSummaryDto) {
+    const x = c.positionX ?? POSITION_DEFAULT;
+    const y = c.positionY ?? POSITION_DEFAULT;
+    const w = c.width ?? INDEX_CARD_DEFAULT_W;
+    const h = c.height ?? INDEX_CARD_DEFAULT_H;
     return { x: x + w / 2, y: y + h / 2 };
   }
 
@@ -1367,12 +1465,16 @@ export function NoteBoardPage() {
     navigateRelativeNote(1);
   }
 
-  async function handleQuickAddNote() {
+  async function handleQuickAddNote(at?: { x: number; y: number }) {
     if (!boardId) return;
     try {
-      const center = getViewportCenterInBoardCoords();
-      const positionX = center.x - STICKY_NOTE_DEFAULT_SIZE / 2;
-      const positionY = center.y - STICKY_NOTE_DEFAULT_SIZE / 2;
+      const center = at ?? getViewportCenterInBoardCoords();
+      const { x: positionX, y: positionY } = clampToBoardBounds(
+        center.x - STICKY_NOTE_DEFAULT_SIZE / 2,
+        center.y - STICKY_NOTE_DEFAULT_SIZE / 2,
+        STICKY_NOTE_DEFAULT_SIZE,
+        STICKY_NOTE_DEFAULT_SIZE,
+      );
 
       const created = await createNote({
         content: "",
@@ -1403,9 +1505,8 @@ export function NoteBoardPage() {
     return tutorial.registerAction("add-note", handleQuickAddNote);
   });
 
-  const DRAG_ECHO_IGNORE_MS = 280;
   function handleNoteDragStart(id: string) {
-    draggingNoteIdRef.current = id;
+    noteDragGuardRef.current = { id, expected: null };
   }
   async function handleDragStop(id: string, x: number, y: number) {
     const pending = noteDragMapRef.current.get(id);
@@ -1430,10 +1531,13 @@ export function NoteBoardPage() {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, positionX: x, positionY: y } : n)),
     );
-    // Keep treating this id as "just dragged" so we ignore echo broadcasts (our own PATCH or late throttle)
+    // Keep ignoring echoes for this note until the one matching our final drop position
+    // arrives (stale mid-drag echoes queued up during the drag may still be in flight).
+    // Safety net: release the guard regardless after a while in case that echo is ever lost.
+    noteDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingNoteIdRef.current === id) draggingNoteIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (noteDragGuardRef.current?.id === id) noteDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
 
     try {
       // Defer to next macrotask so handleDelete (from click-after-mouseup) can run first
@@ -1458,6 +1562,10 @@ export function NoteBoardPage() {
       return next;
     });
 
+    // Deleting a note while it's mid-edit unmounts it, which flushes this same save path —
+    // skip it, the note is already gone server-side (patching it 500s).
+    if (deletedNoteIdsRef.current.has(id)) return;
+
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, title: title || null, content } : n,
@@ -1476,6 +1584,9 @@ export function NoteBoardPage() {
   }
 
   async function handleNoteContentChange(id: string, title: string, content: string) {
+    // See handleSave — deleting a note mid-edit flushes the autosave-on-unmount path too.
+    if (deletedNoteIdsRef.current.has(id)) return;
+
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, title: title || null, content } : n,
@@ -1620,9 +1731,9 @@ export function NoteBoardPage() {
   // Index Card handlers
   // =============================================
 
-  async function handleQuickAddCard() {
+  async function handleQuickAddCard(at?: { x: number; y: number }) {
     if (!boardId) return;
-    const center = getViewportCenterInBoardCoords();
+    const center = at ?? getViewportCenterInBoardCoords();
     let positionX = center.x - INDEX_CARD_DEFAULT_W / 2;
     let positionY = center.y - INDEX_CARD_DEFAULT_H / 2;
     // During the "add a card" tour step, nudge away from the tutorial's sticky note
@@ -1636,31 +1747,7 @@ export function NoteBoardPage() {
         positionY = (tutorialNote.positionY ?? 0) + (tutorialNote.height ?? STICKY_NOTE_DEFAULT_SIZE) + 40;
       }
     }
-    const tempId = `temp-card-${nextTempCardId++}`;
-    const now = new Date().toISOString();
-
-    const optimisticCard: IndexCardSummaryDto = {
-      id: tempId,
-      title: null,
-      content: "",
-      folderId: null,
-      projectId: null,
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-      positionX,
-      positionY,
-      width: null,
-      height: null,
-      color: null,
-      rotation: null,
-    };
-
-    setIndexCards((prev) => [...prev, optimisticCard]);
-    setEditingCardIds((prev) => new Set(prev).add(tempId));
-    primaryEditingCardIdRef.current = tempId;
-    setEditingNoteIds(new Set());
-    primaryEditingNoteIdRef.current = null;
+    ({ x: positionX, y: positionY } = clampToBoardBounds(positionX, positionY, INDEX_CARD_DEFAULT_W, INDEX_CARD_DEFAULT_H));
 
     try {
       const created = await createIndexCard({
@@ -1672,25 +1759,16 @@ export function NoteBoardPage() {
 
       boardRedoStackRef.current = [];
       boardUndoStackRef.current.push({ type: "card-create", card: created });
-      // A concurrent realtime refetch can land between the optimistic push and this
-      // resolving, replacing state wholesale and dropping the temp entry before we get
-      // here — so reconcile idempotently instead of assuming `tempId` is still present.
-      setIndexCards((prev) => {
-        const withoutTemp = prev.filter((c) => c.id !== tempId);
-        return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
-      });
-      setEditingCardIds((prev) => {
-        const next = new Set(prev);
-        next.delete(tempId);
-        next.add(created.id);
-        return next;
-      });
+      setIndexCards((prev) => [...prev, created]);
+      setEditingCardIds((prev) => new Set(prev).add(created.id));
       primaryEditingCardIdRef.current = created.id;
+      setEditingNoteIds(new Set());
+      primaryEditingNoteIdRef.current = null;
       if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
         tutorial.cardCreated(created.id);
       }
     } catch {
-      // Card stays in local state with temp ID
+      // Silently fail - user can retry
     }
   }
 
@@ -1699,7 +1777,7 @@ export function NoteBoardPage() {
   });
 
   function handleCardDragStart(id: string) {
-    draggingCardIdRef.current = id;
+    cardDragGuardRef.current = { id, expected: null };
   }
   async function handleCardDragStop(id: string, x: number, y: number) {
     const pending = cardDragMapRef.current.get(id);
@@ -1722,9 +1800,10 @@ export function NoteBoardPage() {
     setIndexCards((prev) =>
       prev.map((c) => (c.id === id ? { ...c, positionX: x, positionY: y } : c)),
     );
+    cardDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingCardIdRef.current === id) draggingCardIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (cardDragGuardRef.current?.id === id) cardDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
 
     try {
       if (deletedCardIdsRef.current.has(id) || !indexCardsRef.current.some((c) => c.id === id)) return;
@@ -1744,6 +1823,10 @@ export function NoteBoardPage() {
       return next;
     });
 
+    // Deleting a card while it's mid-edit unmounts it, which flushes this same save path —
+    // skip it, the card is already gone server-side (patching it 500s).
+    if (deletedCardIdsRef.current.has(id)) return;
+
     setIndexCards((prev) =>
       prev.map((c) =>
         c.id === id ? { ...c, title: title || null, content } : c,
@@ -1762,6 +1845,9 @@ export function NoteBoardPage() {
   }
 
   async function handleCardContentChange(id: string, title: string, content: string) {
+    // See handleCardSave — deleting a card mid-edit flushes the autosave-on-unmount path too.
+    if (deletedCardIdsRef.current.has(id)) return;
+
     setIndexCards((prev) =>
       prev.map((c) =>
         c.id === id ? { ...c, title: title || null, content } : c,
@@ -1833,9 +1919,9 @@ export function NoteBoardPage() {
     }
   }, []);
 
-  async function handleQuickAddImage() {
+  async function handleQuickAddImage(at?: { x: number; y: number }) {
     if (!boardId) return;
-    setPendingImageDrop(null);
+    setPendingImageDrop(at ?? null);
     triggerImageFileInput();
   }
 
@@ -1852,6 +1938,7 @@ export function NoteBoardPage() {
       positionX = center.x - IMAGE_CARD_DEFAULT_W / 2;
       positionY = center.y - IMAGE_CARD_DEFAULT_H / 2;
     }
+    ({ x: positionX, y: positionY } = clampToBoardBounds(positionX, positionY, IMAGE_CARD_DEFAULT_W, IMAGE_CARD_DEFAULT_H));
     setPendingImageDrop(null);
 
     uploadBoardImage(boardId, file)
@@ -2008,12 +2095,18 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        (note.positionX ?? 0) + DUPLICATE_OFFSET,
+        (note.positionY ?? 0) + DUPLICATE_OFFSET,
+        note.width ?? STICKY_NOTE_DEFAULT_SIZE,
+        note.height ?? STICKY_NOTE_DEFAULT_SIZE,
+      );
       const created = await createNote({
         boardId,
         title: note.title ?? undefined,
         content: note.content ?? "",
-        positionX: (note.positionX ?? 0) + DUPLICATE_OFFSET,
-        positionY: (note.positionY ?? 0) + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: note.width ?? undefined,
         height: note.height ?? undefined,
         color: note.color ?? undefined,
@@ -2030,12 +2123,18 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        (card.positionX ?? 0) + DUPLICATE_OFFSET,
+        (card.positionY ?? 0) + DUPLICATE_OFFSET,
+        card.width ?? INDEX_CARD_DEFAULT_W,
+        card.height ?? INDEX_CARD_DEFAULT_H,
+      );
       const created = await createIndexCard({
         boardId,
         title: card.title ?? undefined,
         content: card.content ?? "",
-        positionX: (card.positionX ?? 0) + DUPLICATE_OFFSET,
-        positionY: (card.positionY ?? 0) + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: card.width ?? undefined,
         height: card.height ?? undefined,
         color: card.color ?? undefined,
@@ -2052,10 +2151,16 @@ export function NoteBoardPage() {
     if (!boardId) return;
     setItemContextMenu(null);
     try {
+      const { x: dupX, y: dupY } = clampToBoardBounds(
+        image.positionX + DUPLICATE_OFFSET,
+        image.positionY + DUPLICATE_OFFSET,
+        image.width ?? IMAGE_CARD_DEFAULT_W,
+        image.height ?? IMAGE_CARD_DEFAULT_H,
+      );
       const created = await createBoardImageCard(boardId, {
         imageUrl: image.imageUrl,
-        positionX: image.positionX + DUPLICATE_OFFSET,
-        positionY: image.positionY + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: image.width ?? undefined,
         height: image.height ?? undefined,
         rotation: image.rotation ?? undefined,
@@ -2067,14 +2172,14 @@ export function NoteBoardPage() {
     }
   }
 
-  function buildItemContextMenuItems(): import("../components/ui/ContextMenu").ContextMenuItem[] {
+  function buildItemContextMenuItems(): ContextMenuItem[] {
     if (!itemContextMenu) return [];
     if (itemContextMenu.type === "note") {
       const { note } = itemContextMenu;
       return [
         { label: "Edit", icon: Pencil, onClick: () => handleStartEdit(note.id) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateNote(note) },
-        { label: "Bring to front", icon: Layers, onClick: () => bringToFront(note.id) },
+        { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(note.id) },
         {
           label: "Delete",
           icon: Trash2,
@@ -2091,14 +2196,14 @@ export function NoteBoardPage() {
       return [
         { label: "Edit", icon: Pencil, onClick: () => handleCardStartEdit(card.id) },
         { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateCard(card) },
-        { label: "Bring to front", icon: Layers, onClick: () => bringToFront(card.id) },
+        { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(card.id) },
         { label: "Delete", icon: Trash2, onClick: () => handleCardDelete(card.id), divider: true },
       ];
     }
     const { image } = itemContextMenu;
     return [
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateImage(image) },
-      { label: "Bring to front", icon: Layers, onClick: () => bringToFront(image.id) },
+      { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(image.id) },
       { label: "Delete", icon: Trash2, onClick: () => handleImageDelete(image.id), divider: true },
     ];
   }
@@ -2209,11 +2314,12 @@ export function NoteBoardPage() {
 
     if (type === "sticky-note") {
       try {
+        const clamped = clampToBoardBounds(x, y, STICKY_NOTE_DEFAULT_SIZE, STICKY_NOTE_DEFAULT_SIZE);
         const created = await createNote({
           content: "",
           boardId,
-          positionX: x,
-          positionY: y,
+          positionX: clamped.x,
+          positionY: clamped.y,
           width: STICKY_NOTE_DEFAULT_SIZE,
           height: STICKY_NOTE_DEFAULT_SIZE,
         });
@@ -2231,62 +2337,30 @@ export function NoteBoardPage() {
         // Silently fail
       }
     } else if (type === "image-card") {
-      setPendingImageDrop({ x, y });
+      const clamped = clampToBoardBounds(x, y, IMAGE_CARD_DEFAULT_W, IMAGE_CARD_DEFAULT_H);
+      setPendingImageDrop(clamped);
       triggerImageFileInput();
     } else if (type === "index-card") {
-      const tempId = `temp-card-${nextTempCardId++}`;
-      const now = new Date().toISOString();
-
-      const optimisticCard: IndexCardSummaryDto = {
-        id: tempId,
-        title: null,
-        content: "",
-        folderId: null,
-        projectId: null,
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-        positionX: x,
-        positionY: y,
-        width: null,
-        height: null,
-        color: null,
-        rotation: null,
-      };
-
-      setIndexCards((prev) => [...prev, optimisticCard]);
-      setEditingCardIds((prev) => new Set(prev).add(tempId));
-      primaryEditingCardIdRef.current = tempId;
-      setEditingNoteIds(new Set());
-      primaryEditingNoteIdRef.current = null;
-
+      const { x: cardX, y: cardY } = clampToBoardBounds(x, y, INDEX_CARD_DEFAULT_W, INDEX_CARD_DEFAULT_H);
       try {
         const created = await createIndexCard({
           content: "",
           boardId,
-          positionX: x,
-          positionY: y,
+          positionX: cardX,
+          positionY: cardY,
         });
         boardRedoStackRef.current = [];
         boardUndoStackRef.current.push({ type: "card-create", card: created });
-        // See handleQuickAddCard — reconcile idempotently in case a concurrent realtime
-        // refetch already replaced state before this optimistic entry got swapped in.
-        setIndexCards((prev) => {
-          const withoutTemp = prev.filter((c) => c.id !== tempId);
-          return withoutTemp.some((c) => c.id === created.id) ? withoutTemp : [...withoutTemp, created];
-        });
-        setEditingCardIds((prev) => {
-          const next = new Set(prev);
-          next.delete(tempId);
-          next.add(created.id);
-          return next;
-        });
+        setIndexCards((prev) => [...prev, created]);
+        setEditingCardIds((prev) => new Set(prev).add(created.id));
         primaryEditingCardIdRef.current = created.id;
+        setEditingNoteIds(new Set());
+        primaryEditingNoteIdRef.current = null;
         if (tutorial.isActive && tutorial.currentStep?.id === "add-card") {
           tutorial.cardCreated(created.id);
         }
       } catch {
-        // Card stays in local state with temp ID
+        // Silently fail
       }
     }
   }
@@ -2503,17 +2577,17 @@ export function NoteBoardPage() {
         <CorkBoard
               topBar={boardTopBar}
               presenceWidget={
-                <BoardPresenceButton
-                  users={connectedUsers}
-                  isHubConnected={isHubConnected}
-                  currentUserId={currentUserId ?? undefined}
-                />
+                isEmbedded ? undefined : (
+                  <BoardPresenceButton
+                    users={connectedUsers}
+                    isHubConnected={isHubConnected}
+                    currentUserId={currentUserId ?? undefined}
+                  />
+                )
               }
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
               onDropItem={handleBoardDrop}
-              onBoardMouseMove={handleBoardMouseMove}
-              onBoardMouseLeave={handleBoardMouseLeave}
               onBoardClick={(e) => {
                 if (!(e.target as Element).closest("[data-board-item]")) {
                   setEditingNoteIds(new Set());
@@ -2534,27 +2608,6 @@ export function NoteBoardPage() {
               contentMinX={canvasBounds.contentMinX}
               contentMinY={canvasBounds.contentMinY}
             >
-          {/* Remote cursors layer (board-space coords, same transform as canvas) */}
-          <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
-            {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
-              <div
-                key={userId}
-                className="absolute z-[9999] flex items-center gap-1 overflow-visible"
-                style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 32 32"
-                  width="32"
-                  height="32"
-                  className="drop-shadow-lg"
-                >
-                  <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
-                </svg>
-              </div>
-            ))}
-          </div>
-
           <RedStringLayer
             ref={redStringSvgRef}
             connections={connections}
@@ -2603,6 +2656,10 @@ export function NoteBoardPage() {
               isLinking={linkingFrom !== null}
               zoom={zoom}
               onRichTextToolbarChange={handleRichTextToolbarChange}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
 
@@ -2620,6 +2677,10 @@ export function NoteBoardPage() {
               onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, type: "image", image: img })}
               isLinking={linkingFrom !== null}
               zoom={zoom}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
 
@@ -2652,8 +2713,31 @@ export function NoteBoardPage() {
               isLinking={linkingFrom !== null}
               zoom={zoom}
               onRichTextToolbarChange={handleRichTextToolbarChange}
+              boardMinX={BOARD_MIN_X}
+              boardMinY={BOARD_MIN_Y}
+              boardMaxX={BOARD_MAX_X}
+              boardMaxY={BOARD_MAX_Y}
             />
           ))}
+
+          {highlightItemId &&
+            (() => {
+              const note = notes.find((n) => n.id === highlightItemId);
+              const card = indexCards.find((c) => c.id === highlightItemId);
+              const item = note ?? card;
+              if (!item) return null;
+              const x = item.positionX ?? POSITION_DEFAULT;
+              const y = item.positionY ?? POSITION_DEFAULT;
+              const w = item.width ?? (note ? STICKY_NOTE_DEFAULT_SIZE : INDEX_CARD_DEFAULT_W);
+              const h = item.height ?? (note ? STICKY_NOTE_DEFAULT_SIZE : INDEX_CARD_DEFAULT_H);
+              return (
+                <div
+                  aria-hidden
+                  className="search-focus-ring pointer-events-none absolute rounded-2xl"
+                  style={{ left: x - 8, top: y - 8, width: w + 16, height: h + 16, zIndex: 99999 }}
+                />
+              );
+            })()}
 
           {isEmpty && (
             <div className="flex h-full items-center justify-center" style={{ pointerEvents: "none" }}>
@@ -2681,9 +2765,9 @@ export function NoteBoardPage() {
             x={boardContextMenu.x}
             y={boardContextMenu.y}
             items={[
-              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: handleQuickAddNote },
-              { label: "Add Index Card", icon: CreditCard, onClick: handleQuickAddCard },
-              { label: "Add Image", icon: ImageIcon, onClick: handleQuickAddImage },
+              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: () => handleQuickAddNote(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
+              { label: "Add Index Card", icon: CreditCard, onClick: () => handleQuickAddCard(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
+              { label: "Add Image", icon: ImageIcon, onClick: () => handleQuickAddImage(boardPointToWorld(boardContextMenu.x, boardContextMenu.y)) },
               { label: "Undo", onClick: triggerMenuUndo, disabled: boardUndoStackRef.current.length === 0, divider: true },
               { label: "Redo", onClick: triggerMenuRedo, disabled: boardRedoStackRef.current.length === 0 },
             ]}

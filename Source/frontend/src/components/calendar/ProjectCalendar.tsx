@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getCalendarEvents,
-  createCalendarEvent,
-  updateCalendarEvent,
   deleteCalendarEvent,
 } from "../../api/calendar-events";
+import {
+  saveCalendarEventFromForm,
+  type CalendarEventFormData,
+} from "../../utils/calendar-event-save";
 import { CalendarHeader, type CalendarLayout } from "./CalendarHeader";
 import { CalendarGrid } from "./CalendarGrid";
 import { CalendarTimeline } from "./CalendarTimeline";
@@ -126,69 +128,9 @@ export function ProjectCalendar({
     setDialogOpen(true);
   }
 
-  async function handleSave(data: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-    isAllDay: boolean;
-    color: string;
-    eventType: string;
-    startHour: string;
-    endHour: string;
-    recurrenceFrequency: string;
-    recurrenceInterval: number;
-    recurrenceEndDate: string;
-  }) {
+  async function handleSave(data: CalendarEventFormData) {
     try {
-      const toDateUtc = (dateStr: string, hour: string, allDay: boolean) =>
-        allDay ? `${dateStr}T12:00:00.000Z` : `${dateStr}T${hour}:00:00.000Z`;
-
-      const startIso = toDateUtc(data.startDate, data.startHour, data.isAllDay);
-      const endIso = data.endDate
-        ? toDateUtc(data.endDate, data.endHour, data.isAllDay)
-        : undefined;
-
-      const recurrence = data.recurrenceFrequency
-        ? {
-            recurrenceFrequency: data.recurrenceFrequency,
-            recurrenceInterval: data.recurrenceInterval,
-            recurrenceEndDate: data.recurrenceEndDate
-              ? `${data.recurrenceEndDate}T12:00:00.000Z`
-              : undefined,
-          }
-        : {
-            recurrenceFrequency: undefined,
-            recurrenceInterval: 1,
-            recurrenceEndDate: undefined,
-          };
-
-      const eventId = editingEvent?.recurrenceSourceId ?? editingEvent?.id;
-
-      if (editingEvent && eventId) {
-        await updateCalendarEvent(eventId, {
-          title: data.title,
-          description: data.description || undefined,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      } else {
-        await createCalendarEvent({
-          title: data.title,
-          description: data.description || undefined,
-          projectId,
-          startDate: startIso,
-          endDate: endIso,
-          isAllDay: data.isAllDay,
-          color: data.color,
-          eventType: data.eventType,
-          ...recurrence,
-        });
-      }
+      await saveCalendarEventFromForm(data, { editEvent: editingEvent, projectId });
       setDialogOpen(false);
       setEditingEvent(null);
       fetchEvents();

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -18,6 +19,8 @@ import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
+import { sanitizeHtml } from "../../utils/sanitize-html";
+import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -61,6 +64,11 @@ interface StickyNoteProps {
   requestDeleteConfirm?: boolean;
   /** Called after a parent delete request has been handled/opened. */
   onDeleteConfirmHandled?: (id: string) => void;
+  /** Fixed board boundary (world coords) the note cannot be dragged past. */
+  boardMinX?: number;
+  boardMinY?: number;
+  boardMaxX?: number;
+  boardMaxY?: number;
 }
 
 /** Default width and height for sticky notes on boards (square). */
@@ -82,8 +90,6 @@ const MAX_TITLE_TEXT_LENGTH = 500;
 const MAX_TITLE_PARAGRAPHS = 1;
 /** Soft line breaks allowed in title (Shift+Enter). */
 const MAX_TITLE_HARD_BREAKS = 20;
-
-type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 const CURSOR_MAP: Record<ResizeDir, string> = {
   n: "cursor-ns-resize",
@@ -167,7 +173,7 @@ function RemoteCaret({ editor, position, color, wrapperRef }: RemoteCaretProps) 
   );
 }
 
-export function StickyNote({
+function StickyNoteComponent({
   note,
   isEditing,
   zIndex = 0,
@@ -196,6 +202,10 @@ export function StickyNote({
   onRichTextToolbarChange,
   requestDeleteConfirm = false,
   onDeleteConfirmHandled,
+  boardMinX = -Infinity,
+  boardMinY = -Infinity,
+  boardMaxX = Infinity,
+  boardMaxY = Infinity,
 }: StickyNoteProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const ignoreBlurUntilRef = useRef<number>(0);
@@ -503,7 +513,12 @@ export function StickyNote({
   }, [note.content, note.title, note.tags, isEditing, note.height, note.positionY, isResizing]);
 
   const handleDragStop: DraggableEventHandler = (_e, data) => {
-    setPosition({ x: data.x, y: data.y });
+    // react-draggable reads props.position right after this callback returns and, in
+    // controlled mode, snaps back to it if it hasn't updated yet — flushSync forces the
+    // new position to commit synchronously so it doesn't revert-then-flash to the old spot.
+    flushSync(() => {
+      setPosition({ x: data.x, y: data.y });
+    });
     lastDragEndRef.current = Date.now();
     onDragStop(note.id, data.x, data.y);
   };
@@ -559,141 +574,22 @@ export function StickyNote({
     };
   }, [onRichTextToolbarChange, note.id]);
 
-  // --- Resize logic using a single stable ref for all mutable state ---
-  const resizeRef = useRef<{
-    dir: ResizeDir;
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-    startPosX: number;
-    startPosY: number;
-    boardW: number;
-    boardH: number;
-  } | null>(null);
-
-  const listenersRef = useRef<{
-    move: (e: MouseEvent) => void;
-    up: (e: MouseEvent) => void;
-  } | null>(null);
-
-  function startResize(dir: ResizeDir) {
-    return (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-      }
-
-      const parent = nodeRef.current?.parentElement;
-      const boardW = parent?.clientWidth ?? 9999;
-      const boardH = parent?.clientHeight ?? 9999;
-
-      resizeRef.current = {
-        dir,
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: size.width,
-        startH: size.height,
-        startPosX: position.x,
-        startPosY: position.y,
-        boardW,
-        boardH,
-      };
-
-      setIsResizing(true);
-
-      function onMove(ev: MouseEvent) {
-        const rs = resizeRef.current;
-        if (!rs) return;
-
-        const dx = (ev.clientX - rs.startX) / zoom;
-        const dy = (ev.clientY - rs.startY) / zoom;
-
-        let newW = rs.startW;
-        let newH = rs.startH;
-        let newX = rs.startPosX;
-        let newY = rs.startPosY;
-
-        if (rs.dir === "e" || rs.dir === "ne" || rs.dir === "se") {
-          newW = Math.min(MAX_WIDTH, Math.max(MIN_SIZE, rs.startW + dx));
-        }
-        if (rs.dir === "w" || rs.dir === "nw" || rs.dir === "sw") {
-          const proposed = rs.startW - dx;
-          if (proposed >= MIN_SIZE && proposed <= MAX_WIDTH) {
-            newW = proposed;
-            newX = rs.startPosX + dx;
-          } else if (proposed < MIN_SIZE) {
-            newW = MIN_SIZE;
-            newX = rs.startPosX + (rs.startW - MIN_SIZE);
-          } else {
-            newW = MAX_WIDTH;
-            newX = rs.startPosX + (rs.startW - MAX_WIDTH);
-          }
-        }
-        if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(STICKY_NOTE_MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
-        }
-        if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
-          const proposed = rs.startH - dy;
-          if (proposed >= MIN_SIZE && proposed <= STICKY_NOTE_MAX_HEIGHT) {
-            newH = proposed;
-            newY = rs.startPosY + dy;
-          } else if (proposed < MIN_SIZE) {
-            newH = MIN_SIZE;
-            newY = rs.startPosY + (rs.startH - MIN_SIZE);
-          } else {
-            newH = STICKY_NOTE_MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - STICKY_NOTE_MAX_HEIGHT);
-          }
-        }
-
-        newW = Math.max(MIN_SIZE, newW);
-        newH = Math.max(MIN_SIZE, newH);
-
-        setSize({ width: newW, height: newH });
-        setPosition({ x: newX, y: newY });
-      }
-
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        listenersRef.current = null;
-        resizeRef.current = null;
-        setIsResizing(false);
-
-        setSize((finalSize) => {
-          const w = Math.round(finalSize.width);
-          const h = Math.round(finalSize.height);
-          setTimeout(() => onResizeRef.current(note.id, w, h), 0);
-          return finalSize;
-        });
-        setPosition((finalPos) => {
-          const x = Math.round(finalPos.x);
-          const y = Math.round(finalPos.y);
-          setTimeout(() => onDragStopRef.current(note.id, x, y), 0);
-          return finalPos;
-        });
-      }
-
-      listenersRef.current = { move: onMove, up: onUp };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
-  }
-
-  // Cleanup only on unmount
-  useEffect(() => {
-    return () => {
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-        listenersRef.current = null;
-      }
-    };
-  }, []);
+  const { startResize } = useBoardItemResize({
+    size,
+    position,
+    zoom,
+    minWidth: MIN_SIZE,
+    maxWidth: MAX_WIDTH,
+    minHeight: MIN_SIZE,
+    maxHeight: STICKY_NOTE_MAX_HEIGHT,
+    setSize,
+    setPosition,
+    setIsResizing,
+    onResizeEnd: (final) => {
+      setTimeout(() => onResizeRef.current(note.id, final.width, final.height), 0);
+      setTimeout(() => onDragStopRef.current(note.id, final.x, final.y), 0);
+    },
+  });
 
   const edgeThickness = 6;
 
@@ -752,6 +648,7 @@ export function StickyNote({
       cancel=".note-action-area, .note-action-btn, .note-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
+      bounds={{ left: boardMinX, top: boardMinY, right: boardMaxX - size.width, bottom: boardMaxY - size.height }}
     >
       {/* Outer positioning wrapper – react-draggable applies translate here.
            Rotation lives on the inner div so translate and rotate don't interact. */}
@@ -759,13 +656,21 @@ export function StickyNote({
         ref={nodeRef}
         data-board-item="note"
         data-note-id={note.id}
-        className="absolute overflow-visible"
+        className="absolute overflow-visible will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
           zIndex,
         }}
         onMouseDown={() => onBringToFront?.(note.id)}
+        onDragStart={(e) => {
+          // Selected text inside the note is natively draggable in the browser. Without
+          // this, grabbing the drag handle while text is highlighted starts a native
+          // text-drag instead of react-draggable's mouse-based drag: the note never
+          // receives the mousemove/mouseup pair it needs, so it appears to stick to the
+          // cursor until the next click forces react-draggable's stale drag state to end.
+          e.preventDefault();
+        }}
         onContextMenu={(e) => {
           const target = e.target as Element;
           const inEditable = target.closest('[contenteditable="true"]');
@@ -1067,7 +972,7 @@ export function StickyNote({
                 <div
                   data-field="title"
                   className="note-rich-content mb-1 break-words text-sm font-semibold text-gray-800"
-                  dangerouslySetInnerHTML={{ __html: note.title }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(note.title) }}
                 />
               ) : (
                 <p data-field="title" className="mb-1 text-sm font-semibold text-gray-500/50">Untitled</p>
@@ -1076,7 +981,7 @@ export function StickyNote({
                 <div
                   data-field="content"
                   className="note-rich-content break-words text-xs text-gray-600"
-                  dangerouslySetInnerHTML={{ __html: note.content }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(note.content) }}
                 />
               )}
               {note.tags.length > 0 && (
@@ -1180,3 +1085,31 @@ export function StickyNote({
     </Draggable>
   );
 }
+
+function sameShallowList<T extends Record<string, unknown>>(a?: T[] | null, b?: T[] | null): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, i) => {
+    const other = b[i]!;
+    const keys = Object.keys(item);
+    return keys.length === Object.keys(other).length && keys.every((k) => item[k] === other[k]);
+  });
+}
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every note's JSX (and its TipTap editors) on each broadcast.
+// Only re-render a note when its own data actually changed; callback props are treated as
+// stable since the board's handlers read live data via refs rather than render-scoped closures.
+export const StickyNote = memo(StickyNoteComponent, (prev, next) => {
+  return (
+    prev.note === next.note &&
+    prev.isEditing === next.isEditing &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom &&
+    prev.enlargeWhenEditing === next.enlargeWhenEditing &&
+    prev.requestDeleteConfirm === next.requestDeleteConfirm &&
+    sameShallowList(prev.focusedBy, next.focusedBy) &&
+    sameShallowList(prev.remoteTextCursors, next.remoteTextCursors)
+  );
+});

@@ -63,18 +63,20 @@ public sealed class BoardHub : Hub
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupPrefix + boardId.ToString(), cancellationToken);
 
-        var displayName = await _userRepo.Query()
+        var userRow = await _userRepo.Query()
             .Where(u => u.Id == userId.Value)
-            .Select(u => u.Username)
-            .FirstOrDefaultAsync(cancellationToken) ?? userId.Value.ToString();
+            .Select(u => new { u.Username, u.ProfilePictureKey })
+            .FirstOrDefaultAsync(cancellationToken);
+        var displayName = userRow?.Username ?? userId.Value.ToString();
+        var profilePictureKey = userRow?.ProfilePictureKey;
 
-        _presence.AddPresence(boardId, Context.ConnectionId!, userId.Value, displayName, role);
+        _presence.AddPresence(boardId, Context.ConnectionId!, userId.Value, displayName, role, profilePictureKey);
 
         var presenceList = _presence.GetPresence(boardId)
-            .Select(p => new { userId = p.UserId, displayName = p.DisplayName, role = p.Role })
+            .Select(p => new { userId = p.UserId, displayName = p.DisplayName, role = p.Role, profilePictureKey = p.ProfilePictureKey })
             .ToList();
         await Clients.Caller.SendAsync("PresenceList", presenceList, cancellationToken);
-        await Clients.OthersInGroup(GroupPrefix + boardId.ToString()).SendAsync("UserJoined", userId.Value, displayName, role, cancellationToken);
+        await Clients.OthersInGroup(GroupPrefix + boardId.ToString()).SendAsync("UserJoined", userId.Value, displayName, role, profilePictureKey, cancellationToken);
 
         _logger.LogDebug("JoinBoard: User {UserId} joined board {BoardId}", userId, boardId);
     }
@@ -94,14 +96,6 @@ public sealed class BoardHub : Hub
         if (userId is null) return;
         var groupName = GroupPrefix + boardId.ToString();
         await Clients.OthersInGroup(groupName).SendAsync("UserFocusingItem", userId.Value, itemType ?? "", itemId);
-    }
-
-    public async Task CursorPosition(Guid boardId, double x, double y)
-    {
-        var userId = GetUserId();
-        if (userId is null) return;
-        var groupName = GroupPrefix + boardId.ToString();
-        await Clients.OthersInGroup(groupName).SendAsync("CursorPosition", userId.Value, x, y);
     }
 
     /// <summary>Broadcast text cursor position within a note/card editor for collaborative editing.</summary>

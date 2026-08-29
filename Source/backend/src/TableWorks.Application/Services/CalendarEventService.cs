@@ -126,6 +126,10 @@ public sealed class CalendarEventService : ICalendarEventService
 
     public async Task<CalendarEventDto> CreateEventAsync(Guid userId, CreateCalendarEventRequest request, CancellationToken cancellationToken = default)
     {
+        await EnsureWithinProjectEndDateAsync(
+            request.ProjectId, request.StartDate, request.EndDate,
+            request.RecurrenceFrequency, request.RecurrenceEndDate, cancellationToken);
+
         var now = DateTime.UtcNow;
         var entity = new CalendarEvent
         {
@@ -190,6 +194,10 @@ public sealed class CalendarEventService : ICalendarEventService
         if (entity is null)
             throw new KeyNotFoundException($"Calendar event {eventId} not found.");
 
+        await EnsureWithinProjectEndDateAsync(
+            entity.ProjectId, request.StartDate, request.EndDate,
+            request.RecurrenceFrequency, request.RecurrenceEndDate, cancellationToken);
+
         entity.Title = request.Title;
         entity.Description = request.Description;
         entity.StartDate = request.StartDate;
@@ -217,6 +225,49 @@ public sealed class CalendarEventService : ICalendarEventService
 
         _eventRepo.Delete(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Enforces that a project-linked event never lands on a calendar day after the project's
+    /// end date. Recurring events must additionally carry a recurrence end date so the series
+    /// itself terminates on or before the project end. No-ops for personal events or projects
+    /// without an end date. Comparison is by UTC calendar day to match the all-day convention.
+    /// </summary>
+    private async Task EnsureWithinProjectEndDateAsync(
+        Guid? projectId,
+        DateTime startDate,
+        DateTime? endDate,
+        string? recurrenceFrequency,
+        DateTime? recurrenceEndDate,
+        CancellationToken cancellationToken)
+    {
+        if (projectId is null)
+            return;
+
+        var projectEndDate = await _projectRepo.Query()
+            .Where(p => p.Id == projectId.Value)
+            .Select(p => p.EndDate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (projectEndDate is not { } projectEnd)
+            return;
+
+        // Latest calendar day this event will occupy.
+        var lastDay = (endDate ?? startDate).Date;
+
+        if (recurrenceFrequency is not null)
+        {
+            if (recurrenceEndDate is null)
+                throw new InvalidOperationException(
+                    "A repeating event in a project calendar must have an end date on or before the project's end date.");
+
+            var occurrenceDuration = endDate.HasValue ? endDate.Value - startDate : TimeSpan.Zero;
+            lastDay = (recurrenceEndDate.Value + occurrenceDuration).Date;
+        }
+
+        if (lastDay > projectEnd.Date)
+            throw new InvalidOperationException(
+                $"Event cannot extend past the project's end date ({projectEnd:yyyy-MM-dd}).");
     }
 
     private static bool ProjectEventVisibleOnUserMainCalendar(Project p, Guid userId)

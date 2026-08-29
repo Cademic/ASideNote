@@ -19,11 +19,11 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView, minZoo
   };
 
   return (
-    <div className="flex flex-nowrap items-center gap-2 rounded-xl border border-border bg-surface/90 backdrop-blur-sm shadow-lg px-3 py-2">
+    <div className="flex flex-nowrap items-center gap-2 rounded-xl border border-[var(--land-rule)] bg-[var(--land-paper)] px-3 py-2">
       <button
         type="button"
         onClick={() => handleZoomChange(zoom - 0.1)}
-        className="shrink-0 rounded p-1 text-foreground/70 transition-colors hover:bg-background hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+        className="shrink-0 rounded p-1 text-[var(--land-ink-2)] transition-colors hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] disabled:opacity-30 disabled:cursor-not-allowed"
         disabled={zoom <= minZoom}
         title="Zoom out"
         aria-label="Zoom out"
@@ -39,10 +39,10 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView, minZoo
           step={0.01}
           value={zoom}
           onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-          className="min-w-0 flex-1 h-1.5 rounded-full appearance-none cursor-pointer bg-foreground/10 accent-primary"
+          className="min-w-0 flex-1 h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--land-rule)] accent-[var(--land-amber)]"
           aria-label="Zoom level"
         />
-        <span className="shrink-0 text-xs font-medium text-foreground/70 min-w-[2.5rem] text-right">
+        <span className="shrink-0 text-xs font-medium text-[var(--land-ink-2)] min-w-[2.5rem] text-right">
           {Math.round(zoom * 100)}%
         </span>
       </div>
@@ -52,20 +52,20 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView, minZoo
         onClick={() => handleZoomChange(zoom + 0.1)}
         disabled={zoom >= MAX_ZOOM}
         title="Zoom in"
-        className="shrink-0 rounded p-1 text-foreground/70 transition-colors hover:bg-background hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+        className="shrink-0 rounded p-1 text-[var(--land-ink-2)] transition-colors hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] disabled:opacity-30 disabled:cursor-not-allowed"
         aria-label="Zoom in"
       >
         <ZoomIn className="h-4 w-4" />
       </button>
 
-      <div className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+      <div className="mx-0.5 h-4 w-px shrink-0 bg-[var(--land-rule)]" aria-hidden />
 
       {onCenterView && (
         <button
           type="button"
           onClick={onCenterView}
           title="Center view"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-background hover:text-foreground transition-colors"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] transition-colors"
         >
           <Crosshair className="h-3.5 w-3.5" />
         </button>
@@ -75,7 +75,7 @@ export function ZoomControls({ zoom, onZoomChange, onReset, onCenterView, minZoo
         type="button"
         onClick={onReset}
         title="Reset zoom"
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-background hover:text-foreground transition-colors"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] transition-colors"
       >
         <Maximize className="h-3.5 w-3.5" />
       </button>

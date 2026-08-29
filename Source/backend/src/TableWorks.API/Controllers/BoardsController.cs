@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ASideNote.Application.DTOs.Boards;
 using ASideNote.Application.DTOs.Common;
+using ASideNote.Application.Helpers;
 using ASideNote.Application.Interfaces;
 
 namespace ASideNote.API.Controllers;
@@ -77,6 +78,14 @@ public sealed class BoardsController : ControllerBase
         var contentType = (file.ContentType ?? "").Trim().ToLowerInvariant();
         if (!AllowedImageTypes.Contains(contentType))
             return BadRequest(new { error = "InvalidImageType", message = "Only JPEG, PNG, WebP, and GIF images are allowed." });
+
+        var header = new byte[ImageMagicBytes.RequiredHeaderBytes];
+        await using (var headerStream = file.OpenReadStream())
+        {
+            await headerStream.ReadExactlyAsync(header.AsMemory(0, (int)Math.Min(header.Length, file.Length)), cancellationToken);
+        }
+        if (!ImageMagicBytes.MatchesDeclaredType(header, contentType))
+            return BadRequest(new { error = "InvalidImageType", message = "File content does not match the declared image type." });
 
         var userId = _currentUserService.UserId;
         try

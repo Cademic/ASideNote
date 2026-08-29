@@ -10,10 +10,17 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = 
   orange: { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-300 dark:border-orange-700" },
 };
 
+// Times are persisted as the user's picked wall-clock in UTC (see CreateEventDialog /
+// calendar-event-save), so every read here is UTC too or the displayed hour drifts.
 function formatDateTime(isoStr: string, isAllDay: boolean): string {
   const d = new Date(isoStr);
   if (isAllDay) {
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
   }
   return d.toLocaleString("en-US", {
     month: "short",
@@ -21,12 +28,30 @@ function formatDateTime(isoStr: string, isAllDay: boolean): string {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "UTC",
   });
+}
+
+const RECURRENCE_NOUNS: Record<string, string> = {
+  Daily: "day",
+  Weekly: "week",
+  Monthly: "month",
+};
+
+function formatRecurrence(frequency: string | null, interval: number): string {
+  const noun = frequency ? RECURRENCE_NOUNS[frequency] : undefined;
+  if (!noun) return "Repeats";
+  if (interval > 1) return `Repeats every ${interval} ${noun}s`;
+  return `Repeats ${frequency!.toLowerCase()}`;
 }
 
 function formatTime(isoStr: string): string {
   const d = new Date(isoStr);
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+  });
 }
 
 interface EventDetailsPopupProps {
@@ -123,7 +148,7 @@ export function EventDetailsPopup({
 
           <div>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-foreground/50">
-              {isNote ? "Date" : "Date & Time"}
+              {isNote && event.isAllDay ? "Date" : "Date & Time"}
             </h3>
             <div className="text-sm text-foreground">
               {event.isAllDay ? (
@@ -150,10 +175,7 @@ export function EventDetailsPopup({
             <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-foreground/[0.02] px-3 py-2">
               <Repeat className="h-4 w-4 text-foreground/50" />
               <div className="text-sm text-foreground">
-                Repeats {event.recurrenceFrequency?.toLowerCase()}
-                {event.recurrenceInterval > 1 && (
-                  <span> every {event.recurrenceInterval} {event.recurrenceFrequency?.toLowerCase()}s</span>
-                )}
+                {formatRecurrence(event.recurrenceFrequency, event.recurrenceInterval)}
                 {event.recurrenceEndDate && (
                   <span> until {formatDateTime(event.recurrenceEndDate, true)}</span>
                 )}

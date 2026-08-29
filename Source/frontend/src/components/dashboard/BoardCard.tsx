@@ -52,20 +52,20 @@ const BOARD_TYPE_CONFIG: Record<
   NoteBoard: {
     icon: ClipboardList,
     label: "Note Board",
-    tapeColor: "bg-amber-400/60 dark:bg-amber-500/40",
-    iconBg: "bg-amber-100/80 dark:bg-amber-900/30",
+    tapeColor: "bg-amber-400 dark:bg-amber-500",
+    iconBg: "bg-amber-100 dark:bg-amber-900",
   },
   ChalkBoard: {
     icon: PenTool,
     label: "Chalk Board",
-    tapeColor: "bg-slate-400/60 dark:bg-slate-500/40",
-    iconBg: "bg-slate-100/80 dark:bg-slate-900/30",
+    tapeColor: "bg-slate-400 dark:bg-slate-500",
+    iconBg: "bg-slate-100 dark:bg-slate-800",
   },
   Calendar: {
     icon: Calendar,
     label: "Calendar",
-    tapeColor: "bg-sky-400/60 dark:bg-sky-500/40",
-    iconBg: "bg-sky-100/80 dark:bg-sky-900/30",
+    tapeColor: "bg-sky-400 dark:bg-sky-500",
+    iconBg: "bg-sky-100 dark:bg-sky-900",
   },
 };
 
@@ -253,8 +253,8 @@ export function BoardCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isBoardRouteActive
-                ? "bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
-                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+                ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
@@ -264,7 +264,7 @@ export function BoardCard({
         <div
           role="button"
           tabIndex={0}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md"
+          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
           onClick={() => navigate(boardPath)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -273,12 +273,16 @@ export function BoardCard({
             }
           }}
         >
-          {board.isPinned && (
-            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-sky-400" />
+          {board.isPinned && sidebarShowLabel && (
+            <Pin
+              className={`h-3.5 w-3.5 shrink-0 ${
+                isBoardRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
+              }`}
+            />
           )}
           <Icon
             className={`h-4 w-4 shrink-0 ${
-              isBoardRouteActive ? "text-amber-600 dark:text-sky-400" : "text-foreground/40"
+              isBoardRouteActive ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
             }`}
           />
           {sidebarShowLabel && (
@@ -302,7 +306,7 @@ export function BoardCard({
           {/* Project name (top right when board is in a project) */}
           {projectName && (
             <div
-              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
+              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-surface px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
               title={projectName}
             >
               {projectName}
@@ -317,7 +321,7 @@ export function BoardCard({
         ref={menuRef}
         className={
           isSidebarRow
-            ? "relative z-10 shrink-0"
+            ? `relative z-10 shrink-0${sidebarShowLabel ? "" : " hidden"}`
             : "absolute right-3 top-3 z-10"
         }
         onClick={(e) => e.stopPropagation()}
@@ -364,7 +368,7 @@ export function BoardCard({
               setMenuOpen((v) => !v);
             }
           }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
           title="Board actions"
         >
           <MoreVertical className="h-4 w-4" />
@@ -379,7 +383,7 @@ export function BoardCard({
             {onRename && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -404,7 +408,7 @@ export function BoardCard({
               >
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     clearFolderHoverTimer();
@@ -432,7 +436,7 @@ export function BoardCard({
             >
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   clearProjectHoverTimer();
@@ -450,7 +454,7 @@ export function BoardCard({
             {onTogglePin && (
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
               onClick={(e) => {
                 e.stopPropagation();
                 closeMenu();
@@ -472,13 +476,13 @@ export function BoardCard({
             )}
 
             {(showMenuActions || onRemoveFromProject || onDelete) && (
-              <div className="my-1 border-t border-border/50" />
+              <div className="my-1 border-t border-border" />
             )}
 
             {onRemoveFromProject && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -515,7 +519,7 @@ export function BoardCard({
               {onRename && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -539,7 +543,7 @@ export function BoardCard({
                 >
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                     onClick={(e) => {
                       e.stopPropagation();
                       clearFolderHoverTimer();
@@ -566,7 +570,7 @@ export function BoardCard({
                 >
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                     onClick={(e) => {
                       e.stopPropagation();
                       clearProjectHoverTimer();
@@ -583,7 +587,7 @@ export function BoardCard({
               {onTogglePin && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -604,12 +608,12 @@ export function BoardCard({
                 </button>
               )}
               {(showMenuActions || onRemoveFromProject || onDelete) && (
-                <div className="my-1 border-t border-border/50" />
+                <div className="my-1 border-t border-border" />
               )}
               {onRemoveFromProject && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -662,7 +666,7 @@ export function BoardCard({
           )}
 
           {/* Footer — ruled-line separator */}
-          <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
+          <div className="mt-auto flex items-center gap-3 border-t border-border pt-3 text-xs text-foreground/60">
             <span className="flex items-center gap-1">
               <StickyNote className="h-3 w-3" />
               {board.noteCount}
@@ -701,7 +705,7 @@ export function BoardCard({
             ) : projectFolders.length > 0 ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -718,7 +722,7 @@ export function BoardCard({
               <button
                 key={f.id}
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-surface ${
                   board.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
                 }`}
                 onClick={(e) => {

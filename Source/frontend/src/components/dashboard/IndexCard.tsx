@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { memo, useEffect, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -23,6 +24,8 @@ import { INDEX_CARD_COLORS } from "./indexCardColors";
 import type { BoardRichTextToolbarState } from "./BoardMenuBar";
 import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
+import { sanitizeHtml } from "../../utils/sanitize-html";
+import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -65,6 +68,11 @@ interface IndexCardProps {
   /** When true, visually scale the card when editing (for better readability) */
   enlargeWhenEditing?: boolean;
   onRichTextToolbarChange?: (state: BoardRichTextToolbarState | null, clearedSourceId?: string) => void;
+  /** Fixed board boundary (world coords) the card cannot be dragged past. */
+  boardMinX?: number;
+  boardMinY?: number;
+  boardMaxX?: number;
+  boardMaxY?: number;
 }
 
 const DEFAULT_WIDTH = 450;
@@ -75,8 +83,6 @@ const MAX_WIDTH = 800;
 const MAX_HEIGHT = 600;
 const MAX_CONTENT_LENGTH = 10000;
 const MAX_TITLE_LENGTH = 100;
-
-type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 const CURSOR_MAP: Record<ResizeDir, string> = {
   n: "cursor-ns-resize",
@@ -100,7 +106,7 @@ function resolveCardColorKey(card: IndexCardSummaryDto): string {
   return keys[Math.abs(hash) % keys.length] ?? "white";
 }
 
-export function IndexCard({
+function IndexCardComponent({
   card,
   isEditing,
   zIndex = 0,
@@ -124,6 +130,10 @@ export function IndexCard({
   zoom = 1,
   enlargeWhenEditing = false,
   onRichTextToolbarChange,
+  boardMinX = -Infinity,
+  boardMinY = -Infinity,
+  boardMaxX = Infinity,
+  boardMaxY = Infinity,
 }: IndexCardProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastDragEndRef = useRef<number>(0);
@@ -353,7 +363,12 @@ export function IndexCard({
   }, [card.content, card.title, card.tags, isEditing, card.height, card.positionY, isResizing]);
 
   const handleDragStop: DraggableEventHandler = (_e, data) => {
-    setPosition({ x: data.x, y: data.y });
+    // react-draggable reads props.position right after this callback returns and, in
+    // controlled mode, snaps back to it if it hasn't updated yet — flushSync forces the
+    // new position to commit synchronously so it doesn't revert-then-flash to the old spot.
+    flushSync(() => {
+      setPosition({ x: data.x, y: data.y });
+    });
     lastDragEndRef.current = Date.now();
     onDragStop(card.id, data.x, data.y);
   };
@@ -403,141 +418,22 @@ export function IndexCard({
     };
   }, [onRichTextToolbarChange, card.id]);
 
-  // --- Resize logic ---
-  const resizeRef = useRef<{
-    dir: ResizeDir;
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-    startPosX: number;
-    startPosY: number;
-    boardW: number;
-    boardH: number;
-  } | null>(null);
-
-  const listenersRef = useRef<{
-    move: (e: MouseEvent) => void;
-    up: (e: MouseEvent) => void;
-  } | null>(null);
-
-  function startResize(dir: ResizeDir) {
-    return (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-      }
-
-      const parent = nodeRef.current?.parentElement;
-      const boardW = parent?.clientWidth ?? 9999;
-      const boardH = parent?.clientHeight ?? 9999;
-
-      resizeRef.current = {
-        dir,
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: size.width,
-        startH: size.height,
-        startPosX: position.x,
-        startPosY: position.y,
-        boardW,
-        boardH,
-      };
-
-      setIsResizing(true);
-
-      function onMove(ev: MouseEvent) {
-        const rs = resizeRef.current;
-        if (!rs) return;
-
-        const dx = (ev.clientX - rs.startX) / zoom;
-        const dy = (ev.clientY - rs.startY) / zoom;
-
-        let newW = rs.startW;
-        let newH = rs.startH;
-        let newX = rs.startPosX;
-        let newY = rs.startPosY;
-
-        if (rs.dir === "e" || rs.dir === "ne" || rs.dir === "se") {
-          newW = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, rs.startW + dx));
-        }
-        if (rs.dir === "w" || rs.dir === "nw" || rs.dir === "sw") {
-          const proposed = rs.startW - dx;
-          if (proposed >= MIN_WIDTH && proposed <= MAX_WIDTH) {
-            newW = proposed;
-            newX = rs.startPosX + dx;
-          } else if (proposed < MIN_WIDTH) {
-            newW = MIN_WIDTH;
-            newX = rs.startPosX + (rs.startW - MIN_WIDTH);
-          } else {
-            newW = MAX_WIDTH;
-            newX = rs.startPosX + (rs.startW - MAX_WIDTH);
-          }
-        }
-        if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, rs.startH + dy));
-        }
-        if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
-          const proposed = rs.startH - dy;
-          if (proposed >= MIN_HEIGHT && proposed <= MAX_HEIGHT) {
-            newH = proposed;
-            newY = rs.startPosY + dy;
-          } else if (proposed < MIN_HEIGHT) {
-            newH = MIN_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MIN_HEIGHT);
-          } else {
-            newH = MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MAX_HEIGHT);
-          }
-        }
-
-        newW = Math.max(MIN_WIDTH, newW);
-        newH = Math.max(MIN_HEIGHT, newH);
-
-        setSize({ width: newW, height: newH });
-        setPosition({ x: newX, y: newY });
-      }
-
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        listenersRef.current = null;
-        resizeRef.current = null;
-        setIsResizing(false);
-
-        setSize((finalSize) => {
-          const w = Math.round(finalSize.width);
-          const h = Math.round(finalSize.height);
-          setTimeout(() => onResizeRef.current(card.id, w, h), 0);
-          return finalSize;
-        });
-        setPosition((finalPos) => {
-          const x = Math.round(finalPos.x);
-          const y = Math.round(finalPos.y);
-          setTimeout(() => onDragStopRef.current(card.id, x, y), 0);
-          return finalPos;
-        });
-      }
-
-      listenersRef.current = { move: onMove, up: onUp };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
-  }
-
-  // Cleanup only on unmount
-  useEffect(() => {
-    return () => {
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-        listenersRef.current = null;
-      }
-    };
-  }, []);
+  const { startResize } = useBoardItemResize({
+    size,
+    position,
+    zoom,
+    minWidth: MIN_WIDTH,
+    maxWidth: MAX_WIDTH,
+    minHeight: MIN_HEIGHT,
+    maxHeight: MAX_HEIGHT,
+    setSize,
+    setPosition,
+    setIsResizing,
+    onResizeEnd: (final) => {
+      setTimeout(() => onResizeRef.current(card.id, final.width, final.height), 0);
+      setTimeout(() => onDragStopRef.current(card.id, final.x, final.y), 0);
+    },
+  });
 
   const edgeThickness = 6;
 
@@ -566,19 +462,28 @@ export function IndexCard({
       cancel=".index-card-action-area, .index-card-action-btn, .index-card-options-menu"
       scale={zoom}
       disabled={isEditing || isResizing}
+      bounds={{ left: boardMinX, top: boardMinY, right: boardMaxX - size.width, bottom: boardMaxY - size.height }}
     >
       {/* Outer positioning wrapper */}
       <div
         ref={nodeRef}
         data-board-item="card"
         data-card-id={card.id}
-        className="absolute overflow-visible"
+        className="absolute overflow-visible will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
           zIndex,
         }}
         onMouseDown={() => onBringToFront?.(card.id)}
+        onDragStart={(e) => {
+          // Selected text inside the card is natively draggable in the browser. Without
+          // this, grabbing the drag handle while text is highlighted starts a native
+          // text-drag instead of react-draggable's mouse-based drag: the card never
+          // receives the mousemove/mouseup pair it needs, so it appears to stick to the
+          // cursor until the next click forces react-draggable's stale drag state to end.
+          e.preventDefault();
+        }}
         onContextMenu={(e) => {
           const target = e.target as Element;
           const inEditable = target.closest('[contenteditable="true"]');
@@ -821,7 +726,7 @@ export function IndexCard({
                   <div
                     data-field="title"
                     className="note-rich-content break-words text-sm font-semibold text-gray-800"
-                    dangerouslySetInnerHTML={{ __html: card.title }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.title) }}
                   />
                 ) : (
                   <p data-field="title" className="text-sm font-semibold text-gray-500/50">Untitled</p>
@@ -866,7 +771,7 @@ export function IndexCard({
                   <div
                     data-field="content"
                     className="note-rich-content index-card-content break-words text-xs text-gray-600"
-                    dangerouslySetInnerHTML={{ __html: card.content }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(card.content) }}
                   />
                 )}
                 {card.tags.length > 0 && (
@@ -970,3 +875,29 @@ export function IndexCard({
     </Draggable>
   );
 }
+
+function sameShallowList<T extends Record<string, unknown>>(a?: T[] | null, b?: T[] | null): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((item, i) => {
+    const other = b[i]!;
+    const keys = Object.keys(item);
+    return keys.length === Object.keys(other).length && keys.every((k) => item[k] === other[k]);
+  });
+}
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every card's JSX (and its TipTap editors) on each broadcast.
+// Only re-render a card when its own data actually changed; callback props are treated as
+// stable since the board's handlers read live data via refs rather than render-scoped closures.
+export const IndexCard = memo(IndexCardComponent, (prev, next) => {
+  return (
+    prev.card === next.card &&
+    prev.isEditing === next.isEditing &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom &&
+    prev.enlargeWhenEditing === next.enlargeWhenEditing &&
+    sameShallowList(prev.focusedBy, next.focusedBy)
+  );
+});

@@ -52,7 +52,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, loggerConfiguration) =>
 {
     loggerConfiguration.ReadFrom.Configuration(context.Configuration);
-    loggerConfiguration.WriteTo.Console();
 });
 
 // ---------------------------------------------------------------------------
@@ -163,6 +162,11 @@ var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
         ? "DEV_ONLY_FALLBACK_SECRET_CHANGE_IN_PRODUCTION_MIN_32_CHARS"
         : throw new InvalidOperationException("JWT_SECRET environment variable is required in non-development environments."));
 
+// Single source of truth: write the resolved secret back into configuration so
+// TokenService (and anything else reading Jwt:Secret) uses this same validated
+// value instead of re-deriving it with its own fallback.
+builder.Configuration["Jwt:Secret"] = jwtSecret;
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -236,23 +240,32 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
-    // General API: 100 requests per minute per IP
-    options.AddPolicy("general", context =>
+    // General API: 1200 requests per minute per IP (20/sec). Board drag-to-save (notes/index
+    // cards PATCH position) is throttled client-side to 1 request per 120ms per dragged item
+    // (~500/min for a single continuous drag), so this needs enough headroom above that for
+    // real interactive use — plus multiple users/tabs behind the same NAT/office IP — while
+    // still capping scripted/bulk abuse well below what a real client can generate.
+    static RateLimitPartition<string> GeneralPartition(HttpContext context) =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 100,
+                PermitLimit = 1200,
                 Window = TimeSpan.FromMinutes(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
-            }));
+                QueueLimit = 20
+            });
+
+    options.AddPolicy("general", context => GeneralPartition(context));
+
+    // Applied to every request by default so endpoints without an explicit
+    // [EnableRateLimiting] policy (i.e. everything except auth) are still throttled.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(GeneralPartition);
 });
 
 // ---------------------------------------------------------------------------
-// AutoMapper, FluentValidation, Health Checks
+// FluentValidation, Health Checks
 // ---------------------------------------------------------------------------
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<ASideNote.Application.Validators.Auth.RegisterRequestValidator>();
 builder.Services.AddHealthChecks()

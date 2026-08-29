@@ -14,11 +14,6 @@ namespace ASideNote.Infrastructure.Services;
 /// <summary>Converts TipTap/ProseMirror JSON document to DOCX (Word) bytes.</summary>
 public static class TipTapJsonToDocx
 {
-    public static byte[] ToDocx(string contentJson)
-    {
-        return ToDocxAsync(contentJson, null!, CancellationToken.None).GetAwaiter().GetResult();
-    }
-
     public static async Task<byte[]> ToDocxAsync(string contentJson, IImageResolver imageResolver, CancellationToken cancellationToken)
     {
         using var stream = new MemoryStream();

@@ -19,18 +19,16 @@ public sealed class TagService : ITagService
 
     public async Task<IReadOnlyList<TagDto>> GetTagsAsync(CancellationToken cancellationToken = default)
     {
-        var tags = await _tagRepo.Query()
-            .Include(t => t.NoteTags)
+        return await _tagRepo.Query()
+            .Select(t => new TagDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Color = t.Color,
+                NoteCount = t.NoteTags.Count
+            })
             .AsNoTracking()
             .ToListAsync(cancellationToken);
-
-        return tags.Select(t => new TagDto
-        {
-            Id = t.Id,
-            Name = t.Name,
-            Color = t.Color,
-            NoteCount = t.NoteTags.Count
-        }).ToList();
     }
 
     public async Task<TagDto> CreateTagAsync(CreateTagRequest request, CancellationToken cancellationToken = default)

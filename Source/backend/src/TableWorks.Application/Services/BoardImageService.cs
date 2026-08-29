@@ -150,6 +150,7 @@ public sealed class BoardImageService : IBoardImageService
     private async Task EnsureBoardWriteAccessAsync(Guid userId, Guid boardId, CancellationToken cancellationToken)
     {
         var board = await _boardRepo.Query()
+            .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == boardId, cancellationToken)
             ?? throw new KeyNotFoundException("Board not found.");
 

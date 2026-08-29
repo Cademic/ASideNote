@@ -1,6 +1,6 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { corkPanToScroll, corkScrollInnerLayout, corkScrollToPan, corkZoomAroundScreenPoint } from "../../lib/boardViewportScroll";
-import { corkScreenToWorld } from "../../lib/boardViewportMath";
+import { corkScreenToWorld, screenDeltaToWorldDelta } from "../../lib/boardViewportMath";
 import { isWheelOverEditableText, wheelEventDeltaPixels } from "../../lib/boardWheelPan";
 import { ZoomControls } from "./ZoomControls";
 import { useTouchViewport } from "../../hooks/useTouchViewport";
@@ -15,9 +15,6 @@ interface CorkBoardProps {
   presenceWidget?: ReactNode;
   boardRef?: React.RefObject<HTMLDivElement | null>;
   onDropItem?: (type: string, x: number, y: number) => void;
-  /** Board-space (canvas) coords when mouse moves over the viewport */
-  onBoardMouseMove?: (x: number, y: number) => void;
-  onBoardMouseLeave?: () => void;
   /** Called when user clicks the board (receives event so handler can check if click was on background) */
   onBoardClick?: (e: React.MouseEvent) => void;
   zoom: number;
@@ -56,14 +53,39 @@ const DEFAULT_CANVAS_SIZE = 10000;
 const SCROLL_EPS = 0.5;
 const PAN_EPS = 1e-4;
 
+/**
+ * Clamp a scroll viewport's scrollLeft/Top so the canvas (the fixed board) can never be
+ * scrolled past its own edges — i.e. no empty runway beyond the board, for any interaction
+ * method (wheel, scrollbar drag, or cursor-drag panning, since all of them end up here).
+ *
+ * Reads the canvas element's actual rendered position via getBoundingClientRect() rather than
+ * re-deriving the pan/scroll offset formula (see boardViewportScroll.ts) — that formula has a
+ * documented `(zoom + 1)` quirk from the double-translate DOM shape that's easy to get subtly
+ * wrong by hand; measuring the real rendered box sidesteps it entirely.
+ */
+function clampScrollToCanvas(
+  viewport: HTMLDivElement,
+  canvas: HTMLDivElement,
+): { scrollLeft: number; scrollTop: number } {
+  const viewportRect = viewport.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  const canvasScrollLeft = viewport.scrollLeft + (canvasRect.left - viewportRect.left);
+  const canvasScrollTop = viewport.scrollTop + (canvasRect.top - viewportRect.top);
+  const maxScrollLeft = canvasScrollLeft + Math.max(0, canvasRect.width - viewport.clientWidth);
+  const maxScrollTop = canvasScrollTop + Math.max(0, canvasRect.height - viewport.clientHeight);
+  const clampedLeft = clamp(viewport.scrollLeft, canvasScrollLeft, maxScrollLeft);
+  const clampedTop = clamp(viewport.scrollTop, canvasScrollTop, maxScrollTop);
+  if (clampedLeft !== viewport.scrollLeft) viewport.scrollLeft = clampedLeft;
+  if (clampedTop !== viewport.scrollTop) viewport.scrollTop = clampedTop;
+  return { scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop };
+}
+
 export function CorkBoard({
   children,
   topBar,
   presenceWidget,
   boardRef,
   onDropItem,
-  onBoardMouseMove,
-  onBoardMouseLeave,
   onBoardClick,
   zoom,
   panX,
@@ -114,27 +136,40 @@ export function CorkBoard({
     canvasWidth,
     canvasHeight,
     zoom,
+    contentMinX,
+    contentMinY,
   );
 
   // Keep native scroll position aligned with pan/zoom from props (zoom, persistence, contentMin nudge, etc.)
   useLayoutEffect(() => {
     const el = viewportRef.current;
-    if (!el) return;
-    const { scrollLeft: sl, scrollTop: st } = corkPanToScroll(panX, panY, zoom);
+    const canvas = canvasRef.current;
+    if (!el || !canvas) return;
+    const { scrollLeft: sl, scrollTop: st } = corkPanToScroll(panX, panY, zoom, contentMinX, contentMinY);
     if (Math.abs(el.scrollLeft - sl) < SCROLL_EPS && Math.abs(el.scrollTop - st) < SCROLL_EPS) return;
     syncingScrollFromPanRef.current = true;
     el.scrollLeft = sl;
     el.scrollTop = st;
+    // Clamp to the board's own edges — no scrolling into empty space beyond the fixed board —
+    // then resync pan state to wherever we actually landed so state and the visible scroll
+    // never diverge (e.g. a stale persisted pan, or a cursor-drag pan pushed past the edge).
+    const { scrollLeft: clampedLeft, scrollTop: clampedTop } = clampScrollToCanvas(el, canvas);
+    const { panX: clampedPanX, panY: clampedPanY } = corkScrollToPan(clampedLeft, clampedTop, zoom, contentMinX, contentMinY);
+    if (Math.abs(clampedPanX - panX) > PAN_EPS || Math.abs(clampedPanY - panY) > PAN_EPS) {
+      onViewportChangeRef.current(zoom, clampedPanX, clampedPanY);
+    }
     queueMicrotask(() => {
       syncingScrollFromPanRef.current = false;
     });
-  }, [panX, panY, zoom, scrollWidth, scrollHeight]);
+  }, [panX, panY, zoom, scrollWidth, scrollHeight, contentMinX, contentMinY]);
 
   const handleViewportScroll = useCallback(() => {
     const el = viewportRef.current;
-    if (!el || syncingScrollFromPanRef.current) return;
+    const canvas = canvasRef.current;
+    if (!el || !canvas || syncingScrollFromPanRef.current) return;
+    const { scrollLeft: clampedLeft, scrollTop: clampedTop } = clampScrollToCanvas(el, canvas);
     const z = zoomRef.current;
-    const { panX: nx, panY: ny } = corkScrollToPan(el.scrollLeft, el.scrollTop, z);
+    const { panX: nx, panY: ny } = corkScrollToPan(clampedLeft, clampedTop, z, contentMinXRef.current, contentMinYRef.current);
     if (Math.abs(nx - panXRef.current) < PAN_EPS && Math.abs(ny - panYRef.current) < PAN_EPS) return;
     onViewportChangeRef.current(z, nx, ny);
   }, []);
@@ -180,18 +215,6 @@ export function CorkBoard({
 
     onDropItem(itemType, canvasX, canvasY);
   }
-
-  const handleViewportMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = viewportRef.current?.getBoundingClientRect();
-      if (!rect || !onBoardMouseMove) return;
-      const screenX = e.clientX - rect.left;
-      const screenY = e.clientY - rect.top;
-      const { x, y } = corkScreenToWorld(screenX, screenY, zoom, panX, panY, contentMinX, contentMinY);
-      onBoardMouseMove(x, y);
-    },
-    [zoom, panX, panY, contentMinX, contentMinY, onBoardMouseMove],
-  );
 
   // ---- Wheel: Ctrl/Cmd + scroll = zoom; otherwise native scroll on this viewport pans ----
   useEffect(() => {
@@ -258,8 +281,15 @@ export function CorkBoard({
 
   // ---- Pan (right-click drag, middle-click drag, or space + left-click drag) ----
 
-  // Track whether right-click was used for panning so we can suppress the context menu
-  const didRightPanRef = useRef(false);
+  // A right-click only pans once the cursor actually moves past this threshold while held —
+  // below it, releasing the button is treated as a click and opens the board context menu
+  // instead (see onContextMenu below).
+  const RIGHT_CLICK_DRAG_THRESHOLD_PX = 4;
+  // True while the right mouse button is down (from mousedown until its contextmenu/mouseup).
+  const rightMouseDownRef = useRef(false);
+  // True once real movement past the threshold has occurred during that right-button hold —
+  // this (not merely pressing the button) is what suppresses the resulting context menu.
+  const rightDragOccurredRef = useRef(false);
 
   function handleMouseDown(e: React.MouseEvent) {
     // Don't start pan when right-clicking on a board item (let item show context menu)
@@ -268,7 +298,10 @@ export function CorkBoard({
     if (e.button === 2 || e.button === 1 || (e.button === 0 && isSpaceHeld)) {
       e.preventDefault();
       setIsPanning(true);
-      didRightPanRef.current = e.button === 2;
+      if (e.button === 2) {
+        rightMouseDownRef.current = true;
+        rightDragOccurredRef.current = false;
+      }
       panStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -284,8 +317,11 @@ export function CorkBoard({
     function onMouseMove(e: MouseEvent) {
       const start = panStartRef.current;
       if (!start) return;
-      const dx = (e.clientX - start.x) / zoom;
-      const dy = (e.clientY - start.y) / zoom;
+      if (rightMouseDownRef.current && !rightDragOccurredRef.current) {
+        const movedPx = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (movedPx > RIGHT_CLICK_DRAG_THRESHOLD_PX) rightDragOccurredRef.current = true;
+      }
+      const { x: dx, y: dy } = screenDeltaToWorldDelta(e.clientX - start.x, e.clientY - start.y, zoom);
       onViewportChange(zoom, start.panX + dx, start.panY + dy);
     }
 
@@ -302,15 +338,18 @@ export function CorkBoard({
     };
   }, [isPanning, zoom, onViewportChange]);
 
-  // Suppress context menu after right-click panning; show board menu on empty-area right-click
+  // Suppress context menu only after an actual right-click drag (pan); a plain right-click
+  // (press + release with no meaningful movement) opens the board menu instead.
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
     function onContextMenu(e: MouseEvent) {
-      if (didRightPanRef.current) {
+      const wasDrag = rightDragOccurredRef.current;
+      rightMouseDownRef.current = false;
+      rightDragOccurredRef.current = false;
+      if (wasDrag) {
         e.preventDefault();
-        didRightPanRef.current = false;
         return;
       }
       if ((e.target as Element).closest("[data-board-item]")) return;
@@ -396,7 +435,11 @@ export function CorkBoard({
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden corkboard-frame">
       {topBar ? (
-        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
+        // right-[18px] clears the corkboard-surface scrollbar so the toolbar's rounded card never
+        // paints over it — sized above the custom 10px scrollbar width in index.css since not
+        // every browser/build honors ::-webkit-scrollbar sizing (some render a ~15-17px native
+        // gutter regardless), so this leaves margin for that case too.
+        <div className="pointer-events-none absolute left-0 right-[18px] top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
           <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
@@ -421,8 +464,6 @@ export function CorkBoard({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onMouseDown={handleMouseDown}
-        onMouseMove={onBoardMouseMove ? handleViewportMouseMove : undefined}
-        onMouseLeave={onBoardMouseLeave}
       >
         <div
           className="relative"
@@ -433,7 +474,7 @@ export function CorkBoard({
         >
           <div
             ref={setCanvasRef}
-            className="absolute origin-top-left"
+            className="absolute origin-top-left overflow-hidden"
             style={{
               left: `${canvasLeft}px`,
               top: `${canvasTop}px`,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Settings, User, Palette, Save, Loader2, LogOut, ShieldAlert, Trash2, Lock } from "lucide-react";
+import { Save, Loader2, LogOut, Trash2, Lock } from "lucide-react";
 import { getProfile, updateProfile, getPreferences, updatePreferences, changePassword as changePasswordApi, deleteAccount as deleteAccountApi } from "../api/users";
 import { useAuth } from "../context/AuthContext";
 import { useThemeContext, resolveTheme, type ThemeMode } from "../context/ThemeContext";
@@ -242,30 +242,24 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
-      <div className="mx-auto max-w-2xl px-6 py-8">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-            <Settings className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Settings</h1>
-            <p className="text-sm text-foreground/50">
-              Configure your account and preferences.
-            </p>
-          </div>
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="mx-auto max-w-2xl px-6 py-10">
+        <div className="mb-10 border-b border-border pb-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Settings</h1>
+          <p className="mt-1 text-sm text-foreground/50">
+            Manage your account details and preferences.
+          </p>
         </div>
 
         {/* ── Account / Profile ───────────────────────────── */}
-        <section ref={profileSectionRef} className="mb-10 scroll-mt-8">
-          <div className="mb-4 flex items-center gap-2 border-l-4 border-l-amber-400 pl-3 dark:border-l-amber-500">
-            <User className="h-5 w-5 text-foreground/50" />
-            <h2 className="text-base font-semibold text-foreground">Account / Profile</h2>
-          </div>
+        <section ref={profileSectionRef} className="scroll-mt-8 pb-12">
+          <h2 className="mb-6 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            Account &amp; profile
+          </h2>
           {profileError && (
             <p className="mb-4 text-sm text-red-500">{profileError}</p>
           )}
-          <form onSubmit={handleSaveProfile} className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
+          <form onSubmit={handleSaveProfile} className="space-y-6">
             {/* Profile picture */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Profile picture</label>
@@ -345,7 +339,7 @@ export function SettingsPage() {
                 type="email"
                 value={email}
                 readOnly
-                className="w-full cursor-not-allowed rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-foreground/80 focus:outline-none"
+                className="w-full cursor-not-allowed rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground/80 focus:outline-none"
                 tabIndex={-1}
                 aria-describedby="settings-email-hint"
               />
@@ -376,15 +370,14 @@ export function SettingsPage() {
         </section>
 
         {/* ── Preferences ─────────────────────────────────── */}
-        <section className="mb-10">
-          <div className="mb-4 flex items-center gap-2 border-l-4 border-l-violet-400 pl-3 dark:border-l-violet-500">
-            <Palette className="h-5 w-5 text-foreground/50" />
-            <h2 className="text-base font-semibold text-foreground">Preferences</h2>
-          </div>
+        <section className="border-t border-border py-12">
+          <h2 className="mb-6 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            Preferences
+          </h2>
           {prefsError && (
             <p className="mb-4 text-sm text-red-500">{prefsError}</p>
           )}
-          <form onSubmit={handleSavePreferences} className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
+          <form onSubmit={handleSavePreferences} className="space-y-6">
             {/* Theme */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Theme</label>
@@ -422,12 +415,11 @@ export function SettingsPage() {
         </section>
 
         {/* ── Account actions ───────────────────────────── */}
-        <section className="mb-10">
-          <div className="mb-4 flex items-center gap-2 border-l-4 border-l-red-400 pl-3 dark:border-l-red-500">
-            <ShieldAlert className="h-5 w-5 text-foreground/50" />
-            <h2 className="text-base font-semibold text-foreground">Account actions</h2>
-          </div>
-          <div className="space-y-6 rounded-xl border border-border/60 bg-surface p-6">
+        <section className="border-t border-border pt-12">
+          <h2 className="mb-6 text-xs font-semibold uppercase tracking-wider text-foreground/50">
+            Account actions
+          </h2>
+          <div className="space-y-8">
             {/* Change password */}
             <form onSubmit={handleChangePassword} className="space-y-4">
               <h3 className="text-sm font-medium text-foreground">Change password</h3>
@@ -483,7 +475,7 @@ export function SettingsPage() {
             </form>
 
             {/* Log out */}
-            <div>
+            <div className="border-t border-border/60 pt-6">
               <h3 className="mb-2 text-sm font-medium text-foreground">Log out</h3>
               <button
                 type="button"
@@ -496,7 +488,7 @@ export function SettingsPage() {
             </div>
 
             {/* Delete account */}
-            <div>
+            <div className="border-t border-border/60 pt-6">
               <h3 className="mb-2 text-sm font-medium text-foreground">Delete account</h3>
               <p className="mb-3 text-sm text-foreground/60">
                 Permanently delete your account and all data. This cannot be undone.

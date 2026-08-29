@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, Repeat } from "lucide-react";
 import type { CalendarEventDto } from "../../types";
+import type { CalendarEventFormData } from "../../utils/calendar-event-save";
 
 const EVENT_COLORS = [
   { value: "sky", label: "Sky", bg: "bg-sky-400", ring: "ring-sky-500" },
@@ -11,29 +12,10 @@ const EVENT_COLORS = [
   { value: "orange", label: "Orange", bg: "bg-orange-400", ring: "ring-orange-500" },
 ];
 
-const HOURS = Array.from({ length: 24 }, (_, i) => {
-  const hour = i % 12 || 12;
-  const ampm = i < 12 ? "AM" : "PM";
-  return { value: String(i).padStart(2, "0"), label: `${hour}:00 ${ampm}` };
-});
-
 interface CreateEventDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: {
-    title: string;
-    description: string;
-    startDate: string;
-    endDate: string;
-    isAllDay: boolean;
-    color: string;
-    eventType: string;
-    startHour: string;
-    endHour: string;
-    recurrenceFrequency: string;
-    recurrenceInterval: number;
-    recurrenceEndDate: string;
-  }) => void;
+  onSave: (data: CalendarEventFormData) => void;
   onDelete?: () => void;
   initialDate?: string;
   editEvent?: CalendarEventDto | null;
@@ -57,8 +39,8 @@ export function CreateEventDialog({
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [startHour, setStartHour] = useState("09");
-  const [endHour, setEndHour] = useState("10");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
   const [isAllDay, setIsAllDay] = useState(true);
   const [color, setColor] = useState("sky");
   const [eventType, setEventType] = useState<"Event" | "Note">("Event");
@@ -74,8 +56,8 @@ export function CreateEventDialog({
       setDescription(editEvent.description ?? "");
       setStartDate(formatDateForInput(editEvent.startDate));
       setEndDate(editEvent.endDate ? formatDateForInput(editEvent.endDate) : "");
-      setStartHour(extractHour(editEvent.startDate));
-      setEndHour(editEvent.endDate ? extractHour(editEvent.endDate) : "10");
+      setStartTime(extractTime(editEvent.startDate));
+      setEndTime(editEvent.endDate ? extractTime(editEvent.endDate) : "10:00");
       setIsAllDay(editEvent.isAllDay);
       setColor(editEvent.color);
       setEventType(editEvent.eventType as "Event" | "Note");
@@ -86,9 +68,10 @@ export function CreateEventDialog({
       setTitle("");
       setDescription("");
       setStartDate(initialDate ?? toLocalDateStr(new Date()));
-      setEndDate("");
-      setStartHour("09");
-      setEndHour("10");
+      // Inside a project calendar, default the end date to the project's end date
+      setEndDate(projectEndDate ? formatDateForInput(projectEndDate) : "");
+      setStartTime("09:00");
+      setEndTime("10:00");
       setIsAllDay(true);
       setColor("sky");
       setEventType("Event");
@@ -96,7 +79,7 @@ export function CreateEventDialog({
       setRecurrenceInterval(1);
       setRecurrenceEndDate("");
     }
-  }, [isOpen, editEvent, initialDate]);
+  }, [isOpen, editEvent, initialDate, projectEndDate]);
 
   // Compute date boundaries when inside a project calendar
   const minDate = projectStartDate ? formatDateForInput(projectStartDate) : undefined;
@@ -108,21 +91,32 @@ export function CreateEventDialog({
     e.preventDefault();
     if (!title.trim()) return;
 
-    // Enforce project date boundaries
+    // A timed event with an end time but no explicit end date ends on the start
+    // day; an end time at or before the start time means it runs past midnight.
+    let resolvedEndDate = endDate;
+    if (eventType === "Event" && !isAllDay && !resolvedEndDate) {
+      resolvedEndDate = endTime > startTime ? startDate : addDays(startDate, 1);
+    }
+
+    // Enforce project date boundaries — events must not extend past the project's end date
     if (minDate && startDate < minDate) return;
     if (maxDate && startDate > maxDate) return;
-    if (maxDate && endDate && endDate > maxDate) return;
+    if (maxDate && resolvedEndDate && resolvedEndDate > maxDate) return;
+    if (maxDate && recurrenceFrequency) {
+      // A repeating event inside a project must terminate on or before the project end date
+      if (!recurrenceEndDate || recurrenceEndDate > maxDate) return;
+    }
 
     onSave({
       title: title.trim(),
       description: description.trim(),
       startDate,
-      endDate,
+      endDate: resolvedEndDate,
       isAllDay,
       color,
       eventType,
-      startHour,
-      endHour,
+      startTime,
+      endTime,
       recurrenceFrequency,
       recurrenceInterval,
       recurrenceEndDate,
@@ -244,54 +238,44 @@ export function CreateEventDialog({
             )}
           </div>
 
-          {/* All Day Toggle */}
-          {eventType === "Event" && (
-            <label className="flex items-center gap-2 text-sm text-foreground/70">
-              <input
-                type="checkbox"
-                checked={isAllDay}
-                onChange={(e) => setIsAllDay(e.target.checked)}
-                className="h-4 w-4 rounded border-border accent-primary"
-              />
-              All day event
-            </label>
-          )}
+          {/* All Day Toggle — available for both events and notes */}
+          <label className="flex items-center gap-2 text-sm text-foreground/70">
+            <input
+              type="checkbox"
+              checked={isAllDay}
+              onChange={(e) => setIsAllDay(e.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            {eventType === "Note" ? "All day (no set time)" : "All day event"}
+          </label>
 
-          {/* Hourly Time Selectors (when not all-day) */}
-          {eventType === "Event" && !isAllDay && (
-            <div className="grid grid-cols-2 gap-3">
+          {/* Time pickers (when not all-day) — notes take a single time, events a range */}
+          {!isAllDay && (
+            <div className={eventType === "Event" ? "grid grid-cols-2 gap-3" : ""}>
               <div>
                 <label className="mb-1 block text-xs font-medium text-foreground/60">
-                  Start Time
+                  {eventType === "Event" ? "Start Time" : "Time"}
                 </label>
-                <select
-                  value={startHour}
-                  onChange={(e) => setStartHour(e.target.value)}
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {HOURS.map((h) => (
-                    <option key={h.value} value={h.value}>
-                      {h.label}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-foreground/60">
-                  End Time
-                </label>
-                <select
-                  value={endHour}
-                  onChange={(e) => setEndHour(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {HOURS.map((h) => (
-                    <option key={h.value} value={h.value}>
-                      {h.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {eventType === "Event" && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-foreground/60">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -425,7 +409,15 @@ function formatDateForInput(isoStr: string): string {
   return `${year}-${month}-${day}`;
 }
 
-function extractHour(isoStr: string): string {
+function extractTime(isoStr: string): string {
   const d = new Date(isoStr);
-  return String(d.getUTCHours()).padStart(2, "0");
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+/** Shift a "yyyy-MM-dd" string by whole days without timezone drift. */
+function addDays(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }

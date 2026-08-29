@@ -169,7 +169,7 @@ export function ProjectsPage() {
 
   if (isLoading) {
     return (
-      <div className="h-full overflow-y-auto bg-background bg-dots">
+      <div className="h-full overflow-y-auto bg-background">
         <div className="mx-auto max-w-[1600px] px-6 py-6">
           <div className="mb-6 flex items-center justify-between">
             <div className="skeleton h-8 w-32" />
@@ -209,13 +209,13 @@ export function ProjectsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background bg-dots">
+    <div className="h-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/30">
-              <FolderOpen className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900">
+              <FolderOpen className="h-5 w-5 text-violet-600 dark:text-violet-300" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Projects</h1>
@@ -236,7 +236,7 @@ export function ProjectsPage() {
 
         {/* Status filter pills */}
         <div className="mb-6 flex items-center gap-2">
-          <Filter className="h-4 w-4 text-foreground/40" />
+          <Filter className="h-4 w-4 text-foreground/60" />
           {STATUS_FILTERS.map((filter) => (
             <button
               key={filter.value}
@@ -245,8 +245,8 @@ export function ProjectsPage() {
               className={[
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
                 statusFilter === filter.value
-                  ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
-                  : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
+                  ? "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-200"
+                  : "text-foreground/60 hover:bg-surface hover:text-foreground",
               ].join(" ")}
             >
               {filter.label}
@@ -256,11 +256,11 @@ export function ProjectsPage() {
 
         {/* Project grid */}
         {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-14">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-              <PencilLine className="h-5 w-5 text-foreground/30" />
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface py-14">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background">
+              <PencilLine className="h-5 w-5 text-foreground/60" />
             </div>
-            <p className="mb-4 text-sm text-foreground/40">
+            <p className="mb-4 text-sm text-foreground/60">
               {statusFilter
                 ? `No ${statusFilter.toLowerCase()} projects found`
                 : "No projects yet"}
@@ -269,7 +269,7 @@ export function ProjectsPage() {
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
+                className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-primary hover:text-primary hover:shadow-sm motion-reduce:transition-none"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create your first project

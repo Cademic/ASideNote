@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { X, GripVertical } from "lucide-react";
 import type { BoardImageSummaryDto } from "../../types";
+import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
 
 const DEFAULT_WIDTH = 200;
 const DEFAULT_HEIGHT = 150;
 const MIN_SIZE = 60;
 const MAX_WIDTH = 800;
 const MAX_HEIGHT = 600;
-
-type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 const CURSOR_MAP: Record<ResizeDir, string> = {
   n: "cursor-ns-resize",
@@ -38,9 +38,14 @@ interface ImageCardProps {
   /** Called when user right-clicks the image (for context menu). Call e.preventDefault() and e.stopPropagation() before showing menu. */
   onContextMenu?: (e: React.MouseEvent) => void;
   zoom?: number;
+  /** Fixed board boundary (world coords) the image cannot be dragged past. */
+  boardMinX?: number;
+  boardMinY?: number;
+  boardMaxX?: number;
+  boardMaxY?: number;
 }
 
-export function ImageCard({
+function ImageCardComponent({
   image,
   zIndex = 0,
   onDragStart,
@@ -52,6 +57,10 @@ export function ImageCard({
   isLinking = false,
   onContextMenu,
   zoom = 1,
+  boardMinX = -Infinity,
+  boardMinY = -Infinity,
+  boardMaxX = Infinity,
+  boardMaxY = Infinity,
 }: ImageCardProps) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -84,137 +93,30 @@ export function ImageCard({
   }, [image.positionX, image.positionY, isResizing]);
 
   const handleDragStop: DraggableEventHandler = (_e, data) => {
-    setPosition({ x: data.x, y: data.y });
+    // react-draggable reads props.position right after this callback returns and, in
+    // controlled mode, snaps back to it if it hasn't updated yet — flushSync forces the
+    // new position to commit synchronously so it doesn't revert-then-flash to the old spot.
+    flushSync(() => {
+      setPosition({ x: data.x, y: data.y });
+    });
     onDragStop(image.id, data.x, data.y);
   };
 
-  const resizeRef = useRef<{
-    dir: ResizeDir;
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-    startPosX: number;
-    startPosY: number;
-  } | null>(null);
-
-  const listenersRef = useRef<{
-    move: (e: MouseEvent) => void;
-    up: () => void;
-  } | null>(null);
-  const lastResizeValuesRef = useRef<{ w: number; h: number; x: number; y: number } | null>(null);
-
-  function startResize(dir: ResizeDir) {
-    return (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-      }
-
-      resizeRef.current = {
-        dir,
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: size.width,
-        startH: size.height,
-        startPosX: position.x,
-        startPosY: position.y,
-      };
-
-      setIsResizing(true);
-
-      function onMove(ev: MouseEvent) {
-        const rs = resizeRef.current;
-        if (!rs) return;
-
-        const dx = (ev.clientX - rs.startX) / zoom;
-        const dy = (ev.clientY - rs.startY) / zoom;
-
-        let newW = rs.startW;
-        let newH = rs.startH;
-        let newX = rs.startPosX;
-        let newY = rs.startPosY;
-
-        if (rs.dir === "e" || rs.dir === "ne" || rs.dir === "se") {
-          newW = Math.min(MAX_WIDTH, Math.max(MIN_SIZE, rs.startW + dx));
-        }
-        if (rs.dir === "w" || rs.dir === "nw" || rs.dir === "sw") {
-          const proposed = rs.startW - dx;
-          if (proposed >= MIN_SIZE && proposed <= MAX_WIDTH) {
-            newW = proposed;
-            newX = rs.startPosX + dx;
-          } else if (proposed < MIN_SIZE) {
-            newW = MIN_SIZE;
-            newX = rs.startPosX + (rs.startW - MIN_SIZE);
-          } else {
-            newW = MAX_WIDTH;
-            newX = rs.startPosX + (rs.startW - MAX_WIDTH);
-          }
-        }
-        if (rs.dir === "s" || rs.dir === "se" || rs.dir === "sw") {
-          newH = Math.min(MAX_HEIGHT, Math.max(MIN_SIZE, rs.startH + dy));
-        }
-        if (rs.dir === "n" || rs.dir === "ne" || rs.dir === "nw") {
-          const proposed = rs.startH - dy;
-          if (proposed >= MIN_SIZE && proposed <= MAX_HEIGHT) {
-            newH = proposed;
-            newY = rs.startPosY + dy;
-          } else if (proposed < MIN_SIZE) {
-            newH = MIN_SIZE;
-            newY = rs.startPosY + (rs.startH - MIN_SIZE);
-          } else {
-            newH = MAX_HEIGHT;
-            newY = rs.startPosY + (rs.startH - MAX_HEIGHT);
-          }
-        }
-
-        lastResizeValuesRef.current = { w: newW, h: newH, x: newX, y: newY };
-        setSize({ width: newW, height: newH });
-        setPosition({ x: newX, y: newY });
-      }
-
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        listenersRef.current = null;
-        let final = lastResizeValuesRef.current;
-        lastResizeValuesRef.current = null;
-        const rs = resizeRef.current;
-        resizeRef.current = null;
-        setIsResizing(false);
-
-        if (!final && rs) {
-          final = { w: rs.startW, h: rs.startH, x: rs.startPosX, y: rs.startPosY };
-        }
-        if (final) {
-          const w = Math.round(final.w);
-          const h = Math.round(final.h);
-          const x = Math.round(final.x);
-          const y = Math.round(final.y);
-          setSize({ width: final.w, height: final.h });
-          setPosition({ x: final.x, y: final.y });
-          setTimeout(() => onResizeRef.current(image.id, w, h, x, y), 0);
-        }
-      }
-
-      listenersRef.current = { move: onMove, up: onUp };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    };
-  }
-
-  useEffect(() => {
-    return () => {
-      if (listenersRef.current) {
-        document.removeEventListener("mousemove", listenersRef.current.move);
-        document.removeEventListener("mouseup", listenersRef.current.up);
-        listenersRef.current = null;
-      }
-    };
-  }, []);
+  const { startResize } = useBoardItemResize({
+    size,
+    position,
+    zoom,
+    minWidth: MIN_SIZE,
+    maxWidth: MAX_WIDTH,
+    minHeight: MIN_SIZE,
+    maxHeight: MAX_HEIGHT,
+    setSize,
+    setPosition,
+    setIsResizing,
+    onResizeEnd: (final) => {
+      setTimeout(() => onResizeRef.current(image.id, final.width, final.height, final.x, final.y), 0);
+    },
+  });
 
   const edgeThickness = 6;
 
@@ -227,11 +129,12 @@ export function ImageCard({
       handle=".image-card-handle"
       scale={zoom}
       disabled={isResizing}
+      bounds={{ left: boardMinX, top: boardMinY, right: boardMaxX - size.width, bottom: boardMaxY - size.height }}
     >
       <div
         ref={nodeRef}
         data-board-item="image"
-        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10"
+        className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 will-change-transform"
         style={{
           width: `${size.width}px`,
           height: `${size.height}px`,
@@ -383,3 +286,16 @@ export function ImageCard({
     </Draggable>
   );
 }
+
+// Board pages re-render on every unrelated realtime event (remote cursors, presence, etc.),
+// which would otherwise recreate every image's JSX on each broadcast. Only re-render an image
+// when its own data actually changed; callback props are treated as stable since the board's
+// handlers read live data via refs rather than render-scoped closures.
+export const ImageCard = memo(ImageCardComponent, (prev, next) => {
+  return (
+    prev.image === next.image &&
+    prev.zIndex === next.zIndex &&
+    prev.isLinking === next.isLinking &&
+    prev.zoom === next.zoom
+  );
+});

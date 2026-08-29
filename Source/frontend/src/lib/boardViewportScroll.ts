@@ -3,95 +3,73 @@
  *
  * Legacy CorkBoard transform: translate(-contentMin) scale(zoom) translate(panX, panY), giving
  *   screenX = zoom * (worldX + panX) - contentMinX * (zoom + 1)
+ * (see boardViewportMath.ts's corkScreenToWorld/corkWorldToScreen, which encode this same
+ * formula as the single canonical implementation; corkZoomAroundScreenPoint below builds on it
+ * rather than re-deriving it.)
  *
- * With pan removed from CSS and scroll encoding pan, we use a large origin offset so
- * scrollLeft/Top stay non-negative for typical pan ranges (scroll cannot be negative).
+ * With pan removed from CSS and scroll encoding pan, the canvas is positioned at
+ * left/top = contentMinX/contentMinY (instead of a fixed padding origin) and the scroll surface
+ * is sized to exactly the canvas's rendered (zoomed) extent. That makes the canvas's own
+ * left/top edge land at scroll position 0 and its bottom/right edge land at
+ * scrollWidth/scrollHeight, so the native scrollbar's thumb-to-track ratio always reflects the
+ * real pannable range with no dead runway — the browser's own scroll clamping (can't scroll
+ * negative or past scrollWidth - clientWidth) does the board-containment job that a fixed large
+ * origin used to need CorkBoard's scroll-sync layout effect to correct after the fact. That
+ * effect (see clampScrollToCanvas in CorkBoard.tsx) is now a no-op safety net, not the primary
+ * containment mechanism — kept for zoom-change transients, not removed.
  */
+
+import { corkScreenToWorld } from "./boardViewportMath";
 
 export interface ScrollSize {
   scrollWidth: number;
   scrollHeight: number;
 }
 
-/** Padding origin so pan≈0 maps to a mid-range scroll position and pan can go positive or negative. */
-export const BOARD_SCROLL_ORIGIN = 10_000;
-
 export interface CorkScrollLayout extends ScrollSize {
   canvasLeft: number;
   canvasTop: number;
 }
 
-/** Inner scroll surface for CorkBoard / note board (scale = zoom). */
-export function corkScrollInnerLayout(canvasWidth: number, canvasHeight: number, zoom: number): CorkScrollLayout {
-  const o = BOARD_SCROLL_ORIGIN;
-  return {
-    scrollWidth: o * 2 + canvasWidth * zoom,
-    scrollHeight: o * 2 + canvasHeight * zoom,
-    canvasLeft: o,
-    canvasTop: o,
-  };
-}
-
-export function corkPanToScroll(panX: number, panY: number, zoom: number): { scrollLeft: number; scrollTop: number } {
-  const o = BOARD_SCROLL_ORIGIN;
-  return {
-    scrollLeft: o - zoom * panX,
-    scrollTop: o - zoom * panY,
-  };
-}
-
-export function corkScrollToPan(scrollLeft: number, scrollTop: number, zoom: number): { panX: number; panY: number } {
-  const o = BOARD_SCROLL_ORIGIN;
-  return {
-    panX: (o - scrollLeft) / zoom,
-    panY: (o - scrollTop) / zoom,
-  };
-}
-
-/**
- * Chalk board: CSS scale is zoom/RESOLUTION_FACTOR; Fabric uses the same pan units.
- * Same origin pattern with effective scale zoom/RF.
- */
-export function chalkScrollInnerLayout(
+/** Inner scroll surface for CorkBoard / note board (scale = zoom), sized to exactly the pannable canvas extent. */
+export function corkScrollInnerLayout(
   canvasWidth: number,
   canvasHeight: number,
   zoom: number,
-  resolutionFactor: number,
+  contentMinX: number,
+  contentMinY: number,
 ): CorkScrollLayout {
-  const o = BOARD_SCROLL_ORIGIN;
-  const z = zoom / resolutionFactor;
   return {
-    scrollWidth: o * 2 + canvasWidth * z,
-    scrollHeight: o * 2 + canvasHeight * z,
-    canvasLeft: o,
-    canvasTop: o,
+    scrollWidth: canvasWidth * zoom,
+    scrollHeight: canvasHeight * zoom,
+    canvasLeft: contentMinX,
+    canvasTop: contentMinY,
   };
 }
 
-export function chalkPanToScroll(
+export function corkPanToScroll(
   panX: number,
   panY: number,
   zoom: number,
-  resolutionFactor: number,
+  contentMinX: number,
+  contentMinY: number,
 ): { scrollLeft: number; scrollTop: number } {
-  const o = BOARD_SCROLL_ORIGIN;
   return {
-    scrollLeft: o - (zoom * panX) / resolutionFactor,
-    scrollTop: o - (zoom * panY) / resolutionFactor,
+    scrollLeft: contentMinX - zoom * panX,
+    scrollTop: contentMinY - zoom * panY,
   };
 }
 
-export function chalkScrollToPan(
+export function corkScrollToPan(
   scrollLeft: number,
   scrollTop: number,
   zoom: number,
-  resolutionFactor: number,
+  contentMinX: number,
+  contentMinY: number,
 ): { panX: number; panY: number } {
-  const o = BOARD_SCROLL_ORIGIN;
-  const rf = resolutionFactor;
   return {
-    panX: ((o - scrollLeft) * rf) / zoom,
-    panY: ((o - scrollTop) * rf) / zoom,
+    panX: (contentMinX - scrollLeft) / zoom,
+    panY: (contentMinY - scrollTop) / zoom,
   };
 }
 
@@ -109,19 +87,70 @@ export function corkZoomAroundScreenPoint(
   contentMinX: number,
   contentMinY: number,
 ): { panX: number; panY: number } {
+  const oldWorld = corkScreenToWorld(screenX, screenY, zoom, 0, 0, contentMinX, contentMinY);
+  const newWorld = corkScreenToWorld(screenX, screenY, newZoom, 0, 0, contentMinX, contentMinY);
   return {
-    panX:
-      panX +
-      (screenX + contentMinX * (newZoom + 1)) / newZoom -
-      (screenX + contentMinX * (zoom + 1)) / zoom,
-    panY:
-      panY +
-      (screenY + contentMinY * (newZoom + 1)) / newZoom -
-      (screenY + contentMinY * (zoom + 1)) / zoom,
+    panX: panX + (newWorld.x - oldWorld.x),
+    panY: panY + (newWorld.y - oldWorld.y),
   };
 }
 
-/** Same idea as cork; matches ChalkBoard Ctrl+wheel / Fabric viewport math. */
+/**
+ * ChalkBoardPage equivalents of the cork* functions above, using chalk's own
+ * resolution-factor-based scale convention (`vpScale = zoom / RESOLUTION_FACTOR`)
+ * instead of a plain `zoom` scale. contentMin is always (0, 0) for chalk boards
+ * (see ChalkBoardPage's fixed board bounds), so unlike the cork* versions there
+ * is no contentMin offset term to carry around.
+ *
+ * Deliberately NOT unified with the cork* functions above — see the module
+ * doc comment in boardViewportMath.ts for why ChalkBoardPage and CorkBoard are
+ * independently-evolving systems that only coincidentally share an algebraic shape.
+ */
+
+/** Inner scroll surface for ChalkBoardPage (scale = zoom / resolutionFactor). */
+export function chalkScrollInnerLayout(
+  canvasWidth: number,
+  canvasHeight: number,
+  zoom: number,
+  resolutionFactor: number,
+): ScrollSize {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    scrollWidth: canvasWidth * vpScale,
+    scrollHeight: canvasHeight * vpScale,
+  };
+}
+
+export function chalkPanToScroll(
+  panX: number,
+  panY: number,
+  zoom: number,
+  resolutionFactor: number,
+): { scrollLeft: number; scrollTop: number } {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    scrollLeft: -vpScale * panX,
+    scrollTop: -vpScale * panY,
+  };
+}
+
+export function chalkScrollToPan(
+  scrollLeft: number,
+  scrollTop: number,
+  zoom: number,
+  resolutionFactor: number,
+): { panX: number; panY: number } {
+  const vpScale = zoom / resolutionFactor;
+  return {
+    panX: -scrollLeft / vpScale,
+    panY: -scrollTop / vpScale,
+  };
+}
+
+/**
+ * Keep the board point under (screenX, screenY) fixed when zoom changes, using
+ * chalk's resolution-factor scale convention.
+ */
 export function chalkZoomAroundScreenPoint(
   panX: number,
   panY: number,
@@ -133,81 +162,12 @@ export function chalkZoomAroundScreenPoint(
 ): { panX: number; panY: number } {
   const vpScale = zoom / resolutionFactor;
   const newVpScale = newZoom / resolutionFactor;
+  const worldX = screenX / vpScale - panX;
+  const worldY = screenY / vpScale - panY;
+  const newWorldX = screenX / newVpScale - panX;
+  const newWorldY = screenY / newVpScale - panY;
   return {
-    panX: panX + screenX * (1 / newVpScale - 1 / vpScale),
-    panY: panY + screenY * (1 / newVpScale - 1 / vpScale),
+    panX: panX + (newWorldX - worldX),
+    panY: panY + (newWorldY - worldY),
   };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-/** Visible world width/height (chalk coords) for a viewport in CSS pixels at the given zoom. */
-export function chalkVisibleWorldSize(
-  viewportWidth: number,
-  viewportHeight: number,
-  zoom: number,
-  resolutionFactor: number,
-): { vw: number; vh: number } {
-  const rf = resolutionFactor;
-  return {
-    vw: (rf * viewportWidth) / zoom,
-    vh: (rf * viewportHeight) / zoom,
-  };
-}
-
-/**
- * Minimum zoom so the drawable board fully covers the viewport (no “letterbox” pan dead zone).
- * Matches screen→world mapping: worldX = (rf * screenX) / zoom - panX.
- */
-export function chalkMinZoomForBoard(
-  viewportWidth: number,
-  viewportHeight: number,
-  boardWidth: number,
-  boardHeight: number,
-  resolutionFactor: number,
-  absoluteMinZoom: number,
-): number {
-  if (viewportWidth <= 0 || viewportHeight <= 0) return absoluteMinZoom;
-  const rf = resolutionFactor;
-  const zx = (rf * viewportWidth) / boardWidth;
-  const zy = (rf * viewportHeight) / boardHeight;
-  return Math.max(absoluteMinZoom, zx, zy);
-}
-
-/**
- * Keeps the visible world rectangle inside [0, boardWidth] × [0, boardHeight].
- * Uses the same convention as ChalkBoardPage: top-left visible world at (-panX, -panY).
- */
-export function chalkClampPan(
-  panX: number,
-  panY: number,
-  viewportWidth: number,
-  viewportHeight: number,
-  zoom: number,
-  boardWidth: number,
-  boardHeight: number,
-  resolutionFactor: number,
-): { panX: number; panY: number } {
-  if (viewportWidth <= 0 || viewportHeight <= 0 || zoom <= 0) {
-    return { panX, panY };
-  }
-  const { vw, vh } = chalkVisibleWorldSize(viewportWidth, viewportHeight, zoom, resolutionFactor);
-
-  let cx: number;
-  if (vw <= boardWidth) {
-    cx = clamp(panX, vw - boardWidth, 0);
-  } else {
-    cx = (vw - boardWidth) / 2;
-  }
-
-  let cy: number;
-  if (vh <= boardHeight) {
-    cy = clamp(panY, vh - boardHeight, 0);
-  } else {
-    cy = (vh - boardHeight) / 2;
-  }
-
-  return { panX: cx, panY: cy };
 }

@@ -455,6 +455,8 @@ export interface CreateProjectFolderRequest {
 export interface UpdateProjectFolderRequest {
   name?: string;
   sortOrder?: number | null;
+  /** Move the folder (and its boards/notebooks) to this project. Requires Editor rights on both projects. */
+  targetProjectId?: string | null;
 }
 
 export interface SetProjectItemFolderRequest {

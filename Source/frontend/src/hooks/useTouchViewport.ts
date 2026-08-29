@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { corkScreenToWorld } from "../lib/boardViewportMath";
 
 interface UseTouchViewportOptions {
   resolutionFactor?: number;
@@ -107,11 +108,11 @@ export function useTouchViewport(
         const startPanY = panYRef.current;
         const anchorWorldX =
           resolutionFactor === 1 && contentMinX != null
-            ? (midpoint.x + contentMinX * (startZoom + 1)) / startZoom - startPanX
+            ? corkScreenToWorld(midpoint.x, midpoint.y, startZoom, startPanX, startPanY, contentMinX, contentMinY ?? 0).x
             : midpoint.x / (startZoom / resolutionFactor) - startPanX;
         const anchorWorldY =
           resolutionFactor === 1 && contentMinY != null
-            ? (midpoint.y + contentMinY * (startZoom + 1)) / startZoom - startPanY
+            ? corkScreenToWorld(midpoint.x, midpoint.y, startZoom, startPanX, startPanY, contentMinX ?? 0, contentMinY).y
             : midpoint.y / (startZoom / resolutionFactor) - startPanY;
         touchStartRef.current = {
           type: "pinch",
@@ -164,11 +165,19 @@ export function useTouchViewport(
 
         // Keep the same board-space anchor under the current midpoint.
         if (resolutionFactor === 1 && contentMinX != null && contentMinY != null) {
-          const anchoredPanX =
-            (currentMidpoint.x + contentMinX * (newZoom + 1)) / newZoom - start.anchorWorldX;
-          const anchoredPanY =
-            (currentMidpoint.y + contentMinY * (newZoom + 1)) / newZoom - start.anchorWorldY;
-          const anchored = { panX: anchoredPanX, panY: anchoredPanY };
+          const newWorld = corkScreenToWorld(
+            currentMidpoint.x,
+            currentMidpoint.y,
+            newZoom,
+            0,
+            0,
+            contentMinX,
+            contentMinY,
+          );
+          const anchored = {
+            panX: newWorld.x - start.anchorWorldX,
+            panY: newWorld.y - start.anchorWorldY,
+          };
           const norm = normalizeViewportRef.current?.(newZoom, anchored.panX, anchored.panY) ?? {
             zoom: newZoom,
             panX: anchored.panX,

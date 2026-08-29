@@ -9,6 +9,8 @@ export interface BoardPresenceUser {
   displayName: string;
   /** This user's relationship to the board: board/project owner, an editor, or a viewer. Board hub always sets this; other presence producers (e.g. notebook) may omit it. */
   role?: "Owner" | "Editor" | "Viewer";
+  /** Preset avatar key (see constants/avatars.ts); null/undefined means no picture set. Board hub always sets this; other presence producers (e.g. notebook) omit it. */
+  profilePictureKey?: string | null;
 }
 
 function normalizeRole(role: string | undefined): "Owner" | "Editor" | "Viewer" {
@@ -54,7 +56,6 @@ export interface UseBoardRealtimeOptions {
   onIndexCardUpdated?: (payload: BoardItemUpdatePayload) => void;
   onPresenceUpdate?: (users: BoardPresenceUser[]) => void;
   onUserFocusingItem?: (userId: string, itemType: string, itemId: string | null) => void;
-  onCursorPosition?: (userId: string, x: number, y: number) => void;
   onTextCursorPosition?: (userId: string, itemType: string, itemId: string, field: "title" | "content", position: number) => void;
   onUserLeft?: (userId: string) => void;
   /** Called when a note is deleted; merge by removing from state immediately to avoid PATCH-after-delete race. */
@@ -71,7 +72,6 @@ export interface UseBoardRealtimeOptions {
 
 export interface UseBoardRealtimeReturn {
   sendFocus: (itemType: string, itemId: string | null) => void;
-  sendCursor: (x: number, y: number) => void;
   sendTextCursor: (itemType: string, itemId: string, field: "title" | "content", position: number) => void;
   /** True after the SignalR hub has joined the board (collaboration / presence active). */
   isHubConnected: boolean;
@@ -79,8 +79,8 @@ export interface UseBoardRealtimeReturn {
 
 /**
  * Connects to the board SignalR hub and calls refetch when any board event is received.
- * Supports presence (PresenceList, UserJoined, UserLeft), focus (UserFocusingItem), and cursor (CursorPosition).
- * Returns sendFocus and sendCursor to broadcast focus/cursor to others.
+ * Supports presence (PresenceList, UserJoined, UserLeft) and focus (UserFocusingItem).
+ * Returns sendFocus to broadcast focus to others.
  */
 export function useBoardRealtime(
   boardId: string | undefined,
@@ -94,7 +94,6 @@ export function useBoardRealtime(
   const onIndexCardUpdatedRef = useRef(options.onIndexCardUpdated);
   const onPresenceUpdateRef = useRef(options.onPresenceUpdate);
   const onUserFocusingItemRef = useRef(options.onUserFocusingItem);
-  const onCursorPositionRef = useRef(options.onCursorPosition);
   const onTextCursorPositionRef = useRef(options.onTextCursorPosition);
   const onUserLeftRef = useRef(options.onUserLeft);
   const onNoteDeletedRef = useRef(options.onNoteDeleted);
@@ -106,7 +105,6 @@ export function useBoardRealtime(
   onIndexCardUpdatedRef.current = options.onIndexCardUpdated;
   onPresenceUpdateRef.current = options.onPresenceUpdate;
   onUserFocusingItemRef.current = options.onUserFocusingItem;
-  onCursorPositionRef.current = options.onCursorPosition;
   onTextCursorPositionRef.current = options.onTextCursorPosition;
   onUserLeftRef.current = options.onUserLeft;
   onNoteDeletedRef.current = options.onNoteDeleted;
@@ -124,12 +122,6 @@ export function useBoardRealtime(
     if (!bid) return;
     connectionRef.current?.invoke("UserFocusingItem", bid, itemType, itemId).catch(() => {});
   }, []);
-  const sendCursor = useCallback((x: number, y: number) => {
-    const bid = boardIdRef.current;
-    if (!bid) return;
-    connectionRef.current?.invoke("CursorPosition", bid, x, y).catch(() => {});
-  }, []);
-
   const sendTextCursor = useCallback((itemType: string, itemId: string, field: "title" | "content", position: number) => {
     const bid = boardIdRef.current;
     if (!bid) return;
@@ -176,18 +168,24 @@ export function useBoardRealtime(
     let presenceList: BoardPresenceUser[] = [];
     const applyPresence = () => onPresenceUpdateRef.current?.(presenceList);
 
-    const handlePresenceList = (list: Array<{ userId: string; displayName: string; role?: string }>) => {
+    const handlePresenceList = (
+      list: Array<{ userId: string; displayName: string; role?: string; profilePictureKey?: string | null }>,
+    ) => {
       presenceList = (list ?? []).map((u) => ({
         userId: String(u.userId),
         displayName: u.displayName ?? "",
         role: normalizeRole(u.role),
+        profilePictureKey: u.profilePictureKey ?? null,
       }));
       applyPresence();
     };
-    const handleUserJoined = (userId: string, displayName: string, role?: string) => {
+    const handleUserJoined = (userId: string, displayName: string, role?: string, profilePictureKey?: string | null) => {
       const id = String(userId);
       if (presenceList.some((u) => u.userId === id)) return;
-      presenceList = [...presenceList, { userId: id, displayName: displayName ?? "", role: normalizeRole(role) }];
+      presenceList = [
+        ...presenceList,
+        { userId: id, displayName: displayName ?? "", role: normalizeRole(role), profilePictureKey: profilePictureKey ?? null },
+      ];
       applyPresence();
     };
     const handleUserLeft = (userId: string) => {
@@ -199,9 +197,6 @@ export function useBoardRealtime(
     const handleUserFocusingItem = (userId: string, itemType: string, itemId: string | null) => {
       onUserFocusingItemRef.current?.(String(userId), itemType ?? "", itemId ?? null);
     };
-    const handleCursorPosition = (userId: string, x: number, y: number) => {
-      onCursorPositionRef.current?.(String(userId), x, y);
-    };
     const handleTextCursorPosition = (userId: string, itemType: string, itemId: string, field: string, position: number) => {
       onTextCursorPositionRef.current?.(String(userId), itemType ?? "", itemId ?? "", (field === "title" ? "title" : "content") as "title" | "content", position);
     };
@@ -210,7 +205,6 @@ export function useBoardRealtime(
     connection.on("UserJoined", handleUserJoined);
     connection.on("UserLeft", handleUserLeft);
     connection.on("UserFocusingItem", handleUserFocusingItem);
-    connection.on("CursorPosition", handleCursorPosition);
     connection.on("TextCursorPosition", handleTextCursorPosition);
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -340,7 +334,6 @@ export function useBoardRealtime(
       connection.off("UserJoined", handleUserJoined);
       connection.off("UserLeft", handleUserLeft);
       connection.off("UserFocusingItem", handleUserFocusingItem);
-      connection.off("CursorPosition", handleCursorPosition);
       connection.off("TextCursorPosition", handleTextCursorPosition);
       connection.off("NoteAdded", scheduleRefetch);
       connection.off("NoteUpdated", handleNoteUpdated);
@@ -359,5 +352,5 @@ export function useBoardRealtime(
     };
   }, [boardId, isAuthenticated, accessToken, enabled]);
 
-  return { sendFocus, sendCursor, sendTextCursor, isHubConnected };
+  return { sendFocus, sendTextCursor, isHubConnected };
 }

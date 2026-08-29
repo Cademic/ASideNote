@@ -11,17 +11,23 @@ public sealed class ProjectFolderService : IProjectFolderService
     private readonly IRepository<ProjectFolder> _folderRepo;
     private readonly IRepository<Project> _projectRepo;
     private readonly IRepository<ProjectMember> _memberRepo;
+    private readonly IRepository<Board> _boardRepo;
+    private readonly IRepository<Notebook> _notebookRepo;
     private readonly IUnitOfWork _unitOfWork;
 
     public ProjectFolderService(
         IRepository<ProjectFolder> folderRepo,
         IRepository<Project> projectRepo,
         IRepository<ProjectMember> memberRepo,
+        IRepository<Board> boardRepo,
+        IRepository<Notebook> notebookRepo,
         IUnitOfWork unitOfWork)
     {
         _folderRepo = folderRepo;
         _projectRepo = projectRepo;
         _memberRepo = memberRepo;
+        _boardRepo = boardRepo;
+        _notebookRepo = notebookRepo;
         _unitOfWork = unitOfWork;
     }
 
@@ -146,24 +152,69 @@ public sealed class ProjectFolderService : IProjectFolderService
             .FirstOrDefaultAsync(f => f.Id == folderId && f.ProjectId == projectId, cancellationToken)
             ?? throw new KeyNotFoundException("Folder not found.");
 
+        var isMove = request.TargetProjectId.HasValue && request.TargetProjectId.Value != projectId;
+        var effectiveProjectId = isMove ? request.TargetProjectId!.Value : projectId;
+
+        if (isMove)
+            await EnsureCanEditAsync(userId, effectiveProjectId, cancellationToken);
+
         if (request.Name is not null)
         {
             var name = request.Name.Trim();
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentException("Folder name cannot be empty.");
-            var duplicate = await _folderRepo.Query()
-                .AnyAsync(
-                    f => f.ProjectId == projectId && f.Id != folderId && f.Name.ToLower() == name.ToLower(),
-                    cancellationToken);
-            if (duplicate)
-                throw new InvalidOperationException($"A folder named \"{name}\" already exists in this project.");
             folder.Name = name;
         }
 
-        if (request.SortOrder.HasValue)
-            folder.SortOrder = request.SortOrder.Value;
+        // Name must be unique within the folder's (possibly new) project.
+        if (request.Name is not null || isMove)
+        {
+            var finalName = folder.Name;
+            var duplicate = await _folderRepo.Query()
+                .AnyAsync(
+                    f => f.ProjectId == effectiveProjectId && f.Id != folderId && f.Name.ToLower() == finalName.ToLower(),
+                    cancellationToken);
+            if (duplicate)
+                throw new InvalidOperationException($"A folder named \"{finalName}\" already exists in this project.");
+        }
 
-        folder.UpdatedAt = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
+
+        if (isMove)
+        {
+            var maxSort = await _folderRepo.Query()
+                .Where(f => f.ProjectId == effectiveProjectId)
+                .Select(f => (int?)f.SortOrder)
+                .MaxAsync(cancellationToken) ?? -1;
+            folder.ProjectId = effectiveProjectId;
+            folder.SortOrder = maxSort + 1;
+
+            var boards = await _boardRepo.Query()
+                .Where(b => b.ProjectFolderId == folderId)
+                .ToListAsync(cancellationToken);
+            foreach (var b in boards)
+            {
+                b.ProjectId = effectiveProjectId;
+                b.UpdatedAt = now;
+                _boardRepo.Update(b);
+            }
+
+            var notebooks = await _notebookRepo.Query()
+                .Where(n => n.ProjectFolderId == folderId)
+                .ToListAsync(cancellationToken);
+            foreach (var n in notebooks)
+            {
+                n.ProjectId = effectiveProjectId;
+                n.UpdatedAt = now;
+                _notebookRepo.Update(n);
+            }
+        }
+        else if (request.SortOrder.HasValue)
+        {
+            folder.SortOrder = request.SortOrder.Value;
+        }
+
+        folder.UpdatedAt = now;
         _folderRepo.Update(folder);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }

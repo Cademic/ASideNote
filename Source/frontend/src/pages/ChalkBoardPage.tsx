@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { useAuth } from "../context/AuthContext";
@@ -20,6 +20,7 @@ import { useBoardRealtime, type BoardItemUpdatePayload } from "../hooks/useBoard
 import { useFileImport } from "../hooks/useFileImport";
 import { getColorForUserId } from "../lib/presenceColors";
 import { isWheelOverEditableText, wheelEventDeltaPixels } from "../lib/boardWheelPan";
+import { chalkScrollInnerLayout, chalkPanToScroll, chalkScrollToPan, chalkZoomAroundScreenPoint } from "../lib/boardViewportScroll";
 import {
   createBoardExportPayload,
   triggerBoardDownload,
@@ -66,9 +67,6 @@ export function ChalkBoardPage() {
   const primaryEditingNoteIdRef = useRef<string | null>(null);
   const noteNavAnchorRef = useRef<string | null>(null);
   const [remoteFocus, setRemoteFocus] = useState<Map<string, { userId: string; color: string }[]>>(new Map());
-  const [remoteCursors, setRemoteCursors] = useState<Map<string, { x: number; y: number; color: string }>>(new Map());
-  const cursorThrottleRef = useRef<{ last: number }>({ last: 0 });
-  const CURSOR_THROTTLE_MS = 60;
 
   // --- Z-index stacking ---
   const [zIndexMap, setZIndexMap] = useState<Record<string, number>>({});
@@ -109,38 +107,42 @@ export function ChalkBoardPage() {
   panXRef.current = panX;
   panYRef.current = panY;
 
-  // Fixed-size notes layer that expands when notes are placed or dragged outside current bounds.
-  const CANVAS_PADDING = 300;
-  const DEFAULT_CANVAS_SIZE = 2000;
   const NOTE_DEFAULT_SIZE = 270;
   const POSITION_DEFAULT = 20;
-  const chalkNotesBounds = useMemo(() => {
-    let maxX = DEFAULT_CANVAS_SIZE;
-    let maxY = DEFAULT_CANVAS_SIZE;
-    for (const n of notes) {
-      const x = n.positionX ?? POSITION_DEFAULT;
-      const y = n.positionY ?? POSITION_DEFAULT;
-      const w = n.width ?? NOTE_DEFAULT_SIZE;
-      const h = n.height ?? NOTE_DEFAULT_SIZE;
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
-    }
-    // Keep note-space origin aligned with drawing-space origin (0,0) so notes
-    // can always be placed directly over drawings without drifting past an
-    // implicit negative-offset boundary.
-    const contentMinX = 0;
-    const contentMinY = 0;
-    const canvasWidth = Math.max(DEFAULT_CANVAS_SIZE, maxX + CANVAS_PADDING);
-    const canvasHeight = Math.max(DEFAULT_CANVAS_SIZE, maxY + CANVAS_PADDING);
-    return { contentMinX, contentMinY, canvasWidth, canvasHeight };
-  }, [notes]);
+
+  // Fixed-size board: a firm boundary instead of a canvas that grows to fit wherever
+  // content has been dragged (see NoteBoardPage's BOARD_MIN/MAX_X/Y for the incident
+  // this pattern fixes on noteboards — a stray/corrupted position blowing the shared
+  // canvas out to hundreds of thousands of pixels, degrading drag precision for every
+  // item on the board). Chalk keeps contentMin pinned at (0, 0) so notes always sit
+  // directly over drawing-space coordinates.
+  const CHALK_BOARD_MAX_X = 20000;
+  const CHALK_BOARD_MAX_Y = 20000;
+  const chalkCanvasBounds = { canvasWidth: CHALK_BOARD_MAX_X, canvasHeight: CHALK_BOARD_MAX_Y };
+
+  /** Clamp a newly-placed item's position so its full extent stays within the fixed board. */
+  function clampToChalkBoardBounds(x: number, y: number, width: number, height: number) {
+    return {
+      x: Math.min(Math.max(x, 0), CHALK_BOARD_MAX_X - width),
+      y: Math.min(Math.max(y, 0), CHALK_BOARD_MAX_Y - height),
+    };
+  }
 
   const [isPanning, setIsPanning] = useState(false);
   const [isTouchPanning, setIsTouchPanning] = useState(false);
   const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+  /** Outer frame — hosts pan/wheel/drag handlers and is the rect source for screen<->board math. */
   const viewportRef = useRef<HTMLDivElement>(null);
+  /** Inner native-scroll surface — its scrollLeft/scrollTop encode pan (see the sync effect below). */
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  /** Ignore scroll events while applying scrollLeft/Top from React pan state (mirrors CorkBoard). */
+  const syncingScrollFromPanRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
-  const didRightPanRef = useRef(false);
+  // True while the right mouse button is down (from mousedown until its contextmenu/mouseup).
+  const rightMouseDownRef = useRef(false);
+  // True once real movement past the threshold has occurred during that right-button hold —
+  // this (not merely pressing the button) is what suppresses the resulting context menu.
+  const rightDragOccurredRef = useRef(false);
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<{ x: number; y: number; note: NoteSummaryDto } | null>(null);
 
@@ -184,7 +186,24 @@ export function ChalkBoardPage() {
     }
   });
 
-  // Restore viewport from localStorage on mount
+  // Whether this board has never been opened before (nothing saved for it yet) — decided once,
+  // during the very first render, before any effect gets a chance to run. Computed here rather
+  // than inside an effect so it can't race with the viewport-persistence effect below (see the
+  // matching comment in NoteBoardPage.tsx for the exact failure mode that motivates this).
+  const needsInitialCenterRef = useRef<boolean | null>(null);
+  if (needsInitialCenterRef.current === null) {
+    let hasSaved = false;
+    if (boardId) {
+      try {
+        hasSaved = localStorage.getItem(`board-viewport-${boardId}`) !== null;
+      } catch {
+        // ignore
+      }
+    }
+    needsInitialCenterRef.current = !hasSaved;
+  }
+
+  // Restore viewport from localStorage on mount.
   useEffect(() => {
     if (!boardId) return;
     try {
@@ -199,6 +218,18 @@ export function ChalkBoardPage() {
       // ignore parse errors
     }
   }, [boardId]);
+
+  // If this board has never been opened before, center the view on the board instead of
+  // leaving the default panX/panY = 0, which lands on the board's origin/top-left corner
+  // (contentMin is pinned at 0,0 — see CHALK_BOARD_MAX_X/Y). Deferred until loading finishes:
+  // while isLoading is true the board renders a placeholder instead of the real viewport, so
+  // viewportRef isn't attached yet and panViewportToBoardPoint's rect measurement would
+  // silently no-op.
+  useEffect(() => {
+    if (isLoading || !needsInitialCenterRef.current) return;
+    needsInitialCenterRef.current = false;
+    panViewportToBoardPoint(CHALK_BOARD_MAX_X / 2, CHALK_BOARD_MAX_Y / 2);
+  }, [isLoading]);
 
   // Persist viewport to localStorage (debounced)
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -256,8 +287,8 @@ export function ChalkBoardPage() {
     if (!rect) return { x: 400, y: 300 };
     const centerScreenX = rect.width / 2;
     const centerScreenY = rect.height / 2;
-    const x = (centerScreenX + chalkNotesBounds.contentMinX) * (RESOLUTION_FACTOR / zoom) - panX;
-    const y = (centerScreenY + chalkNotesBounds.contentMinY) * (RESOLUTION_FACTOR / zoom) - panY;
+    const x = centerScreenX * (RESOLUTION_FACTOR / zoom) - panX;
+    const y = centerScreenY * (RESOLUTION_FACTOR / zoom) - panY;
     return { x, y };
   }
 
@@ -266,8 +297,8 @@ export function ChalkBoardPage() {
     if (!rect) return;
     const centerScreenX = rect.width / 2;
     const centerScreenY = rect.height / 2;
-    const newPanX = (centerScreenX + chalkNotesBounds.contentMinX) * (RESOLUTION_FACTOR / zoom) - centerX;
-    const newPanY = (centerScreenY + chalkNotesBounds.contentMinY) * (RESOLUTION_FACTOR / zoom) - centerY;
+    const newPanX = centerScreenX * (RESOLUTION_FACTOR / zoom) - centerX;
+    const newPanY = centerScreenY * (RESOLUTION_FACTOR / zoom) - centerY;
     handleViewportChange(zoom, newPanX, newPanY);
   }
 
@@ -336,7 +367,7 @@ export function ChalkBoardPage() {
     navigateRelativeNote(1);
   }
 
-  // --- Wheel: Ctrl/Cmd + scroll = zoom; Alt + scroll = horizontal pan ---
+  // --- Wheel: Ctrl/Cmd + scroll = zoom; Alt + scroll = horizontal pan; otherwise pan both axes ---
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
@@ -355,12 +386,17 @@ export function ChalkBoardPage() {
         );
         const factor = Math.pow(ZOOM_STEP_PER_UNIT, exponent);
         const newZoom = clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM);
-        const vpScale = zoom / RESOLUTION_FACTOR;
-        const newVpScale = newZoom / RESOLUTION_FACTOR;
 
-        // Keep point under cursor fixed (same formula as Note Board CorkBoard)
-        const newPanX = panX + mouseX * (1 / newVpScale - 1 / vpScale);
-        const newPanY = panY + mouseY * (1 / newVpScale - 1 / vpScale);
+        // Keep point under cursor fixed
+        const { panX: newPanX, panY: newPanY } = chalkZoomAroundScreenPoint(
+          panX,
+          panY,
+          zoom,
+          newZoom,
+          mouseX,
+          mouseY,
+          RESOLUTION_FACTOR,
+        );
 
         handleViewportChange(newZoom, newPanX, newPanY);
         return;
@@ -368,26 +404,74 @@ export function ChalkBoardPage() {
 
       if (isWheelOverEditableText(e.target)) return;
 
-      // Alt + wheel: convert vertical scroll into horizontal pan (mice without a horizontal wheel)
-      if (e.altKey) {
-        e.preventDefault();
-        const { dy } = wheelEventDeltaPixels(e, viewport!);
-        const dx = (RESOLUTION_FACTOR * dy) / zoom;
-        handleViewportChange(zoom, panX - dx, panY);
-      }
+      // Plain wheel/trackpad pans both axes; Alt + wheel converts vertical scroll into
+      // horizontal pan (mice without a horizontal wheel). Handled manually (rather than
+      // relying on native scroll) so panning works the same whether the pointer is over
+      // the drawing canvas or the notes layer — see the scrollViewportRef sync effect,
+      // which reflects this panX/panY change back into native scrollLeft/scrollTop.
+      e.preventDefault();
+      const { dx: rawDx, dy: rawDy } = wheelEventDeltaPixels(e, viewport!);
+      const dx = e.altKey ? rawDy : rawDx;
+      const dy = e.altKey ? 0 : rawDy;
+      const vpScale = zoom / RESOLUTION_FACTOR;
+      handleViewportChange(zoom, panX - dx / vpScale, panY - dy / vpScale);
     }
 
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
   }, [zoom, panX, panY]);
 
+  // --- Keep native scroll position (scrollViewportRef) in sync with panX/panY/zoom state ---
+  // useLayoutEffect (not useEffect) so an out-of-bounds correction below lands before paint —
+  // otherwise a fast drag past the edge would show one visible frame of the drawing (which reads
+  // panX/panY directly) drifting ahead of the already-clamped notes layer on every step.
+  useLayoutEffect(() => {
+    const el = scrollViewportRef.current;
+    if (!el) return;
+    const { scrollLeft: sl, scrollTop: st } = chalkPanToScroll(panX, panY, zoom, RESOLUTION_FACTOR);
+    if (Math.abs(el.scrollLeft - sl) < 0.5 && Math.abs(el.scrollTop - st) < 0.5) return;
+    syncingScrollFromPanRef.current = true;
+    el.scrollLeft = sl;
+    el.scrollTop = st;
+    // Past the board edge the browser silently clamps scrollLeft/Top and leaves the actual
+    // position unchanged — which means no native "scroll" event fires to correct panX/panY back.
+    // Without this, a drag/wheel gesture that pushes past the edge keeps driving panX/panY further
+    // out of range on every subsequent move event, even though the (already-pinned) native scroll
+    // never moves again — desyncing ChalkCanvas's drawing (reads panX/panY directly) from the notes
+    // layer (reads actual, correctly-clamped scroll position). Read back what the browser actually
+    // landed on and snap state to match, so panning simply can't go past the border in the first place.
+    if (Math.abs(el.scrollLeft - sl) > 0.5 || Math.abs(el.scrollTop - st) > 0.5) {
+      const { panX: clampedPanX, panY: clampedPanY } = chalkScrollToPan(el.scrollLeft, el.scrollTop, zoom, RESOLUTION_FACTOR);
+      handleViewportChange(zoom, clampedPanX, clampedPanY);
+    }
+    queueMicrotask(() => {
+      syncingScrollFromPanRef.current = false;
+    });
+  }, [panX, panY, zoom]);
+
+  const handleViewportScroll = useCallback(() => {
+    const el = scrollViewportRef.current;
+    if (!el || syncingScrollFromPanRef.current) return;
+    const { panX: nx, panY: ny } = chalkScrollToPan(el.scrollLeft, el.scrollTop, zoom, RESOLUTION_FACTOR);
+    if (Math.abs(nx - panX) < 1e-4 && Math.abs(ny - panY) < 1e-4) return;
+    handleViewportChange(zoom, nx, ny);
+  }, [zoom, panX, panY]);
+
   // --- Pan (right-click, middle-click, space+left drag) ---
+  // A right-click only pans once the cursor actually moves past this threshold while held —
+  // below it, releasing the button is treated as a click and opens the board context menu
+  // instead (see onContextMenu below).
+  const RIGHT_CLICK_DRAG_THRESHOLD_PX = 4;
+
   function handleViewportMouseDown(e: React.MouseEvent) {
     if (e.button === 2 && (e.target as Element).closest("[data-board-item]")) return;
     if (e.button === 2 || e.button === 1 || (e.button === 0 && isSpaceHeld)) {
       e.preventDefault();
       setIsPanning(true);
-      didRightPanRef.current = e.button === 2;
+      if (e.button === 2) {
+        rightMouseDownRef.current = true;
+        rightDragOccurredRef.current = false;
+      }
       panStartRef.current = { x: e.clientX, y: e.clientY, panX, panY };
 
       // Temporarily disable drawing while panning
@@ -403,6 +487,10 @@ export function ChalkBoardPage() {
     function onMouseMove(e: MouseEvent) {
       const start = panStartRef.current;
       if (!start) return;
+      if (rightMouseDownRef.current && !rightDragOccurredRef.current) {
+        const movedPx = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+        if (movedPx > RIGHT_CLICK_DRAG_THRESHOLD_PX) rightDragOccurredRef.current = true;
+      }
       const dx = RESOLUTION_FACTOR * (e.clientX - start.x) / zoom;
       const dy = RESOLUTION_FACTOR * (e.clientY - start.y) / zoom;
       handleViewportChange(zoom, start.panX + dx, start.panY + dy);
@@ -438,9 +526,11 @@ export function ChalkBoardPage() {
     if (!viewport) return;
 
     function onContextMenu(e: MouseEvent) {
-      if (didRightPanRef.current) {
+      const wasDrag = rightDragOccurredRef.current;
+      rightMouseDownRef.current = false;
+      rightDragOccurredRef.current = false;
+      if (wasDrag) {
         e.preventDefault();
-        didRightPanRef.current = false;
         return;
       }
       if ((e.target as Element).closest("[data-board-item]")) return;
@@ -696,7 +786,18 @@ export function ChalkBoardPage() {
           }
           return n;
         });
-        setNotes(migrated);
+        // Preserve the live position of a note currently being dragged: a refetch (e.g.
+        // triggered by another collaborator's SignalR event) would otherwise overwrite it
+        // with the last-persisted server position, snapping the note backward mid-drag.
+        const draggingId = noteDragGuardRef.current?.id ?? null;
+        const localDraggingNote = draggingId ? notesRef.current.find((n) => n.id === draggingId) : undefined;
+        setNotes(
+          localDraggingNote
+            ? migrated.map((n) =>
+                n.id === draggingId ? { ...n, positionX: localDraggingNote.positionX, positionY: localDraggingNote.positionY } : n,
+              )
+            : migrated,
+        );
       }
 
       if (
@@ -715,12 +816,35 @@ export function ChalkBoardPage() {
     fetchData();
   }, [fetchData]);
 
-  const draggingNoteIdRef = useRef<string | null>(null);
+  // While actively dragging, `expected` is null and every echo is skipped unconditionally.
+  // After drop, `expected` holds the position we just set locally; echoes are skipped until
+  // one arrives matching it (confirming the drop landed), or a safety-net timeout releases the
+  // guard. This avoids a fixed short timeout letting *stale* mid-drag echoes (still working
+  // their way back from a long/fast drag's throttled PATCH calls) overwrite the note after drop.
+  type DragGuard = { id: string; expected: { x: number; y: number } | null };
+  const noteDragGuardRef = useRef<DragGuard | null>(null);
+  const DRAG_ECHO_SAFETY_NET_MS = 5000;
+  const POSITION_ECHO_EPSILON = 0.5;
   const RESIZE_ECHO_IGNORE_MS = 400;
   const lastResizedNoteRef = useRef<{ id: string; at: number } | null>(null);
   const mergeNotePayload = useCallback((payload: BoardItemUpdatePayload) => {
     const id = String(payload.id);
-    const skipPosition = id === draggingNoteIdRef.current;
+    let skipPosition = false;
+    const guard = noteDragGuardRef.current;
+    if (guard?.id === id) {
+      if (!guard.expected) {
+        skipPosition = true;
+      } else if (
+        payload.positionX !== undefined &&
+        payload.positionY !== undefined &&
+        Math.abs(payload.positionX - guard.expected.x) < POSITION_ECHO_EPSILON &&
+        Math.abs(payload.positionY - guard.expected.y) < POSITION_ECHO_EPSILON
+      ) {
+        noteDragGuardRef.current = null;
+      } else {
+        skipPosition = true;
+      }
+    }
     const skipSize =
       lastResizedNoteRef.current?.id === id &&
       Date.now() - lastResizedNoteRef.current.at < RESIZE_ECHO_IGNORE_MS;
@@ -760,21 +884,11 @@ export function ChalkBoardPage() {
     });
   }, []);
 
-  const handleCursorPosition = useCallback((userId: string, x: number, y: number) => {
-    setRemoteCursors((prev) => {
-      const next = new Map(prev);
-      if (x < 0 || y < 0) next.delete(userId);
-      else next.set(userId, { x, y, color: getColorForUserId(userId) });
-      return next;
-    });
-  }, []);
-
-  const { sendFocus, sendCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
+  const { sendFocus, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
     enabled: !!board?.projectId,
     onNoteUpdated: mergeNotePayload,
     onPresenceUpdate: setBoardPresence,
     onUserFocusingItem: handleUserFocusingItem,
-    onCursorPosition: handleCursorPosition,
   });
 
   useEffect(() => {
@@ -782,23 +896,6 @@ export function ChalkBoardPage() {
     if (primary) sendFocus("note", primary);
     else sendFocus("note", null);
   }, [editingNoteIds, sendFocus]);
-
-  const handleChalkBoardMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = viewportRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const now = Date.now();
-      if (now - cursorThrottleRef.current.last < CURSOR_THROTTLE_MS) return;
-      cursorThrottleRef.current.last = now;
-      const x = RESOLUTION_FACTOR * (e.clientX - rect.left) / zoom - panX;
-      const y = RESOLUTION_FACTOR * (e.clientY - rect.top) / zoom - panY;
-      sendCursor(x, y);
-    },
-    [zoom, panX, panY, sendCursor],
-  );
-  const handleChalkBoardMouseLeave = useCallback(() => {
-    sendCursor(-1, -1);
-  }, [sendCursor]);
 
   const DRAG_THROTTLE_MS = 120;
   type DragPending = { x: number; y: number; timer: ReturnType<typeof setTimeout> };
@@ -1126,8 +1223,29 @@ export function ChalkBoardPage() {
     await handleAddStickyNoteAt(positionX, positionY);
   }
 
-  async function handleAddStickyNoteAt(positionX: number, positionY: number) {
+  /** Convert a right-click's viewport-relative client coordinates into board (world) coordinates. */
+  function boardPointToWorld(clientX: number, clientY: number) {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 400, y: 300 };
+    return {
+      x: (RESOLUTION_FACTOR * (clientX - rect.left)) / zoom - panX,
+      y: (RESOLUTION_FACTOR * (clientY - rect.top)) / zoom - panY,
+    };
+  }
+
+  /** Add a sticky note centered on a right-click point (board/world coordinates). */
+  async function handleAddStickyNoteAtPoint(worldX: number, worldY: number) {
+    await handleAddStickyNoteAt(worldX - NOTE_DEFAULT_SIZE / 2, worldY - NOTE_DEFAULT_SIZE / 2);
+  }
+
+  async function handleAddStickyNoteAt(rawPositionX: number, rawPositionY: number) {
     if (!boardId) return;
+    const { x: positionX, y: positionY } = clampToChalkBoardBounds(
+      rawPositionX,
+      rawPositionY,
+      NOTE_DEFAULT_SIZE,
+      NOTE_DEFAULT_SIZE,
+    );
     try {
       const created = await createNote({
         content: "",
@@ -1148,9 +1266,8 @@ export function ChalkBoardPage() {
   }
 
   function handleNoteDragStart(id: string) {
-    draggingNoteIdRef.current = id;
+    noteDragGuardRef.current = { id, expected: null };
   }
-  const DRAG_ECHO_IGNORE_MS = 280;
   async function handleDragStop(id: string, x: number, y: number) {
     const pending = noteDragMapRef.current.get(id);
     if (pending) {
@@ -1172,9 +1289,13 @@ export function ChalkBoardPage() {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, positionX: x, positionY: y } : n)),
     );
+    // Keep ignoring echoes for this note until the one matching our final drop position
+    // arrives (stale mid-drag echoes queued up during the drag may still be in flight).
+    // Safety net: release the guard regardless after a while in case that echo is ever lost.
+    noteDragGuardRef.current = { id, expected: { x, y } };
     window.setTimeout(() => {
-      if (draggingNoteIdRef.current === id) draggingNoteIdRef.current = null;
-    }, DRAG_ECHO_IGNORE_MS);
+      if (noteDragGuardRef.current?.id === id) noteDragGuardRef.current = null;
+    }, DRAG_ECHO_SAFETY_NET_MS);
     try {
       if (deletedNoteIdsRef.current.has(id) || !notesRef.current.some((n) => n.id === id)) return;
       await patchNote(id, { positionX: x, positionY: y });
@@ -1329,13 +1450,19 @@ export function ChalkBoardPage() {
   async function handleDuplicateNote(note: NoteSummaryDto) {
     if (!boardId) return;
     setItemContextMenu(null);
+    const { x: dupX, y: dupY } = clampToChalkBoardBounds(
+      (note.positionX ?? 0) + DUPLICATE_OFFSET,
+      (note.positionY ?? 0) + DUPLICATE_OFFSET,
+      note.width ?? NOTE_DEFAULT_SIZE,
+      note.height ?? NOTE_DEFAULT_SIZE,
+    );
     try {
       const created = await createNote({
         boardId,
         title: note.title ?? undefined,
         content: note.content ?? "",
-        positionX: (note.positionX ?? 0) + DUPLICATE_OFFSET,
-        positionY: (note.positionY ?? 0) + DUPLICATE_OFFSET,
+        positionX: dupX,
+        positionY: dupY,
         width: note.width ?? undefined,
         height: note.height ?? undefined,
         color: note.color ?? undefined,
@@ -1354,7 +1481,7 @@ export function ChalkBoardPage() {
     return [
       { label: "Edit", icon: Pencil, onClick: () => handleStartEdit(note.id) },
       { label: "Duplicate", icon: Copy, onClick: () => handleDuplicateNote(note) },
-      { label: "Bring to front", icon: Layers, onClick: () => bringToFront(note.id) },
+      { label: "Bring to Front", icon: Layers, onClick: () => bringToFront(note.id) },
       { label: "Delete", icon: Trash2, onClick: () => handleDelete(note.id), divider: true },
     ];
   }
@@ -1395,6 +1522,15 @@ export function ChalkBoardPage() {
       : backgroundTheme === "blackboard"
         ? CHALK_BLACKBOARD_BG
         : CHALKBOARD_BG;
+  const { scrollWidth, scrollHeight } = chalkScrollInnerLayout(
+    chalkCanvasBounds.canvasWidth,
+    chalkCanvasBounds.canvasHeight,
+    zoom,
+    RESOLUTION_FACTOR,
+  );
+  // Exactly one of {drawing canvas, notes layer} is interactive at a time.
+  const isDrawingActive = mode === "draw" && !isSpaceHeld && !isPanning;
+  const isNotesLayerActive = mode === "select" && !isSpaceHeld && !isPanning;
 
   return (
     <div className="relative flex h-full w-full flex-col">
@@ -1408,8 +1544,12 @@ export function ChalkBoardPage() {
           .filter(Boolean)
           .join(" ")}
       >
-        {/* Menu card inside frame, overlapping chalkboard surface under top border */}
-        <div className="pointer-events-none absolute left-0 right-0 top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
+        {/* Menu card inside frame, overlapping chalkboard surface under top border.
+            right-[18px] clears the chalkboard-surface scrollbar so the toolbar's rounded card
+            never paints over it — sized above the custom 10px scrollbar width in index.css since
+            not every browser/build honors ::-webkit-scrollbar sizing (some render a ~15-17px
+            native gutter regardless), so this leaves margin for that case too. */}
+        <div className="pointer-events-none absolute left-0 right-[18px] top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
           <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
@@ -1464,7 +1604,8 @@ export function ChalkBoardPage() {
           aria-hidden
           onChange={handleLoadFileSelect}
         />
-        {/* Viewport (clips and captures pan/zoom events) */}
+        {/* Viewport (clips and captures pan/zoom events; pointer events fall through to whichever
+            of the two layers below is inactive, via each layer's own pointer-events toggle) */}
         <div
           ref={viewportRef}
           className={[
@@ -1473,17 +1614,17 @@ export function ChalkBoardPage() {
             cursorClass,
           ].join(" ")}
           style={{ backgroundColor: chalkBg }}
-          onMouseLeave={handleChalkBoardMouseLeave}
           onMouseDown={handleViewportMouseDown}
-          onMouseMove={handleChalkBoardMouseMove}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-        {/* Layer 1: Drawing canvas (uses fabric.js viewport transform for zoom/pan) */}
+        {/* Layer 1: Drawing canvas (uses fabric.js viewport transform for zoom/pan; stays pinned to
+            the visible viewport rather than the scrolled world — a real <canvas> element sized to
+            the fixed board would allocate a catastrophic pixel buffer). */}
         <ChalkCanvas
           ref={canvasRef}
-          isActive={mode === "draw" && !isSpaceHeld && !isPanning}
+          isActive={isDrawingActive}
           brushColor={brushColor}
           brushSize={brushSize}
           zoom={zoom}
@@ -1493,75 +1634,63 @@ export function ChalkBoardPage() {
           backgroundColor={chalkBg}
         />
 
-        {/* Layer 2: Sticky notes (expandable canvas; uses CSS transform for zoom/pan, matches Fabric viewport) */}
+        {/* Layer 2: Sticky notes on a fixed-size world, panned via native scroll (scrollLeft/Top
+            encode pan — see the scrollViewportRef sync effect). pointer-events toggles with
+            isDrawingActive so this layer is fully inert (including for wheel/scrollbar) whenever
+            the drawing canvas above should receive clicks instead. */}
         <div
-          className="absolute origin-top-left"
-          style={{
-            transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px) scale(${zoom / RESOLUTION_FACTOR}) translate(${panX}px, ${panY}px)`,
-            width: `${chalkNotesBounds.canvasWidth}px`,
-            height: `${chalkNotesBounds.canvasHeight}px`,
-            pointerEvents: mode === "select" && !isSpaceHeld && !isPanning ? "auto" : "none",
-          }}
-          onClick={(e) => {
-            if (!(e.target as Element).closest("[data-board-item]")) {
-              setEditingNoteIds(new Set());
-              primaryEditingNoteIdRef.current = null;
-            }
-          }}
+          ref={scrollViewportRef}
+          className="chalkboard-surface absolute inset-0 overflow-auto"
+          style={{ pointerEvents: isDrawingActive ? "none" : "auto" }}
+          onScroll={handleViewportScroll}
         >
-          <div
-            style={{
-              transform: `translate(${-chalkNotesBounds.contentMinX}px, ${-chalkNotesBounds.contentMinY}px)`,
-              width: "100%",
-              height: "100%",
-            }}
-          >
-            {/* Remote cursors (board-space coordinates) */}
-            <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
-              {Array.from(remoteCursors.entries()).map(([userId, { x, y, color }]) => (
-                <div
-                  key={userId}
-                  className="absolute z-[9999] flex items-center gap-1 overflow-visible"
-                  style={{ left: x, top: y, transform: "translate(-6px, -2px)" }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 32 32"
-                    width="32"
-                    height="32"
-                    className="drop-shadow-lg"
-                  >
-                    <path d="M6 2v24l6-6 4 10 4-2-4-10h8L6 2z" fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth="0.5" />
-                  </svg>
-                </div>
+          <div style={{ position: "relative", width: `${scrollWidth}px`, height: `${scrollHeight}px` }}>
+            <div
+              className="absolute left-0 top-0 origin-top-left overflow-hidden"
+              style={{
+                transform: `scale(${zoom / RESOLUTION_FACTOR})`,
+                width: `${CHALK_BOARD_MAX_X}px`,
+                height: `${CHALK_BOARD_MAX_Y}px`,
+                pointerEvents: isNotesLayerActive ? "auto" : "none",
+              }}
+              onClick={(e) => {
+                if (!(e.target as Element).closest("[data-board-item]")) {
+                  setEditingNoteIds(new Set());
+                  primaryEditingNoteIdRef.current = null;
+                }
+              }}
+            >
+              {notes.map((note) => (
+                <StickyNote
+                  key={note.id}
+                  note={note}
+                  isEditing={editingNoteIds.has(note.id)}
+                  enlargeWhenEditing={autoEnlargeNotes}
+                  focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
+                  zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
+                  onDrag={handleNoteDrag}
+                  onDragStart={handleNoteDragStart}
+                  onDragStop={handleDragStop}
+                  onDelete={handleDelete}
+                  onStartEdit={handleStartEdit}
+                  onSave={handleSave}
+                  onContentChange={handleNoteContentChange}
+                  onResize={handleResize}
+                  onColorChange={handleColorChange}
+                  onRotationChange={handleRotationChange}
+                  onBringToFront={bringToFront}
+                  onUnmount={handleNoteUnmount}
+                  onExitEdit={handleExitEditNote}
+                  onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
+                  zoom={zoom / RESOLUTION_FACTOR}
+                  onRichTextToolbarChange={handleRichTextToolbarChange}
+                  boardMinX={0}
+                  boardMinY={0}
+                  boardMaxX={CHALK_BOARD_MAX_X}
+                  boardMaxY={CHALK_BOARD_MAX_Y}
+                />
               ))}
             </div>
-            {notes.map((note) => (
-              <StickyNote
-                key={note.id}
-                note={note}
-                isEditing={editingNoteIds.has(note.id)}
-                enlargeWhenEditing={autoEnlargeNotes}
-                focusedBy={remoteFocus.get(`note:${note.id}`) ?? null}
-                zIndex={(zIndexMap[note.id] ?? 0) + (editingNoteIds.has(note.id) ? 10000 : 0)}
-                onDrag={handleNoteDrag}
-                onDragStart={handleNoteDragStart}
-                onDragStop={handleDragStop}
-                onDelete={handleDelete}
-                onStartEdit={handleStartEdit}
-                onSave={handleSave}
-                onContentChange={handleNoteContentChange}
-                onResize={handleResize}
-                onColorChange={handleColorChange}
-                onRotationChange={handleRotationChange}
-                onBringToFront={bringToFront}
-                onUnmount={handleNoteUnmount}
-                onExitEdit={handleExitEditNote}
-                onContextMenu={(e) => setItemContextMenu({ x: e.clientX, y: e.clientY, note })}
-                zoom={zoom / RESOLUTION_FACTOR}
-                onRichTextToolbarChange={handleRichTextToolbarChange}
-              />
-            ))}
           </div>
         </div>
         </div>
@@ -1583,7 +1712,14 @@ export function ChalkBoardPage() {
             x={boardContextMenu.x}
             y={boardContextMenu.y}
             items={[
-              { label: "Add Sticky Note", icon: StickyNoteIcon, onClick: handleAddStickyNote },
+              {
+                label: "Add Sticky Note",
+                icon: StickyNoteIcon,
+                onClick: () => {
+                  const { x, y } = boardPointToWorld(boardContextMenu.x, boardContextMenu.y);
+                  handleAddStickyNoteAtPoint(x, y);
+                },
+              },
               {
                 label: "Undo",
                 onClick: triggerMenuUndo,

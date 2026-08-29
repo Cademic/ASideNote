@@ -51,19 +51,19 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-overlay-enter motion-reduce:animate-none"
+        className="absolute inset-0 bg-black/60 animate-overlay-enter motion-reduce:animate-none"
         onClick={onCancel}
         onKeyDown={() => {}}
         role="presentation"
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-2xl overflow-hidden animate-dialog-enter motion-reduce:animate-none">
+      <div className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 overflow-hidden animate-dialog-enter motion-reduce:animate-none">
         {/* Close button */}
         <button
           type="button"
           onClick={onCancel}
-          className="absolute right-4 top-4 rounded-lg p-1 text-foreground/50 transition-colors hover:bg-background hover:text-foreground"
+          className="absolute right-4 top-4 rounded-lg p-1 text-[var(--land-ink-3)] transition-colors hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]"
         >
           <X className="h-4 w-4" />
         </button>

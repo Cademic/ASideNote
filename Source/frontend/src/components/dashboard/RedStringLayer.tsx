@@ -30,29 +30,35 @@ function buildCatenaryPath(from: PinPosition, to: PinPosition): string {
 }
 
 /**
- * Read the centre position of every pin relative to the red-string SVG viewport
+ * Read the centre position of the given pins relative to the red-string SVG viewport
  * (same space as path `d` coordinates). Pins are found under `boardEl`; the
  * reference rect must be the overlay SVG so coords match after the inner canvas
  * `translate(-contentMinX, -contentMinY)` wrapper.
+ *
+ * Only queries the specific `noteIds` requested (the endpoints of active connections)
+ * rather than every pin on the board — this loop runs every animation frame, so
+ * scanning the whole board here would make its cost scale with total board content
+ * (every note/card/image ever added) instead of with the connections actually drawn.
  */
 function readPinPositions(
   boardEl: HTMLDivElement,
   svgEl: SVGSVGElement | null,
+  noteIds: Iterable<string>,
   zoom = 1,
 ): Map<string, PinPosition> {
   const map = new Map<string, PinPosition>();
   if (!svgEl) return map;
   const origin = svgEl.getBoundingClientRect();
-  const pins = boardEl.querySelectorAll<HTMLElement>("[data-pin-note-id]");
-  pins.forEach((pin) => {
-    const noteId = pin.getAttribute("data-pin-note-id");
-    if (!noteId) return;
+  for (const noteId of noteIds) {
+    if (map.has(noteId)) continue;
+    const pin = boardEl.querySelector<HTMLElement>(`[data-pin-note-id="${CSS.escape(noteId)}"]`);
+    if (!pin) continue;
     const r = pin.getBoundingClientRect();
     map.set(noteId, {
       x: (r.left + r.width / 2 - origin.left) / zoom,
       y: (r.top + r.height / 2 - origin.top) / zoom,
     });
-  });
+  }
   return map;
 }
 
@@ -117,15 +123,21 @@ export const RedStringLayer = forwardRef<SVGSVGElement, RedStringLayerProps>(fun
     function tick() {
       const svg = svgRef.current;
       const board = boardRef.current;
-      if (!svg || !board) {
+      const conns = connectionsRef.current;
+      const linking = linkingFromRef.current;
+      const mouse = mousePosRef.current;
+      if (!svg || !board || (conns.length === 0 && !linking)) {
         rafId = requestAnimationFrame(tick);
         return;
       }
 
-      const pins = readPinPositions(board, svg, zoomRef.current);
-      const conns = connectionsRef.current;
-      const linking = linkingFromRef.current;
-      const mouse = mousePosRef.current;
+      const neededIds = new Set<string>();
+      for (const conn of conns) {
+        neededIds.add(conn.fromItemId);
+        neededIds.add(conn.toItemId);
+      }
+      if (linking) neededIds.add(linking);
+      const pins = readPinPositions(board, svg, neededIds, zoomRef.current);
 
       // Update established connection paths
       for (const conn of conns) {
@@ -176,7 +188,12 @@ export const RedStringLayer = forwardRef<SVGSVGElement, RedStringLayerProps>(fun
 
   let deleteButtonPos: { x: number; y: number; droop: number } | null = null;
   if (selectedConn && boardRef.current && svgRef.current) {
-    const pins = readPinPositions(boardRef.current, svgRef.current, zoom);
+    const pins = readPinPositions(
+      boardRef.current,
+      svgRef.current,
+      [selectedConn.fromItemId, selectedConn.toItemId],
+      zoom,
+    );
     const from = pins.get(selectedConn.fromItemId);
     const to = pins.get(selectedConn.toItemId);
     if (from && to) {
