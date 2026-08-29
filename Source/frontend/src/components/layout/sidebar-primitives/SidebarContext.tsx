@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { isEditableTarget } from "../../../lib/is-editable-target";
 
 export type SidebarState = "expanded" | "collapsed";
 
@@ -38,10 +39,10 @@ const SIDEBAR_BREAKPOINT = 1024;
 const STORAGE_KEY = "asidenote.sidebar.collapsed";
 const WIDTH_STORAGE_KEY = "asidenote.sidebar.width";
 
-/** Desktop expanded-width bounds (px). Default matches the former fixed `w-60` (15rem). */
-export const MIN_SIDEBAR_WIDTH = 180;
-export const MAX_SIDEBAR_WIDTH = 480;
-export const DEFAULT_SIDEBAR_WIDTH = 240;
+/** Desktop expanded-width bounds (px). */
+export const MIN_SIDEBAR_WIDTH = 300;
+export const MAX_SIDEBAR_WIDTH = 520;
+export const DEFAULT_SIDEBAR_WIDTH = 300;
 /** Collapsed icon-rail width (`w-16` = 4rem) — reported through the `--sidebar-width` var. */
 const COLLAPSED_SIDEBAR_WIDTH = 64;
 
@@ -53,12 +54,6 @@ const SidebarContext = createContext<SidebarContextValue | undefined>(undefined)
 
 interface SidebarProviderProps {
   children: ReactNode;
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return true;
-  return target.isContentEditable;
 }
 
 export function SidebarProvider({ children }: SidebarProviderProps) {

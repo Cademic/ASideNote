@@ -7,6 +7,7 @@ import { getPinnedNotebooks, toggleNotebookPin } from "../../api/notebooks";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-primitives";
+import { GlobalSearchProvider } from "../../context/GlobalSearchContext";
 import { useSidebarWorkspaceActions } from "./useSidebarWorkspaceActions";
 import { useAuth } from "../../context/AuthContext";
 import { usePreferences } from "../../context/PreferencesContext";
@@ -41,12 +42,23 @@ export interface AppLayoutContext {
   refreshPinnedNotebooks: () => void;
   /** Desktop only: true when sidebar is expanded (user-resizable width), false when collapsed (w-16). */
   isSidebarOpen: boolean;
+  /** True while the dashboard's Active Canvas has a live board mounted — makes the sidebar show board tools. */
+  dashboardBoardActive: boolean;
+  setDashboardBoardActive: (active: boolean) => void;
+  /** Opens the create dialog on the dashboard (navigating there first if needed). Driven from the rail "Create" button. */
+  requestCreate: () => void;
+  /** Non-zero while a create request is pending — the dashboard watches this to open its create dialog. */
+  createNonce: number;
+  /** Called by the dashboard once it has acted on a pending create request, so it doesn't re-fire on remount. */
+  consumeCreate: () => void;
 }
 
 export function AppLayout() {
   return (
     <SidebarProvider>
-      <AppLayoutInner />
+      <GlobalSearchProvider>
+        <AppLayoutInner />
+      </GlobalSearchProvider>
     </SidebarProvider>
   );
 }
@@ -66,6 +78,15 @@ function AppLayoutInner() {
   const [pinnedBoards, setPinnedBoards] = useState<BoardSummaryDto[]>([]);
   const [pinnedProjects, setPinnedProjects] = useState<ProjectSummaryDto[]>([]);
   const [pinnedNotebooks, setPinnedNotebooks] = useState<NotebookSummaryDto[]>([]);
+  const [dashboardBoardActive, setDashboardBoardActive] = useState(false);
+  const [createNonce, setCreateNonce] = useState(0);
+
+  const requestCreate = useCallback(() => {
+    setCreateNonce((n) => n + 1);
+    if (location.pathname !== "/dashboard") navigate("/dashboard");
+  }, [location.pathname, navigate]);
+
+  const consumeCreate = useCallback(() => setCreateNonce(0), []);
 
   /** For board-page open-arrow: delay showing until drawer close animation ends */
   const prevSidebarOpenForArrowRef = useRef(openMobile);
@@ -256,15 +277,22 @@ function AppLayoutInner() {
     openNotebook,
     refreshPinnedNotebooks,
     isSidebarOpen,
+    dashboardBoardActive,
+    setDashboardBoardActive,
+    requestCreate,
+    createNonce,
+    consumeCreate,
   };
 
   /** Note or chalk board detail — hide global navbar for maximum canvas space */
   const isNoteBoardRoute = /^\/boards\/[^/]+$/.test(location.pathname);
   const isChalkBoardRoute = /^\/chalkboards\/[^/]+$/.test(location.pathname);
   const isBoardDetailRoute = isNoteBoardRoute || isChalkBoardRoute;
+  /** Dashboard renders its own edge-to-edge panel layout — no page padding or scroll. */
+  const isDashboardRoute = location.pathname === "/dashboard";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="app-editorial flex h-screen overflow-hidden bg-background text-foreground">
       <TutorialOverlay />
       {sidebarWorkspace.dialogs}
       {/* Desktop: sidebar in flow; mobile: sidebar only as overlay when open */}
@@ -283,6 +311,8 @@ function AppLayoutInner() {
           getBoardCardProps={sidebarWorkspace.getBoardCardProps}
           getNotebookCardProps={sidebarWorkspace.getNotebookCardProps}
           resolveBoardDto={sidebarWorkspace.resolveBoardDto}
+          dashboardBoardToolsActive={dashboardBoardActive}
+          onRequestCreate={requestCreate}
         />
       )}
       {isMobile && (
@@ -290,14 +320,14 @@ function AppLayoutInner() {
           <button
             type="button"
             tabIndex={-1}
-            className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+            className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
               openMobile ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
             }`}
             onClick={toggleSidebar}
             aria-label="Close menu"
           />
           <div
-            className={`fixed left-0 top-0 bottom-0 z-50 w-60 shadow-xl transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            className={`fixed left-0 top-0 bottom-0 z-50 w-60 border-r border-[var(--land-rule)] transition-transform duration-300 ease-out motion-reduce:transition-none ${
               openMobile
                 ? "translate-x-0 pointer-events-auto"
                 : "-translate-x-full pointer-events-none"
@@ -337,10 +367,12 @@ function AppLayoutInner() {
               ? isNoteBoardRoute
                 ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4"
                 : "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-              : "flex-1 overflow-auto p-4 bg-background"
+              : isDashboardRoute
+                ? "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+                : "flex-1 overflow-auto p-4 bg-background"
           }
         >
-          {isBoardDetailRoute ? (
+          {isBoardDetailRoute || isDashboardRoute ? (
             <Outlet context={outletContext} />
           ) : (
             <div key={location.pathname} className="animate-page-enter motion-reduce:animate-none h-full">
@@ -352,7 +384,7 @@ function AppLayoutInner() {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="fixed left-0 top-1/2 z-[100] flex -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-foreground/15 bg-background/95 py-3 pl-px pr-1 text-foreground/80 shadow-sm backdrop-blur-sm transition-opacity duration-200 hover:bg-foreground/5"
+            className="fixed left-0 top-1/2 z-[100] flex -translate-y-1/2 items-center justify-center rounded-r-md border border-l-0 border-[var(--land-rule)] bg-[var(--land-paper)] py-3 pl-px pr-1 text-[var(--land-ink-2)] transition-opacity duration-200 hover:bg-[var(--land-cream)]"
             aria-label="Open sidebar"
           >
             <ChevronRight className="h-4 w-4 shrink-0" strokeWidth={2.5} />

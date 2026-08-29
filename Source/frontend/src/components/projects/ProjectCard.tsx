@@ -43,17 +43,17 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   Active: {
     label: "Active",
     className:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200",
   },
   Completed: {
     label: "Completed",
     className:
-      "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400",
+      "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-200",
   },
   Archived: {
     label: "Archived",
     className:
-      "bg-gray-100 text-gray-600 dark:bg-gray-800/40 dark:text-gray-400",
+      "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
   },
 };
 
@@ -78,12 +78,12 @@ const ROLE_CONFIG: Record<string, { icon: typeof Crown; label: string; className
 const STATUS_OPTIONS = ["Active", "Completed", "Archived"] as const;
 
 const COLOR_MAP: Record<string, { strip: string; iconBg: string; progress: string }> = {
-  violet:  { strip: "bg-violet-400/60 dark:bg-violet-500/40",  iconBg: "bg-violet-100/80 dark:bg-violet-900/30",  progress: "bg-violet-500 dark:bg-violet-400" },
-  sky:     { strip: "bg-sky-400/60 dark:bg-sky-500/40",        iconBg: "bg-sky-100/80 dark:bg-sky-900/30",        progress: "bg-sky-500 dark:bg-sky-400" },
-  amber:   { strip: "bg-amber-400/60 dark:bg-amber-500/40",    iconBg: "bg-amber-100/80 dark:bg-amber-900/30",    progress: "bg-amber-500 dark:bg-amber-400" },
-  rose:    { strip: "bg-rose-400/60 dark:bg-rose-500/40",      iconBg: "bg-rose-100/80 dark:bg-rose-900/30",      progress: "bg-rose-500 dark:bg-rose-400" },
-  emerald: { strip: "bg-emerald-400/60 dark:bg-emerald-500/40", iconBg: "bg-emerald-100/80 dark:bg-emerald-900/30", progress: "bg-emerald-500 dark:bg-emerald-400" },
-  orange:  { strip: "bg-orange-400/60 dark:bg-orange-500/40",  iconBg: "bg-orange-100/80 dark:bg-orange-900/30",  progress: "bg-orange-500 dark:bg-orange-400" },
+  violet:  { strip: "bg-violet-400 dark:bg-violet-500",  iconBg: "bg-violet-100 dark:bg-violet-900",  progress: "bg-violet-500 dark:bg-violet-400" },
+  sky:     { strip: "bg-sky-400 dark:bg-sky-500",        iconBg: "bg-sky-100 dark:bg-sky-900",        progress: "bg-sky-500 dark:bg-sky-400" },
+  amber:   { strip: "bg-amber-400 dark:bg-amber-500",    iconBg: "bg-amber-100 dark:bg-amber-900",    progress: "bg-amber-500 dark:bg-amber-400" },
+  rose:    { strip: "bg-rose-400 dark:bg-rose-500",      iconBg: "bg-rose-100 dark:bg-rose-900",      progress: "bg-rose-500 dark:bg-rose-400" },
+  emerald: { strip: "bg-emerald-400 dark:bg-emerald-500", iconBg: "bg-emerald-100 dark:bg-emerald-900", progress: "bg-emerald-500 dark:bg-emerald-400" },
+  orange:  { strip: "bg-orange-400 dark:bg-orange-500",  iconBg: "bg-orange-100 dark:bg-orange-900",  progress: "bg-orange-500 dark:bg-orange-400" },
 };
 
 function formatDate(dateStr: string): string {
@@ -297,7 +297,7 @@ export function ProjectCard({
         {onRename && (
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
             onClick={(e) => {
               e.stopPropagation();
               closeMenu();
@@ -311,7 +311,7 @@ export function ProjectCard({
         {onTogglePin && (
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
             onClick={(e) => {
               e.stopPropagation();
               closeMenu();
@@ -341,7 +341,7 @@ export function ProjectCard({
             <button
               type="button"
               disabled={patchingStatus}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5 disabled:opacity-50"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface disabled:opacity-50"
               onClick={(e) => {
                 e.stopPropagation();
                 clearStatusHoverTimer();
@@ -359,7 +359,7 @@ export function ProjectCard({
         <button
           type="button"
           disabled={patchingCalendar}
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5 disabled:opacity-50"
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface disabled:opacity-50"
           onClick={(e) => {
             e.stopPropagation();
             void handlePersonalCalendarAction();
@@ -370,7 +370,7 @@ export function ProjectCard({
         </button>
         <button
           type="button"
-          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
           onClick={(e) => {
             e.stopPropagation();
             closeMenu();
@@ -382,7 +382,7 @@ export function ProjectCard({
         </button>
         {!isOwner && onLeave && (
           <>
-            <div className="my-1 border-t border-border/50" />
+            <div className="my-1 border-t border-border" />
             <button
               type="button"
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
@@ -399,7 +399,7 @@ export function ProjectCard({
         )}
         {isOwner && onDelete && (
           <>
-            <div className="my-1 border-t border-border/50" />
+            <div className="my-1 border-t border-border" />
             <button
               type="button"
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
@@ -444,8 +444,8 @@ export function ProjectCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isProjectRouteActive
-                ? "bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
-                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+                ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
@@ -465,11 +465,15 @@ export function ProjectCard({
           }}
         >
           {project.isPinned && sidebarShowLabel && (
-            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-sky-400" />
+            <Pin
+              className={`h-3.5 w-3.5 shrink-0 ${
+                isProjectRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
+              }`}
+            />
           )}
           <FolderOpen
             className={`h-4 w-4 shrink-0 ${
-              isProjectRouteActive ? "text-amber-600 dark:text-sky-400" : "text-foreground/40"
+              isProjectRouteActive ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
             }`}
           />
           {sidebarShowLabel && (
@@ -538,7 +542,7 @@ export function ProjectCard({
               setMenuOpen((v) => !v);
             }
           }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
           title="Project actions"
         >
           <MoreVertical className="h-4 w-4" />
@@ -587,7 +591,7 @@ export function ProjectCard({
                   "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors disabled:opacity-50",
                   project.status === s
                     ? "bg-primary/10 text-primary"
-                    : "text-foreground/70 hover:bg-foreground/5",
+                    : "text-foreground/70 hover:bg-surface",
                 ].join(" ")}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -646,7 +650,7 @@ export function ProjectCard({
           {/* Progress bar */}
           {project.progress > 0 && (
             <div className="mb-3">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/5">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
                 <div
                   className={`h-full rounded-full ${colors.progress} transition-[width] duration-[600ms] ease-spring motion-reduce:transition-none`}
                   style={{ width: `${Math.min(project.progress, 100)}%` }}
@@ -659,13 +663,13 @@ export function ProjectCard({
           )}
 
           {/* Owner */}
-          <div className="mb-3 flex items-center gap-1.5 text-[10px] text-foreground/40">
-            <Crown className="h-3 w-3 text-amber-500/60" />
+          <div className="mb-3 flex items-center gap-1.5 text-[10px] text-foreground/60">
+            <Crown className="h-3 w-3 text-amber-500" />
             <span className="truncate">{project.ownerUsername}</span>
           </div>
 
           {/* Footer */}
-          <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
+          <div className="mt-auto flex items-center gap-3 border-t border-border pt-3 text-xs text-foreground/60">
             <span className="flex items-center gap-1">
               <Users className="h-3 w-3" />
               {project.memberCount + 1}

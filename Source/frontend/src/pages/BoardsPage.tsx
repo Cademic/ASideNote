@@ -326,8 +326,8 @@ export function BoardsPage() {
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/40">
-              <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900">
+              <ClipboardList className="h-5 w-5 text-amber-600 dark:text-amber-200" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-foreground">Boards</h1>
@@ -341,7 +341,7 @@ export function BoardsPage() {
               type="button"
               onClick={handleImportClick}
               disabled={isImporting}
-              className="flex items-center gap-2 rounded-lg border border-border/80 bg-background px-4 py-2.5 text-sm font-medium text-foreground/80 transition-colors hover:bg-foreground/5 hover:text-foreground disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground/80 transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50"
             >
               <Upload className="h-4 w-4" />
               <span>{isImporting ? "Importing…" : "Import Board"}</span>
@@ -360,7 +360,7 @@ export function BoardsPage() {
 
         {/* Type filter pills */}
         <div className="mb-6 flex items-center gap-2">
-          <Filter className="h-4 w-4 text-foreground/40" />
+          <Filter className="h-4 w-4 text-foreground/60" />
           {BOARD_TYPE_FILTERS.map((filter) => (
             <button
               key={filter.value}
@@ -369,8 +369,8 @@ export function BoardsPage() {
               className={[
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none",
                 boardTypeFilter === filter.value
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                  : "text-foreground/50 hover:bg-foreground/5 hover:text-foreground",
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200"
+                  : "text-foreground/60 hover:bg-surface hover:text-foreground",
               ].join(" ")}
             >
               {filter.label}
@@ -380,11 +380,11 @@ export function BoardsPage() {
 
         {/* Board grid or empty state */}
         {filteredBoards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 bg-background/40 py-20">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-foreground/5">
-              <PencilLine className="h-5 w-5 text-foreground/30" />
+          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface py-20">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background">
+              <PencilLine className="h-5 w-5 text-foreground/60" />
             </div>
-            <p className="mb-4 text-sm text-foreground/40">
+            <p className="mb-4 text-sm text-foreground/60">
               {boardTypeFilter
                 ? `No ${boardTypeFilter === "NoteBoard" ? "note" : "chalk"} boards yet`
                 : "No boards yet"}
@@ -392,7 +392,7 @@ export function BoardsPage() {
             <button
               type="button"
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background px-4 py-2 text-xs font-medium text-foreground/60 transition-[colors,box-shadow] duration-150 hover:border-primary/40 hover:text-primary hover:shadow-sm motion-reduce:transition-none"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-xs font-medium text-foreground/70 transition-[colors,box-shadow] duration-150 hover:border-primary hover:text-primary hover:shadow-sm motion-reduce:transition-none"
             >
               <Plus className="h-3.5 w-3.5" />
               Create your first board

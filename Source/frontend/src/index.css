@@ -281,6 +281,191 @@ body {
   --land-rule: #2e2e2c;
 }
 
+/* ---- App editorial wrapper ----
+   Declares the --land-* custom properties ONLY (no background/color/font paint), so adding
+   .app-editorial to the AppLayout root is a pure variable scope: non-dashboard page bodies
+   keep rendering on the global --color-* tokens and look unchanged. Only the chrome classes
+   (rewritten below to read --land-*) and the dashboard's own .editorial-* / .dashboard-editorial
+   classes actually repaint. Mirrors the light/dark values of .landing-editorial. */
+.app-editorial {
+  --land-cream: #f7f2e9;
+  --land-white: #ffffff;
+  --land-paper: #fffdf8;
+  --land-ink: #1b1a17;
+  --land-ink-2: #5c564b;
+  --land-ink-3: #8a7f6b;
+  --land-rule: #e3daca;
+  --land-amber: #e8a33d;
+  --land-coral: #f0997b;
+  --land-yellow: #f2d45b;
+  --land-mint: #9fe1cb;
+  /* Soft pale-yellow section wash (Projects panel). */
+  --land-butter: #fbf6dd;
+  /* Text/icon color that always sits on the amber/yellow accents — light in both themes. */
+  --land-on-accent: #1b1a17;
+  /* Sidebar nav/board highlight + rail "Create" button accent.
+     Amber in light mode, blue in dark mode (see .dark .app-editorial). */
+  --land-blue: #d97706;
+  --land-blue-fg: #ffffff;
+}
+
+.dark .app-editorial {
+  --land-cream: #161616;
+  --land-white: #0d0d0d;
+  --land-paper: #1e1e1e;
+  --land-ink: #f2f2f0;
+  --land-ink-2: #adada9;
+  --land-ink-3: #858581;
+  --land-rule: #2e2e2c;
+  /* Dark: an off-black one step lighter than the navbar/paper (#1e1e1e), not a yellow tint. */
+  --land-butter: #262626;
+  /* Dark mode keeps the accent blue. */
+  --land-blue: #3670b8;
+}
+
+/* Transient ring drawn around a board item that was opened from global search. */
+@keyframes search-focus-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.95), 0 0 0 8px rgba(217, 119, 6, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.95), 0 0 0 16px rgba(217, 119, 6, 0.28);
+  }
+}
+.search-focus-ring {
+  animation: search-focus-pulse 0.9s ease-in-out 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-focus-ring {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.95);
+  }
+}
+
+/* ---- Dashboard editorial primitives ---- */
+.editorial-panel {
+  background: var(--land-paper);
+  border: 1px solid var(--land-rule);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.editorial-panel__header {
+  border-bottom: 1px solid var(--land-rule);
+  font-family: "Karla", system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  color: var(--land-ink);
+}
+
+.editorial-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--land-ink-3);
+}
+
+.editorial-divider {
+  border-top: 1px solid var(--land-rule);
+}
+
+/* Replaces bg-black/xx modal scrims — near-opaque solid ink, no blur */
+.editorial-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--land-ink);
+  opacity: 0.92;
+}
+
+/* Solid danger hover for destructive menu rows (replaces hover:bg-red-500/10) */
+.editorial-danger-hover:hover {
+  background: #f6ddd4;
+  color: #b5401f;
+}
+
+.dark .editorial-danger-hover:hover {
+  background: #3a221c;
+  color: #f0997b;
+}
+
+.editorial-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex: none;
+}
+
+.editorial-timeline-rail {
+  border-left: 1px solid var(--land-rule);
+}
+
+.editorial-timeline-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--land-paper);
+  border: 1px solid var(--land-amber);
+  margin-left: -4px;
+}
+
+.editorial-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid var(--land-rule);
+  border-radius: 9999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  color: var(--land-ink-2);
+  background: var(--land-cream);
+}
+
+.editorial-rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: 1px solid var(--land-blue);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  font-family: "Karla", system-ui, -apple-system, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--land-blue-fg);
+  background: var(--land-blue);
+  transition: filter 0.15s ease;
+}
+
+.editorial-rail-btn:hover {
+  filter: brightness(1.08);
+}
+
+.editorial-rail-btn:active {
+  filter: brightness(0.94);
+}
+
+/* Dashboard Active Canvas — the embedded board sits flush inside its panel: square corners,
+   no floating drop shadow, flat menu-bar chip. Scoped to .dashboard-editorial so the standalone
+   /boards/:id route keeps its rounded, elevated frame. */
+.dashboard-editorial .corkboard-frame {
+  border-radius: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-editorial .corkboard-surface {
+  border-radius: 0;
+}
+
+.dashboard-editorial .corkboard-frame .notepad-card {
+  border-radius: 0;
+  box-shadow: none;
+}
+
 /* ---- Hero — animated glass gradient backdrop ----
    A soft, slowly-drifting color wash (evokes the frosted/dichroic glass reference).
    A bright cream core in the wash sits under the copy column so text stays legible. */
@@ -593,13 +778,13 @@ body {
     ),
     linear-gradient(
       160deg,
-      #6b4e34 0%,
-      #5a3a24 15%,
-      #4a3020 30%,
-      #3a2018 50%,
-      #4a3020 70%,
-      #5a3a24 85%,
-      #6b4e34 100%
+      #4a4a4d 0%,
+      #3c3c3f 15%,
+      #333336 30%,
+      #2a2a2c 50%,
+      #333336 70%,
+      #3c3c3f 85%,
+      #4a4a4d 100%
     );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -786,13 +971,13 @@ body {
     ),
     linear-gradient(
       160deg,
-      #6b4e34 0%,
-      #5a3a24 15%,
-      #4a3020 30%,
-      #3a2018 50%,
-      #4a3020 70%,
-      #5a3a24 85%,
-      #6b4e34 100%
+      #4a4a4d 0%,
+      #3c3c3f 15%,
+      #333336 30%,
+      #2a2a2c 50%,
+      #333336 70%,
+      #3c3c3f 85%,
+      #4a4a4d 100%
     );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
@@ -1461,28 +1646,19 @@ body {
    Navbar — Stationery Shelf
    ======================================== */
 
+/* Flat editorial surface. Tokens flip in dark via .dark .app-editorial / .dark .landing-editorial;
+   literal fallbacks keep it correct anywhere the wrapper is absent. No shadow, no translucency. */
 .navbar-surface {
-  background: linear-gradient(180deg, #fdfcfa 0%, #f8f7f5 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  background: var(--land-paper, #fffdf8);
+  border-bottom: 1px solid var(--land-rule, rgba(0, 0, 0, 0.08));
+  box-shadow: none;
 }
 
-.dark .navbar-surface {
-  background: linear-gradient(180deg, hsl(0, 0%, 9%) 0%, hsl(0, 0%, 7%) 100%);
-  border-bottom-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
+/* Kept for MarketingHeader; de-glossed — solid fill, no backdrop blur. */
 .navbar-surface--glossy {
-  background: linear-gradient(180deg, rgba(253, 252, 250, 0.75) 0%, rgba(248, 247, 245, 0.6) 100%);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-}
-
-.dark .navbar-surface--glossy {
-  background: linear-gradient(180deg, hsla(0, 0%, 9%, 0.7) 0%, hsla(0, 0%, 7%, 0.55) 100%);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  background: var(--land-paper, #fffdf8);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* ========================================
@@ -1556,29 +1732,19 @@ body {
    ======================================== */
 
 .sidebar-surface {
-  background: linear-gradient(90deg, #f4f2ee 0%, #faf9f7 100%);
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.02);
-}
-
-.dark .sidebar-surface {
-  background: linear-gradient(90deg, hsl(0, 0%, 7%) 0%, hsl(0, 0%, 9%) 100%);
-  border-right-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.15);
+  /* Matches .navbar-surface so the rail and the top bar read as one surface. */
+  background: var(--land-paper, #fffdf8);
+  border-right: 1px solid var(--land-rule, rgba(0, 0, 0, 0.08));
+  box-shadow: none;
 }
 
 /* Brand header — notebook cover feel */
 .sidebar-brand {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.015) 0%, transparent 100%);
+  border-bottom: 1px solid var(--land-rule, rgba(0, 0, 0, 0.08));
+  background: none;
 }
 
-.dark .sidebar-brand {
-  border-bottom-color: rgba(255, 255, 255, 0.06);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
-}
-
-/* Active nav item — warm left-accent tab */
+/* Active nav item — darker accent left tab (amber in light, sky in dark) */
 .sidebar-nav-active {
   position: relative;
   box-shadow: inset 3px 0 0 0 #d97706;
@@ -1607,19 +1773,15 @@ body {
 }
 
 .sidebar-rail:hover {
-  background: hsl(var(--color-primary) / 0.15);
+  background: var(--land-cream, hsl(var(--color-primary) / 0.15));
 }
 
 /* Collapsed-mode nav tooltip */
 .sidebar-tooltip {
-  background: hsl(var(--color-surface));
-  color: hsl(var(--color-foreground));
-  border: 1px solid hsl(var(--color-border) / 0.5);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.dark .sidebar-tooltip {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: var(--land-paper, hsl(var(--color-surface)));
+  color: var(--land-ink, hsl(var(--color-foreground)));
+  border: 1px solid var(--land-rule, hsl(var(--color-border) / 0.5));
+  box-shadow: none;
 }
 
 /* ========================================

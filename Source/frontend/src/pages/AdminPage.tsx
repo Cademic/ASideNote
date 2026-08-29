@@ -34,6 +34,7 @@ import type {
   AdminUserListQuery,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { useDebounce } from "../hooks/useDebounce";
 
 const ROLE_OPTIONS = [
   { value: "", label: "All roles" },
@@ -46,17 +47,6 @@ const STATUS_OPTIONS = [
   { value: "true", label: "Active" },
   { value: "false", label: "Banned" },
 ];
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 export function AdminPage() {
   const { user: authUser } = useAuth();

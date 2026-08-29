@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useParams, useOutletContext, useSearchParams } from "react-router-dom";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import {
   BoardMenuBar,
@@ -58,8 +58,19 @@ import { useFileImport } from "../hooks/useFileImport";
 import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
 
-export function NoteBoardPage() {
-  const { boardId } = useParams<{ boardId: string }>();
+interface NoteBoardPageProps {
+  /** When provided, overrides the route param — used when the board is embedded (e.g. dashboard Active Canvas). */
+  boardId?: string;
+  /** "route" (default) = full-screen board page; "embedded" = mounted inside another page's layout. */
+  variant?: "route" | "embedded";
+  /** Skip the SignalR board hub + presence broadcast (used for the read-only dashboard embed). */
+  disableRealtime?: boolean;
+}
+
+export function NoteBoardPage({ boardId: boardIdProp, variant = "route", disableRealtime = false }: NoteBoardPageProps = {}) {
+  const { boardId: routeBoardId } = useParams<{ boardId: string }>();
+  const boardId = boardIdProp ?? routeBoardId;
+  const isEmbedded = variant === "embedded";
   const { setBoardName, openBoard, setBoardPresence, connectedUsers } =
     useOutletContext<AppLayoutContext>();
   const { isAuthenticated, user } = useAuth();
@@ -233,6 +244,12 @@ export function NoteBoardPage() {
   panXRef.current = panX;
   panYRef.current = panY;
 
+  // --- Deep-link focus: /boards/:id?focus=<noteOrCardId> (from global search) ---
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusItemId = searchParams.get("focus");
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
+  const focusHandledRef = useRef<string | null>(null);
+
   // --- Context menu state ---
   const [boardContextMenu, setBoardContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [itemContextMenu, setItemContextMenu] = useState<
@@ -311,6 +328,9 @@ export function NoteBoardPage() {
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (boardId === undefined || boardId === "") return;
+    // Embedded (dashboard) mounts seed from the saved viewport but never write it back, so the
+    // smaller panel view can't clobber the value the full-screen /boards/:id route relies on.
+    if (isEmbedded) return;
     const id = boardId;
     function flush() {
       persistBoardViewport(id, zoomRef.current, panXRef.current, panYRef.current);
@@ -323,7 +343,41 @@ export function NoteBoardPage() {
       if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
       flush();
     };
-  }, [boardId, zoom, panX, panY]);
+  }, [boardId, zoom, panX, panY, isEmbedded]);
+
+  // Once the board's items are loaded, pan to the deep-linked item and pulse a
+  // ring around it. Runs once per distinct ?focus= id, then strips the param so a
+  // refresh or Back doesn't re-trigger it.
+  useEffect(() => {
+    if (isLoading || isEmbedded || !focusItemId) return;
+    if (focusHandledRef.current === focusItemId) return;
+
+    const note = notes.find((n) => n.id === focusItemId);
+    const card = indexCards.find((c) => c.id === focusItemId);
+    if (!note && !card) return; // data not in yet, or item isn't on this board
+
+    focusHandledRef.current = focusItemId;
+    const center = note ? getStickyNoteCenter(note) : getIndexCardCenter(card!);
+
+    const jump = setTimeout(() => {
+      panViewportToBoardPoint(center.x, center.y);
+      bringToFront(focusItemId);
+      setHighlightItemId(focusItemId);
+    }, 80);
+    const clear = setTimeout(() => setHighlightItemId(null), 3000);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+
+    return () => {
+      clearTimeout(jump);
+      clearTimeout(clear);
+    };
+    // panViewportToBoardPoint is re-created each render; the focusHandledRef guard
+    // makes this a run-once-per-id effect keyed on the data becoming available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isEmbedded, focusItemId, notes, indexCards]);
 
   // Sync backgroundTheme and autoEnlargeNotes from localStorage when boardId changes
   useEffect(() => {
@@ -746,8 +800,8 @@ export function NoteBoardPage() {
     setConnections((prev) => prev.filter((c) => c.fromItemId !== cardId && c.toItemId !== cardId));
   }, []);
 
-  const { sendFocus, sendTextCursor, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
-    enabled: !!board?.projectId,
+  const { sendFocus, sendTextCursor, isHubConnected } = useBoardRealtime(disableRealtime ? undefined : (boardId ?? undefined), fetchData, {
+    enabled: !!board?.projectId && !disableRealtime,
     onNoteUpdated: mergeNotePayload,
     onIndexCardUpdated: mergeCardPayload,
     onPresenceUpdate: handlePresenceUpdate,
@@ -817,11 +871,12 @@ export function NoteBoardPage() {
     }
   }, []);
 
-  // Push the board name up to the navbar
+  // Push the board name up to the navbar — skipped when embedded so the breadcrumb stays "Dashboard"
   useEffect(() => {
+    if (isEmbedded) return;
     setBoardName(board?.name ?? null);
     return () => setBoardName(null);
-  }, [board?.name, setBoardName]);
+  }, [board?.name, setBoardName, isEmbedded]);
 
   // Register this board in the "Opened Boards" sidebar section
   useEffect(() => {
@@ -1340,6 +1395,14 @@ export function NoteBoardPage() {
     const y = n.positionY ?? POSITION_DEFAULT;
     const w = n.width ?? STICKY_NOTE_DEFAULT_SIZE;
     const h = n.height ?? STICKY_NOTE_DEFAULT_SIZE;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function getIndexCardCenter(c: IndexCardSummaryDto) {
+    const x = c.positionX ?? POSITION_DEFAULT;
+    const y = c.positionY ?? POSITION_DEFAULT;
+    const w = c.width ?? INDEX_CARD_DEFAULT_W;
+    const h = c.height ?? INDEX_CARD_DEFAULT_H;
     return { x: x + w / 2, y: y + h / 2 };
   }
 
@@ -2514,11 +2577,13 @@ export function NoteBoardPage() {
         <CorkBoard
               topBar={boardTopBar}
               presenceWidget={
-                <BoardPresenceButton
-                  users={connectedUsers}
-                  isHubConnected={isHubConnected}
-                  currentUserId={currentUserId ?? undefined}
-                />
+                isEmbedded ? undefined : (
+                  <BoardPresenceButton
+                    users={connectedUsers}
+                    isHubConnected={isHubConnected}
+                    currentUserId={currentUserId ?? undefined}
+                  />
+                )
               }
               scrollContainerRef={corkBoardScrollRef}
               boardRef={boardRef}
@@ -2654,6 +2719,25 @@ export function NoteBoardPage() {
               boardMaxY={BOARD_MAX_Y}
             />
           ))}
+
+          {highlightItemId &&
+            (() => {
+              const note = notes.find((n) => n.id === highlightItemId);
+              const card = indexCards.find((c) => c.id === highlightItemId);
+              const item = note ?? card;
+              if (!item) return null;
+              const x = item.positionX ?? POSITION_DEFAULT;
+              const y = item.positionY ?? POSITION_DEFAULT;
+              const w = item.width ?? (note ? STICKY_NOTE_DEFAULT_SIZE : INDEX_CARD_DEFAULT_W);
+              const h = item.height ?? (note ? STICKY_NOTE_DEFAULT_SIZE : INDEX_CARD_DEFAULT_H);
+              return (
+                <div
+                  aria-hidden
+                  className="search-focus-ring pointer-events-none absolute rounded-2xl"
+                  style={{ left: x - 8, top: y - 8, width: w + 16, height: h + 16, zIndex: 99999 }}
+                />
+              );
+            })()}
 
           {isEmpty && (
             <div className="flex h-full items-center justify-center" style={{ pointerEvents: "none" }}>

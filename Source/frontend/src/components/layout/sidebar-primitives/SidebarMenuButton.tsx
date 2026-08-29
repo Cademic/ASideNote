@@ -31,6 +31,7 @@ export function SidebarMenuButton({ to, icon: Icon, label, isActive, expanded, c
       onBlur={() => setShowTooltip(false)}
       className={cn(
         sidebarMenuButtonVariants(),
+        !isActive && "hover:bg-[var(--land-cream)]",
         isActive && "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300",
         !expanded && "justify-center",
         // The row is `relative z-10`, which is its own stacking context — so the

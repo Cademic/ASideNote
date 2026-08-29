@@ -208,8 +208,8 @@ export function NotebookCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isNotebookRouteActive
-                ? "bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
-                : "text-foreground/60 hover:bg-foreground/[0.04] hover:text-foreground",
+                ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
         menuOpen ? "z-50 overflow-visible" : "",
@@ -229,11 +229,15 @@ export function NotebookCard({
           }}
         >
           {notebook.isPinned && sidebarShowLabel && (
-            <Pin className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-sky-400" />
+            <Pin
+              className={`h-3.5 w-3.5 shrink-0 ${
+                isNotebookRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
+              }`}
+            />
           )}
           <BookOpen
             className={`h-4 w-4 shrink-0 ${
-              isNotebookRouteActive ? "text-amber-600 dark:text-sky-400" : "text-foreground/40"
+              isNotebookRouteActive ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
             }`}
           />
           {sidebarShowLabel && (
@@ -243,7 +247,7 @@ export function NotebookCard({
       ) : (
         <>
           {/* Tape strip — reddish-brown / notebook cover */}
-          <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-lg bg-amber-800/70 dark:bg-amber-900/60" />
+          <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-lg bg-amber-400 dark:bg-amber-500" />
 
           {notebook.isPinned && (
             <div className="absolute left-3 top-3 z-10">
@@ -253,7 +257,7 @@ export function NotebookCard({
 
           {projectName && (
             <div
-              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-foreground/10 px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
+              className="absolute right-12 top-3 z-10 max-w-[9rem] truncate rounded bg-surface px-2 py-0.5 text-right text-[10px] font-medium text-foreground/60"
               title={projectName}
             >
               {projectName}
@@ -315,7 +319,7 @@ export function NotebookCard({
               setMenuOpen((v) => !v);
             }
           }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
           title="Notebook actions"
         >
           <MoreVertical className="h-4 w-4" />
@@ -329,7 +333,7 @@ export function NotebookCard({
             {onRename && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -354,7 +358,7 @@ export function NotebookCard({
               >
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     clearFolderHoverTimer();
@@ -382,7 +386,7 @@ export function NotebookCard({
               >
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     clearProjectHoverTimer();
@@ -400,7 +404,7 @@ export function NotebookCard({
             {onTogglePin && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -421,12 +425,12 @@ export function NotebookCard({
               </button>
             )}
             {(onRemoveFromProject || onDelete) && (
-              <div className="my-1 border-t border-border/50" />
+              <div className="my-1 border-t border-border" />
             )}
             {onRemoveFromProject && (
               <button
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -463,7 +467,7 @@ export function NotebookCard({
               {onRename && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -487,7 +491,7 @@ export function NotebookCard({
                 >
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                     onClick={(e) => {
                       e.stopPropagation();
                       clearFolderHoverTimer();
@@ -514,7 +518,7 @@ export function NotebookCard({
                 >
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                     onClick={(e) => {
                       e.stopPropagation();
                       clearProjectHoverTimer();
@@ -531,7 +535,7 @@ export function NotebookCard({
               {onTogglePin && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -552,12 +556,12 @@ export function NotebookCard({
                 </button>
               )}
               {(onRemoveFromProject || onDelete) && (
-                <div className="my-1 border-t border-border/50" />
+                <div className="my-1 border-t border-border" />
               )}
               {onRemoveFromProject && (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeMenu();
@@ -590,15 +594,15 @@ export function NotebookCard({
 
       {!isSidebarRow && (
         <>
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100/80 dark:bg-amber-900/30">
-            <BookOpen className="h-5 w-5 text-foreground/60" />
+          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900">
+            <BookOpen className="h-5 w-5 text-amber-600 dark:text-amber-200" />
           </div>
 
           <h3 className="mb-1 truncate pr-6 text-sm font-semibold text-foreground">
             {notebook.name}
           </h3>
 
-          <div className="mt-auto flex items-center gap-3 border-t border-blue-200/25 pt-3 text-xs text-foreground/40 dark:border-blue-300/10">
+          <div className="mt-auto flex items-center gap-3 border-t border-border pt-3 text-xs text-foreground/60">
             <span className="flex items-center gap-1">
               <BookOpen className="h-3 w-3" />
               Document
@@ -633,7 +637,7 @@ export function NotebookCard({
             ) : projectFolders.length > 0 ? (
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-foreground/5"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-surface"
                 onClick={(e) => {
                   e.stopPropagation();
                   closeMenu();
@@ -650,7 +654,7 @@ export function NotebookCard({
               <button
                 key={f.id}
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-foreground/5 ${
+                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-surface ${
                   notebook.projectFolderId === f.id ? "text-primary" : "text-foreground/70"
                 }`}
                 onClick={(e) => {

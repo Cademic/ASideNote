@@ -10,8 +10,8 @@ export const sidebarMenuButtonVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-foreground/60 hover:text-foreground",
-        ghost: "text-foreground/60 hover:text-foreground",
+        default: "text-[var(--land-ink-2)] hover:text-[var(--land-ink)]",
+        ghost: "text-[var(--land-ink-2)] hover:text-[var(--land-ink)]",
       },
       size: {
         default: "text-sm py-2",

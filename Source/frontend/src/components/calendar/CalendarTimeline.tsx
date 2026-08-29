@@ -15,12 +15,12 @@ import { resolveEventProjectName } from "../../utils/calendar-event-project-name
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const BAR_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  sky:     { bg: "bg-sky-50 dark:bg-sky-950/30",     border: "border-sky-300 dark:border-sky-700",     text: "text-sky-700 dark:text-sky-300" },
-  amber:   { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-300 dark:border-amber-700", text: "text-amber-700 dark:text-amber-300" },
-  rose:    { bg: "bg-rose-50 dark:bg-rose-950/30",   border: "border-rose-300 dark:border-rose-700",   text: "text-rose-700 dark:text-rose-300" },
-  emerald: { bg: "bg-emerald-50 dark:bg-emerald-950/30", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-700 dark:text-emerald-300" },
-  violet:  { bg: "bg-violet-50 dark:bg-violet-950/30", border: "border-violet-300 dark:border-violet-700", text: "text-violet-700 dark:text-violet-300" },
-  orange:  { bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-orange-300 dark:border-orange-700", text: "text-orange-700 dark:text-orange-300" },
+  sky:     { bg: "bg-sky-50 dark:bg-sky-900",     border: "border-sky-300 dark:border-sky-700",     text: "text-sky-700 dark:text-sky-100" },
+  amber:   { bg: "bg-amber-50 dark:bg-amber-900", border: "border-amber-300 dark:border-amber-700", text: "text-amber-700 dark:text-amber-100" },
+  rose:    { bg: "bg-rose-50 dark:bg-rose-900",   border: "border-rose-300 dark:border-rose-700",   text: "text-rose-700 dark:text-rose-100" },
+  emerald: { bg: "bg-emerald-50 dark:bg-emerald-900", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-700 dark:text-emerald-100" },
+  violet:  { bg: "bg-violet-50 dark:bg-violet-900", border: "border-violet-300 dark:border-violet-700", text: "text-violet-700 dark:text-violet-100" },
+  orange:  { bg: "bg-orange-50 dark:bg-orange-900", border: "border-orange-300 dark:border-orange-700", text: "text-orange-700 dark:text-orange-100" },
 };
 
 /* ─── Date helpers ─────────────────────────────────────── */
@@ -379,7 +379,7 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
                     key={item.id}
                     type="button"
                     onClick={() => onItemClick(item)}
-                    className={`relative flex min-w-0 items-center gap-2 overflow-hidden ${colors.bg} px-3 py-2 text-left transition-colors cursor-pointer hover:brightness-95 dark:hover:brightness-110 ${
+                    className={`relative flex min-w-0 items-center gap-2 overflow-hidden ${colors.bg} px-3 py-2 text-left transition-[color,background-color,transform] duration-150 ease-out cursor-pointer hover:translate-x-1 hover:brightness-95 motion-reduce:transition-none motion-reduce:hover:translate-x-0 dark:hover:brightness-110 ${
                       roundLeft ? "border-l-[3px] " + colors.border : ""
                     } ${roundLeft && roundRight ? "rounded" : roundLeft ? "rounded-l" : roundRight ? "rounded-r" : ""}`}
                     style={{
