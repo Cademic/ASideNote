@@ -19,6 +19,18 @@ public sealed class CalendarEventServiceTests
 
         var userId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
+        // Project/CalendarEvent have global query filters that require the owning User row to exist
+        // (see AppDbContext.OnModelCreating). Without it every query is filtered out and the
+        // service's end-date validation silently no-ops.
+        dbContext.Set<User>().Add(new User
+        {
+            Id = userId,
+            Username = "calendaruser",
+            Email = "calendar@example.com",
+            PasswordHash = "hash",
+            Role = "User",
+            CreatedAt = DateTime.UtcNow,
+        });
         dbContext.Set<Project>().Add(new Project
         {
             Id = projectId,

@@ -28,6 +28,19 @@ public sealed class ProjectFolderServiceTests
         return (service, db);
     }
 
+    // Project/Board/Notebook/ProjectFolder/ProjectMember all carry a global query filter that
+    // requires the owning User row to exist (see AppDbContext.OnModelCreating). Seed one per
+    // owner id or the service sees no data and authorization checks fail spuriously.
+    private static User NewUser(Guid id) => new()
+    {
+        Id = id,
+        Username = $"user-{id:N}",
+        Email = $"{id:N}@example.com",
+        PasswordHash = "hash",
+        Role = "User",
+        CreatedAt = DateTime.UtcNow,
+    };
+
     private static Project NewProject(Guid ownerId, string name) => new()
     {
         Id = Guid.NewGuid(),
@@ -75,7 +88,7 @@ public sealed class ProjectFolderServiceTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
-        db.AddRange(source, target, folder, board, notebook);
+        db.AddRange(NewUser(userId), source, target, folder, board, notebook);
         await db.SaveChangesAsync();
 
         await service.UpdateFolderAsync(userId, source.Id, folder.Id, new UpdateProjectFolderRequest
@@ -106,7 +119,7 @@ public sealed class ProjectFolderServiceTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
-        db.AddRange(source, target, folder);
+        db.AddRange(NewUser(userId), NewUser(strangerId), source, target, folder);
         await db.SaveChangesAsync();
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
