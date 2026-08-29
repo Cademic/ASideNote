@@ -67,6 +67,7 @@ export function DashboardPage() {
   const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
   const [calendarEventDialogOpen, setCalendarEventDialogOpen] = useState(false);
   const [calendarEventDialogDate, setCalendarEventDialogDate] = useState("");
+  const [calendarEventDialogTime, setCalendarEventDialogTime] = useState("");
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEventDto | null>(null);
 
   const refreshCalendarEvents = useCallback(async () => {
@@ -197,6 +198,15 @@ export function DashboardPage() {
     setEditingCalendarEvent(detailsEvent);
     setDetailsEvent(null);
     setCalendarEventDialogDate("");
+    setCalendarEventDialogTime("");
+    setCalendarEventDialogOpen(true);
+  }
+
+  /** Clicking an empty hour in the dashboard timeline: new note prefilled to that slot. */
+  function handleCreateNoteAt(dateStr: string, time: string) {
+    setEditingCalendarEvent(null);
+    setCalendarEventDialogDate(dateStr);
+    setCalendarEventDialogTime(time);
     setCalendarEventDialogOpen(true);
   }
 
@@ -321,7 +331,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-editorial h-full min-h-0 w-full min-w-0 overflow-hidden bg-[var(--land-cream)]">
+    <div className="dashboard-editorial w-full min-w-0 bg-[var(--land-cream)] lg:h-full lg:min-h-0 lg:overflow-hidden">
       <DashboardLayout
         projects={activeProjectsSorted}
         folders={projectFolders}
@@ -331,6 +341,7 @@ export function DashboardPage() {
         activeBoard={activeCanvasBoard}
         onOpenNotebook={handleOpenNotebook}
         onOpenUpcoming={handleOpenUpcoming}
+        onCreateEventAt={handleCreateNoteAt}
         onOpenActiveBoard={() => {
           if (activeCanvasBoard) navigate(`/boards/${activeCanvasBoard.id}`);
         }}
@@ -372,6 +383,9 @@ export function DashboardPage() {
         onSave={handleCalendarEventSave}
         onDelete={editingCalendarEvent ? handleCalendarEventDelete : undefined}
         initialDate={calendarEventDialogDate}
+        initialTime={calendarEventDialogTime || undefined}
+        initialEventType="Note"
+        initialAllDay={false}
         editEvent={editingCalendarEvent}
       />
     </div>

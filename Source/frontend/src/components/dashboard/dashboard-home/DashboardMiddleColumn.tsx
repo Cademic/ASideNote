@@ -12,8 +12,12 @@ interface DashboardMiddleColumnProps {
   boards: BoardSummaryDto[];
   notebooks: NotebookSummaryDto[];
   upcoming: UpcomingItem[];
+  /** Wide layout: two independently-scrolling panels. Narrow: one page scroll. */
+  isDesktop: boolean;
   onOpenNotebook: (id: string) => void;
   onOpenUpcoming: (item: UpcomingItem) => void;
+  /** Clicking an empty hour in the timeline — `dateStr` is `yyyy-MM-dd`, `time` is `HH:MM`. */
+  onCreateEventAt: (dateStr: string, time: string) => void;
   onWorkspaceChanged: () => void | Promise<void>;
   onAddProject?: () => void;
 }
@@ -42,8 +46,10 @@ export function DashboardMiddleColumn({
   boards,
   notebooks,
   upcoming,
+  isDesktop,
   onOpenNotebook,
   onOpenUpcoming,
+  onCreateEventAt,
   onWorkspaceChanged,
   onAddProject,
 }: DashboardMiddleColumnProps) {
@@ -63,8 +69,8 @@ export function DashboardMiddleColumn({
   });
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-[var(--land-paper)]">
-      {/* Greeting */}
+    <div className="flex w-full flex-col bg-[var(--land-paper)] lg:h-full lg:min-h-0">
+      {/* Greeting — stays first on both layouts */}
       <div className="shrink-0 border-b border-[var(--land-rule)] px-5 pt-6 pb-5">
         <h2 className="text-xl font-bold text-[var(--land-ink)]">
           {greeting}
@@ -72,8 +78,8 @@ export function DashboardMiddleColumn({
         </h2>
       </div>
 
-      {/* Projects */}
-      <div className="flex min-h-0 shrink-0 flex-col bg-[var(--land-butter)]">
+      {/* Projects — below the timeline on mobile, above it on desktop */}
+      <div className="order-3 flex flex-col border-t border-[var(--land-rule)] bg-[var(--land-butter)] lg:order-none lg:min-h-0 lg:shrink-0 lg:border-t-0">
         <div className="flex items-center gap-2 px-5 pt-5 pb-3">
           <FolderOpen className="h-4 w-4 shrink-0 text-[var(--land-ink-3)]" aria-hidden />
           <h2 className="flex-1 text-base font-bold text-[var(--land-ink)]">Projects</h2>
@@ -88,7 +94,7 @@ export function DashboardMiddleColumn({
             </button>
           )}
         </div>
-        <div className="max-h-[45vh] overflow-y-auto px-2 pb-4">
+        <div className="px-2 pb-4 lg:max-h-[45vh] lg:overflow-y-auto">
           <ProjectsTree
             projects={projects}
             folders={folders}
@@ -100,8 +106,8 @@ export function DashboardMiddleColumn({
         </div>
       </div>
 
-      {/* Day schedule */}
-      <div className="flex min-h-0 flex-1 flex-col border-t border-[var(--land-rule)]">
+      {/* Day schedule — directly under the greeting on mobile */}
+      <div className="order-2 flex flex-col border-t border-[var(--land-rule)] lg:order-none lg:min-h-0 lg:flex-1">
         <div className="flex items-center gap-1.5 px-5 pt-5 pb-3">
           <CalendarDays className="h-4 w-4 shrink-0 text-[var(--land-ink-3)]" aria-hidden />
           <h2 className="min-w-0 flex-1 truncate text-base font-bold text-[var(--land-ink)]">
@@ -133,8 +139,19 @@ export function DashboardMiddleColumn({
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-          <UpcomingTimeline items={upcoming} viewDate={viewDate} onOpen={onOpenUpcoming} />
+        <div className="px-5 pb-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <UpcomingTimeline
+            items={upcoming}
+            viewDate={viewDate}
+            onOpen={onOpenUpcoming}
+            autoScrollToNow={isDesktop}
+            onCreateAt={(hour) =>
+              onCreateEventAt(
+                viewDate.toISOString().slice(0, 10),
+                `${String(hour).padStart(2, "0")}:00`,
+              )
+            }
+          />
         </div>
       </div>
     </div>

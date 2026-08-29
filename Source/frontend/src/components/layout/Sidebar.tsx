@@ -11,7 +11,6 @@ import {
   X,
   ClipboardList,
   PenTool,
-  Pin,
   Plus,
   Settings,
   HelpCircle,
@@ -23,11 +22,20 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useThemeContext } from "../../context/ThemeContext";
 import type { OpenedBoard } from "./AppLayout";
-import type { BoardSummaryDto, NotebookSummaryDto, ProjectSummaryDto } from "../../types";
+import type {
+  BoardSummaryDto,
+  NotebookSummaryDto,
+  ProjectSummaryDto,
+} from "../../types";
 import { ProjectCard } from "../projects/ProjectCard";
 import { BoardCard } from "../dashboard/BoardCard";
 import { NotebookCard } from "../notebooks/NotebookCard";
-import { SidebarMenuList, SidebarRail, useSidebar, type SidebarMenuItemDef } from "./sidebar-primitives";
+import {
+  SidebarMenuList,
+  SidebarRail,
+  useSidebar,
+  type SidebarMenuItemDef,
+} from "./sidebar-primitives";
 
 interface SidebarProps {
   /** When true, sidebar is shown as overlay drawer (mobile); no collapse chevron, show close button */
@@ -50,7 +58,11 @@ interface SidebarProps {
   getBoardCardProps: () => {
     onDelete?: (id: string) => void;
     onRename?: (id: string, currentName: string) => void;
-    onMoveToProject?: (boardId: string, projectId: string, folderId?: string) => void;
+    onMoveToProject?: (
+      boardId: string,
+      projectId: string,
+      folderId?: string,
+    ) => void;
     onTogglePin?: (id: string, isPinned: boolean) => void;
     activeProjects?: ProjectSummaryDto[];
   };
@@ -59,7 +71,11 @@ interface SidebarProps {
     onRename?: (id: string, currentName: string) => void;
     onTogglePin?: (id: string, isPinned: boolean) => void;
     onDelete?: (id: string) => void;
-    onAddToProject?: (notebookId: string, projectId: string, folderId?: string) => void;
+    onAddToProject?: (
+      notebookId: string,
+      projectId: string,
+      folderId?: string,
+    ) => void;
     activeProjects?: ProjectSummaryDto[];
   };
   resolveBoardDto: (id: string) => BoardSummaryDto | undefined;
@@ -136,7 +152,9 @@ export function Sidebar({
   const { state, toggleSidebar, width, isResizing } = useSidebar();
 
   const isOnBoardPage = location.pathname.startsWith("/boards/");
-  const isOnChalkBoardPage = location.pathname.startsWith("/chalkboards/") && location.pathname !== "/chalkboards";
+  const isOnChalkBoardPage =
+    location.pathname.startsWith("/chalkboards/") &&
+    location.pathname !== "/chalkboards";
   const isOnAnyBoardPage = isOnBoardPage || isOnChalkBoardPage;
 
   // Don't show pinned boards in the "Opened Boards" section
@@ -145,7 +163,11 @@ export function Sidebar({
 
   function isActive(path: string) {
     if (path === "/dashboard") return location.pathname === "/dashboard";
-    if (path === "/notebooks") return location.pathname === "/notebooks" || location.pathname.startsWith("/notebooks/");
+    if (path === "/notebooks")
+      return (
+        location.pathname === "/notebooks" ||
+        location.pathname.startsWith("/notebooks/")
+      );
     return location.pathname.startsWith(path);
   }
 
@@ -203,7 +225,10 @@ export function Sidebar({
                 : "/asidenote-logo-square.png"
             }
             alt="ASideNote"
-            className={["shrink-0 object-contain", expanded ? "h-8 w-auto" : "h-12 w-12"].join(" ")}
+            className={[
+              "shrink-0 object-contain",
+              expanded ? "h-8 w-auto" : "h-12 w-12",
+            ].join(" ")}
           />
         </Link>
         {isDrawer && (
@@ -241,32 +266,32 @@ export function Sidebar({
       <SidebarMenuList
         items={
           user?.role === "Admin"
-            ? [...NAV_ITEMS, { to: "/admin", icon: ShieldCheck, label: "Admin" }]
+            ? [
+                ...NAV_ITEMS,
+                { to: "/admin", icon: ShieldCheck, label: "Admin" },
+              ]
             : NAV_ITEMS
         }
         isActive={isActive}
         expanded={expanded}
       />
 
-      {/* Pinned (projects, notebooks, boards) */}
-      {(pinnedProjects.length > 0 || pinnedNotebooks.length > 0 || pinnedBoards.length > 0) && (
+      {/* Pinned + Opened — one merged section, pinned rows kept above opened rows */}
+      {(pinnedProjects.length > 0 ||
+        pinnedNotebooks.length > 0 ||
+        pinnedBoards.length > 0 ||
+        filteredOpenedBoards.length > 0) && (
         <div className="flex flex-col border-t border-[var(--land-rule)] overflow-hidden">
-          {expanded && (
-            <span className="px-6 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--land-ink-3)] flex-shrink-0 flex items-center gap-1">
-              <Pin className="h-3 w-3" />
-              Pinned
-            </span>
-          )}
-          {!expanded && (
-            <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-[var(--land-ink-3)] flex-shrink-0">
-              <Pin className="mx-auto h-3 w-3" />
-            </span>
-          )}
-          <div className="overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 max-h-48 scrollbar-thin">
+          <div className="overflow-y-auto px-3 py-2 flex flex-col gap-0.5 max-h-96 scrollbar-thin">
             {pinnedProjects.map((project) => (
               <div
                 key={`project-${project.id}`}
-                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                className={[
+                  "group flex items-center gap-0.5",
+                  !expanded && "justify-center",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <div className="min-w-0 flex-1">
                   <ProjectCard
@@ -295,7 +320,12 @@ export function Sidebar({
             {pinnedNotebooks.map((notebook) => (
               <div
                 key={`notebook-${notebook.id}`}
-                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                className={[
+                  "group flex items-center gap-0.5",
+                  !expanded && "justify-center",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <div className="min-w-0 flex-1">
                   <NotebookCard
@@ -324,7 +354,12 @@ export function Sidebar({
             {pinnedBoards.map((board) => (
               <div
                 key={`board-${board.id}`}
-                className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                className={[
+                  "group flex items-center gap-0.5",
+                  !expanded && "justify-center",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <div className="min-w-0 flex-1">
                   <BoardCard
@@ -350,24 +385,6 @@ export function Sidebar({
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Opened */}
-      {filteredOpenedBoards.length > 0 && (
-        <div className="flex flex-col border-t border-[var(--land-rule)] overflow-hidden">
-          {expanded && (
-            <span className="px-6 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--land-ink-3)] flex-shrink-0">
-              Opened
-            </span>
-          )}
-          {!expanded && (
-            <span className="pt-3 pb-1 text-center text-[9px] font-semibold uppercase tracking-wider text-[var(--land-ink-3)] flex-shrink-0">
-              Open
-            </span>
-          )}
-          <div className="overflow-y-auto px-3 pb-2 flex flex-col gap-0.5 max-h-48 scrollbar-thin">
             {filteredOpenedBoards.map((board) => {
               const fullBoard = resolveBoardDto(board.id);
               if (!fullBoard) {
@@ -376,7 +393,12 @@ export function Sidebar({
                 return (
                   <div
                     key={board.id}
-                    className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                    className={[
+                      "group flex items-center gap-0.5",
+                      !expanded && "justify-center",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <Link
                       to={getBoardPath(board)}
@@ -384,7 +406,7 @@ export function Sidebar({
                       className={[
                         "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
                         active
-                          ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                          ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                           : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
                         !expanded && "justify-center",
                       ]
@@ -393,11 +415,15 @@ export function Sidebar({
                     >
                       <Icon
                         className={`h-4 w-4 flex-shrink-0 ${
-                          active ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
+                          active
+                            ? "text-amber-600 dark:text-sky-400"
+                            : "text-[var(--land-ink-3)]"
                         }`}
                       />
                       {expanded && (
-                        <span className="flex-1 truncate text-xs font-medium">{board.name}</span>
+                        <span className="flex-1 truncate text-xs font-medium">
+                          {board.name}
+                        </span>
                       )}
                     </Link>
                     {expanded && (
@@ -416,7 +442,12 @@ export function Sidebar({
               return (
                 <div
                   key={board.id}
-                  className={["group flex items-center gap-0.5", !expanded && "justify-center"].filter(Boolean).join(" ")}
+                  className={[
+                    "group flex items-center gap-0.5",
+                    !expanded && "justify-center",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   <div className="min-w-0 flex-1">
                     <BoardCard
@@ -470,7 +501,10 @@ export function Sidebar({
                 }
                 draggable="true"
                 onDragStart={(e) => {
-                  e.dataTransfer.setData("application/board-item-type", tool.type);
+                  e.dataTransfer.setData(
+                    "application/board-item-type",
+                    tool.type,
+                  );
                   e.dataTransfer.effectAllowed = "copy";
                   const iconEl = e.currentTarget.querySelector("svg");
                   if (iconEl) {
@@ -479,7 +513,9 @@ export function Sidebar({
                 }}
                 onClick={() => {
                   document.dispatchEvent(
-                    new CustomEvent("board-tool-click", { detail: { type: tool.type } }),
+                    new CustomEvent("board-tool-click", {
+                      detail: { type: tool.type },
+                    }),
                   );
                 }}
                 title={tool.label}
@@ -492,9 +528,7 @@ export function Sidebar({
               >
                 <div className="relative flex-shrink-0">
                   <tool.icon className={`h-5 w-5 ${tool.iconColor}`} />
-                  <div
-                    className={`sidebar-tool-swatch ${tool.swatchColor}`}
-                  />
+                  <div className={`sidebar-tool-swatch ${tool.swatchColor}`} />
                 </div>
                 {expanded && <span>{tool.label}</span>}
               </div>
@@ -533,7 +567,13 @@ export function Sidebar({
         {expanded && user && (
           <button
             type="button"
-            onClick={() => navigate(user?.username ? `/profile/${encodeURIComponent(user.username)}` : "/profile")}
+            onClick={() =>
+              navigate(
+                user?.username
+                  ? `/profile/${encodeURIComponent(user.username)}`
+                  : "/profile",
+              )
+            }
             className="block w-full truncate px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-[var(--land-ink-3)] transition-colors hover:text-[var(--land-ink)]"
           >
             {user.username}

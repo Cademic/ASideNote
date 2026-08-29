@@ -97,6 +97,10 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
     [location.pathname, boardName],
   );
 
+  // On the dashboard at mobile widths the breadcrumb is just "Dashboard" (redundant with the
+  // page's own welcome heading), so we drop it and let the workspace search take its place.
+  const isMobileDashboard = Boolean(showMenuButton) && location.pathname === "/dashboard";
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -126,7 +130,10 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
             <Menu className="h-5 w-5" />
           </button>
         )}
-        <nav className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden" aria-label="Breadcrumb">
+        <nav
+          className={`${isMobileDashboard ? "hidden" : "flex"} items-center gap-1.5 min-w-0 flex-1 overflow-hidden`}
+          aria-label="Breadcrumb"
+        >
           {breadcrumbs.map((seg, i) => {
             const isLast = i === breadcrumbs.length - 1;
             const isFirst = i === 0;
@@ -165,8 +172,13 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
         </nav>
       </div>
 
-      {/* Center: global workspace search */}
-      <div className="mx-2 hidden min-w-0 flex-1 justify-center sm:flex md:mx-6">
+      {/* Center: global workspace search — always shown on the mobile dashboard, where it
+          replaces the breadcrumb; elsewhere it stays a tablet-and-up affordance. */}
+      <div
+        className={`mx-2 min-w-0 flex-1 justify-center md:mx-6 ${
+          isMobileDashboard ? "flex" : "hidden sm:flex"
+        }`}
+      >
         <div className="w-full max-w-md">
           <GlobalSearch />
         </div>
