@@ -18,6 +18,12 @@ interface CreateEventDialogProps {
   onSave: (data: CalendarEventFormData) => void;
   onDelete?: () => void;
   initialDate?: string;
+  /** "HH:MM" (24h) start time for a new item — pairs with `initialDate`. */
+  initialTime?: string;
+  /** Type a new item opens as (defaults to "Event"). */
+  initialEventType?: "Event" | "Note";
+  /** All-day state a new item opens with (defaults to true). */
+  initialAllDay?: boolean;
   editEvent?: CalendarEventDto | null;
   projectId?: string;
   /** Project date boundaries — when set, event dates are constrained to this range */
@@ -31,6 +37,9 @@ export function CreateEventDialog({
   onSave,
   onDelete,
   initialDate,
+  initialTime,
+  initialEventType,
+  initialAllDay,
   editEvent,
   projectStartDate,
   projectEndDate,
@@ -70,16 +79,16 @@ export function CreateEventDialog({
       setStartDate(initialDate ?? toLocalDateStr(new Date()));
       // Inside a project calendar, default the end date to the project's end date
       setEndDate(projectEndDate ? formatDateForInput(projectEndDate) : "");
-      setStartTime("09:00");
-      setEndTime("10:00");
-      setIsAllDay(true);
+      setStartTime(initialTime ?? "09:00");
+      setEndTime(initialTime ? addOneHour(initialTime) : "10:00");
+      setIsAllDay(initialAllDay ?? true);
       setColor("sky");
-      setEventType("Event");
+      setEventType(initialEventType ?? "Event");
       setRecurrenceFrequency("");
       setRecurrenceInterval(1);
       setRecurrenceEndDate("");
     }
-  }, [isOpen, editEvent, initialDate, projectEndDate]);
+  }, [isOpen, editEvent, initialDate, initialTime, initialEventType, initialAllDay, projectEndDate]);
 
   // Compute date boundaries when inside a project calendar
   const minDate = projectStartDate ? formatDateForInput(projectStartDate) : undefined;
@@ -130,7 +139,7 @@ export function CreateEventDialog({
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">
-            {editEvent ? "Edit Event" : "New Event"}
+            {editEvent ? "Edit" : "New"} {eventType === "Note" ? "Note" : "Event"}
           </h2>
           <button
             type="button"
@@ -407,6 +416,13 @@ function formatDateForInput(isoStr: string): string {
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** "HH:MM" one hour later, clamped to 23:00 so a late click doesn't roll past midnight. */
+function addOneHour(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const nextHour = Math.min(23, (h ?? 0) + 1);
+  return `${String(nextHour).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
 }
 
 function extractTime(isoStr: string): string {

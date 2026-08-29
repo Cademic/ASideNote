@@ -253,7 +253,7 @@ export function BoardCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isBoardRouteActive
-                ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                 : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -264,7 +264,7 @@ export function BoardCard({
         <div
           role="button"
           tabIndex={0}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
+          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
           onClick={() => navigate(boardPath)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -276,13 +276,13 @@ export function BoardCard({
           {board.isPinned && sidebarShowLabel && (
             <Pin
               className={`h-3.5 w-3.5 shrink-0 ${
-                isBoardRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
+                isBoardRouteActive ? "text-amber-600 dark:text-sky-400" : "text-amber-500"
               }`}
             />
           )}
           <Icon
             className={`h-4 w-4 shrink-0 ${
-              isBoardRouteActive ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
+              isBoardRouteActive ? "text-amber-600 dark:text-sky-400" : "text-[var(--land-ink-3)]"
             }`}
           />
           {sidebarShowLabel && (

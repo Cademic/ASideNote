@@ -7,10 +7,19 @@ interface UpcomingTimelineProps {
   /** UTC-midnight Date of the day being shown — the grid renders this day's 24 hours only. */
   viewDate: Date;
   onOpen: (item: UpcomingItem) => void;
+  /**
+   * Park the scroll on "now" (or the morning) when the day changes. Only safe when the
+   * timeline has its own scroll container; on the mobile dashboard it scrolls with the
+   * page, where this would yank the whole view past the welcome heading on every load.
+   */
+  autoScrollToNow?: boolean;
+  /** Clicking an empty hour row — `hour` is 0–23 in the shown day's local wall clock. */
+  onCreateAt?: (hour: number) => void;
 }
 
 const HOUR_HEIGHT = 48; // px per hour — matches Google Calendar's mobile day view density
 const GUTTER = 52; // px — time-label column width
+const RULE_OVERHANG = 10; // px the hour line pokes left of the gutter, still clear of the labels
 const MIN_EVENT_HEIGHT = 22;
 const DAY_MS = 86_400_000;
 const DEFAULT_EVENT_MINUTES = 60;
@@ -77,7 +86,13 @@ function assignDepth(blocks: Omit<PositionedEvent, "depth">[]): PositionedEvent[
   });
 }
 
-export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelineProps) {
+export function UpcomingTimeline({
+  items,
+  viewDate,
+  onOpen,
+  autoScrollToNow = true,
+  onCreateAt,
+}: UpcomingTimelineProps) {
   const scrollTargetRef = useRef<HTMLDivElement>(null);
   const dayStartMs = viewDate.getTime();
   const dayEndMs = dayStartMs + DAY_MS;
@@ -125,8 +140,9 @@ export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelinePr
 
   // Re-park the scroll whenever the day changes: to "now" on today, to the morning otherwise.
   useEffect(() => {
+    if (!autoScrollToNow) return;
     scrollTargetRef.current?.scrollIntoView({ block: "center" });
-  }, [dayStartMs]);
+  }, [dayStartMs, autoScrollToNow]);
 
   return (
     <div className="flex flex-col">
@@ -163,21 +179,48 @@ export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelinePr
       )}
 
       <div className="relative" style={{ height: 24 * HOUR_HEIGHT }}>
-        {/* Hour grid */}
-        {Array.from({ length: 24 }, (_, hour) => (
-          <div
-            key={hour}
-            className="absolute inset-x-0 border-t border-[var(--land-rule)]"
-            style={{ top: hour * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-          >
+        {/* Hour grid — each row is a click target for creating a note at that hour */}
+        {Array.from({ length: 24 }, (_, hour) => {
+          const rowStyle = { top: hour * HOUR_HEIGHT, height: HOUR_HEIGHT };
+          const timeLabelSpan = (
             <span
               className="absolute -top-2 left-0 font-label text-[11px] text-[var(--land-ink-3)]"
               style={{ width: GUTTER - 8 }}
             >
               {hour === 0 ? "" : hourLabel(hour)}
             </span>
-          </div>
-        ))}
+          );
+          // Hover fill stays inside the timeline body (past the gutter); the hour rule
+          // reaches a little further left so it meets the labels without crossing them.
+          const hourRule = (
+            <span
+              className="absolute inset-y-0 right-0 border-t border-[var(--land-rule)]"
+              style={{ left: GUTTER - RULE_OVERHANG }}
+            />
+          );
+          return onCreateAt ? (
+            <button
+              key={hour}
+              type="button"
+              onClick={() => onCreateAt(hour)}
+              aria-label={`New note at ${hour === 0 ? "12 AM" : hourLabel(hour)}`}
+              className="group absolute inset-x-0 text-left"
+              style={rowStyle}
+            >
+              {timeLabelSpan}
+              <span
+                className="absolute inset-y-0 right-0 transition-colors group-hover:bg-[var(--land-cream)] motion-reduce:transition-none"
+                style={{ left: GUTTER }}
+              />
+              {hourRule}
+            </button>
+          ) : (
+            <div key={hour} className="absolute inset-x-0" style={rowStyle}>
+              {timeLabelSpan}
+              {hourRule}
+            </div>
+          );
+        })}
 
         {/* Vertical rule between the time gutter and the events */}
         <div
@@ -195,7 +238,12 @@ export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelinePr
 
         {/* Current-time indicator — only when the shown day is actually today */}
         {isViewingToday && (
-          <div className="absolute inset-x-0 z-20" style={{ top: nowTop }} data-now aria-hidden>
+          <div
+            className="pointer-events-none absolute inset-x-0 z-20"
+            style={{ top: nowTop }}
+            data-now
+            aria-hidden
+          >
             <div
               className="absolute h-2 w-2 -translate-y-1/2 rounded-full bg-[#ea4335]"
               style={{ left: GUTTER - 4 }}
@@ -207,8 +255,10 @@ export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelinePr
           </div>
         )}
 
-        {/* Events — positioned inside the area to the right of the time gutter */}
-        <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
+        {/* Events — positioned inside the area to the right of the time gutter. The layer
+            ignores pointer events so clicks on empty space fall through to the hour rows;
+            the event buttons themselves opt back in. */}
+        <div className="pointer-events-none absolute inset-y-0 right-0" style={{ left: GUTTER }}>
           {positioned.map(({ item, top, height, startLabel, depth }, i) => {
             const colors = resolveCalendarEventColor(item.event?.color);
             const inset = Math.min(depth, MAX_STAGGER) * STAGGER_PX;
@@ -218,7 +268,7 @@ export function UpcomingTimeline({ items, viewDate, onOpen }: UpcomingTimelinePr
                 type="button"
                 onClick={() => onOpen(item)}
                 title={item.title}
-                className={`absolute flex flex-col overflow-hidden rounded-md border border-black/10 px-2 py-1 text-left shadow-sm transition-transform duration-150 ease-out hover:translate-x-1 motion-reduce:transition-none motion-reduce:hover:translate-x-0 dark:border-white/15 ${colors.bg} ${colors.text}`}
+                className={`pointer-events-auto absolute flex flex-col overflow-hidden rounded-md border border-black/10 px-2 py-1 text-left shadow-sm transition-transform duration-150 ease-out hover:translate-x-1 motion-reduce:transition-none motion-reduce:hover:translate-x-0 dark:border-white/15 ${colors.bg} ${colors.text}`}
                 style={{
                   top: top + inset,
                   height,
