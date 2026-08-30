@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Settings,
   ListChecks,
+  ExternalLink,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { ProjectSummaryDto } from "../../types";
@@ -294,6 +295,18 @@ export function ProjectCard({
   function renderMenuItems() {
     return (
       <>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
+          onClick={(e) => {
+            e.stopPropagation();
+            closeMenu();
+            window.open(projectPath, "_blank", "noopener,noreferrer");
+          }}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Open in new tab
+        </button>
         {onRename && (
           <button
             type="button"

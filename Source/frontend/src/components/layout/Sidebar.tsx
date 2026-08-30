@@ -1,9 +1,8 @@
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import {
   LayoutDashboard,
   StickyNote,
   Image as ImageIcon,
-  FolderOpen,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -14,7 +13,6 @@ import {
   Plus,
   Settings,
   HelpCircle,
-  BookOpen,
   ShieldCheck,
   LayoutGrid,
 } from "lucide-react";
@@ -30,6 +28,7 @@ import type {
 import { ProjectCard } from "../projects/ProjectCard";
 import { BoardCard } from "../dashboard/BoardCard";
 import { NotebookCard } from "../notebooks/NotebookCard";
+import { RenameInput } from "../ui/RenameInput";
 import {
   SidebarMenuList,
   SidebarRail,
@@ -49,7 +48,6 @@ interface SidebarProps {
   onUnpinProject: (id: string) => void;
   onUnpinNotebook: (id: string) => void;
   getProjectCardProps: () => {
-    onRename?: (id: string, currentName: string) => void;
     onTogglePin?: (id: string, isPinned: boolean) => void;
     onDelete?: (id: string) => void;
     onLeave?: (id: string) => void;
@@ -57,7 +55,6 @@ interface SidebarProps {
   };
   getBoardCardProps: () => {
     onDelete?: (id: string) => void;
-    onRename?: (id: string, currentName: string) => void;
     onMoveToProject?: (
       boardId: string,
       projectId: string,
@@ -68,7 +65,6 @@ interface SidebarProps {
   };
   getNotebookCardProps: () => {
     onOpen: (id: string) => void;
-    onRename?: (id: string, currentName: string) => void;
     onTogglePin?: (id: string, isPinned: boolean) => void;
     onDelete?: (id: string) => void;
     onAddToProject?: (
@@ -78,19 +74,25 @@ interface SidebarProps {
     ) => void;
     activeProjects?: ProjectSummaryDto[];
   };
+  /** Commit an inline rename started from a sidebar row's context / ellipsis menu. */
+  onRenameProject: (id: string, name: string) => void | Promise<void>;
+  onRenameBoard: (id: string, name: string) => void | Promise<void>;
+  onRenameNotebook: (id: string, name: string) => void | Promise<void>;
   resolveBoardDto: (id: string) => BoardSummaryDto | undefined;
   /** True while the dashboard Active Canvas has a live board mounted — keeps the Board Tools visible off the board routes. */
   dashboardBoardToolsActive?: boolean;
+  /** The dashboard Active Canvas board is a chalkboard — narrow Board Tools to the sticky-note tool, as on the chalkboard route. */
+  dashboardActiveBoardIsChalk?: boolean;
   /** Opens the create dialog (rail "Create" button). */
   onRequestCreate?: () => void;
 }
 
+type RenameKind = "project" | "board" | "notebook";
+
 const NAV_ITEMS: SidebarMenuItemDef[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/calendar", icon: Calendar, label: "Calendar" },
-  { to: "/projects", icon: FolderOpen, label: "Projects" },
-  { to: "/notebooks", icon: BookOpen, label: "Notebook" },
-  { to: "/boards", icon: LayoutGrid, label: "Boards" },
+  { to: "/gallery", icon: LayoutGrid, label: "Gallery" },
 ];
 
 const BOARD_TOOLS = [
@@ -141,8 +143,12 @@ export function Sidebar({
   getProjectCardProps,
   getBoardCardProps,
   getNotebookCardProps,
+  onRenameProject,
+  onRenameBoard,
+  onRenameNotebook,
   resolveBoardDto,
   dashboardBoardToolsActive = false,
+  dashboardActiveBoardIsChalk = false,
   onRequestCreate,
 }: SidebarProps) {
   const location = useLocation();
@@ -151,10 +157,39 @@ export function Sidebar({
   const { effectiveTheme } = useThemeContext();
   const { state, toggleSidebar, width, isResizing } = useSidebar();
 
+  // Inline rename — mirrors the dashboard Projects tree: the row's context /
+  // ellipsis "Rename" swaps the card for an autofocused field, committed on
+  // Enter / blur and cancelled on Escape.
+  const [renaming, setRenaming] = useState<{
+    kind: RenameKind;
+    id: string;
+  } | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+
+  function startRename(kind: RenameKind, id: string, currentName: string) {
+    setRenaming({ kind, id });
+    setRenameDraft(currentName);
+  }
+  function cancelRename() {
+    setRenaming(null);
+    setRenameDraft("");
+  }
+  function submitRename() {
+    if (!renaming) return;
+    const { kind, id } = renaming;
+    const name = renameDraft.trim();
+    setRenaming(null);
+    setRenameDraft("");
+    if (!name) return;
+    if (kind === "project") void onRenameProject(id, name);
+    else if (kind === "board") void onRenameBoard(id, name);
+    else void onRenameNotebook(id, name);
+  }
+  const isRenaming = (kind: RenameKind, id: string) =>
+    renaming?.kind === kind && renaming.id === id;
+
   const isOnBoardPage = location.pathname.startsWith("/boards/");
-  const isOnChalkBoardPage =
-    location.pathname.startsWith("/chalkboards/") &&
-    location.pathname !== "/chalkboards";
+  const isOnChalkBoardPage = location.pathname.startsWith("/chalkboards/");
   const isOnAnyBoardPage = isOnBoardPage || isOnChalkBoardPage;
 
   // Don't show pinned boards in the "Opened Boards" section
@@ -163,11 +198,7 @@ export function Sidebar({
 
   function isActive(path: string) {
     if (path === "/dashboard") return location.pathname === "/dashboard";
-    if (path === "/notebooks")
-      return (
-        location.pathname === "/notebooks" ||
-        location.pathname.startsWith("/notebooks/")
-      );
+    if (path === "/gallery") return location.pathname === "/gallery";
     return location.pathname.startsWith(path);
   }
 
@@ -196,7 +227,7 @@ export function Sidebar({
   return (
     <aside
       className={[
-        "sidebar-surface relative flex h-screen flex-col motion-reduce:transition-none",
+        "sidebar-surface relative flex h-full flex-col motion-reduce:transition-none",
         isResizing ? "" : "transition-[width] duration-200 ease-out-smooth",
         isDrawer ? "w-60" : expanded ? "" : "w-16",
       ]
@@ -294,14 +325,24 @@ export function Sidebar({
                   .join(" ")}
               >
                 <div className="min-w-0 flex-1">
-                  <ProjectCard
-                    layout="sidebarRow"
-                    sidebarShowLabel={expanded}
-                    project={project}
-                    {...getProjectCardProps()}
-                  />
+                  {expanded && isRenaming("project", project.id) ? (
+                    <RenameInput
+                      value={renameDraft}
+                      onChange={setRenameDraft}
+                      onSubmit={submitRename}
+                      onCancel={cancelRename}
+                    />
+                  ) : (
+                    <ProjectCard
+                      layout="sidebarRow"
+                      sidebarShowLabel={expanded}
+                      project={project}
+                      {...getProjectCardProps()}
+                      onRename={(id, name) => startRename("project", id, name)}
+                    />
+                  )}
                 </div>
-                {expanded && (
+                {expanded && !isRenaming("project", project.id) && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -328,14 +369,24 @@ export function Sidebar({
                   .join(" ")}
               >
                 <div className="min-w-0 flex-1">
-                  <NotebookCard
-                    layout="sidebarRow"
-                    sidebarShowLabel={expanded}
-                    notebook={notebook}
-                    {...getNotebookCardProps()}
-                  />
+                  {expanded && isRenaming("notebook", notebook.id) ? (
+                    <RenameInput
+                      value={renameDraft}
+                      onChange={setRenameDraft}
+                      onSubmit={submitRename}
+                      onCancel={cancelRename}
+                    />
+                  ) : (
+                    <NotebookCard
+                      layout="sidebarRow"
+                      sidebarShowLabel={expanded}
+                      notebook={notebook}
+                      {...getNotebookCardProps()}
+                      onRename={(id, name) => startRename("notebook", id, name)}
+                    />
+                  )}
                 </div>
-                {expanded && (
+                {expanded && !isRenaming("notebook", notebook.id) && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -362,14 +413,24 @@ export function Sidebar({
                   .join(" ")}
               >
                 <div className="min-w-0 flex-1">
-                  <BoardCard
-                    layout="sidebarRow"
-                    sidebarShowLabel={expanded}
-                    board={board}
-                    {...getBoardCardProps()}
-                  />
+                  {expanded && isRenaming("board", board.id) ? (
+                    <RenameInput
+                      value={renameDraft}
+                      onChange={setRenameDraft}
+                      onSubmit={submitRename}
+                      onCancel={cancelRename}
+                    />
+                  ) : (
+                    <BoardCard
+                      layout="sidebarRow"
+                      sidebarShowLabel={expanded}
+                      board={board}
+                      {...getBoardCardProps()}
+                      onRename={(id, name) => startRename("board", id, name)}
+                    />
+                  )}
                 </div>
-                {expanded && (
+                {expanded && !isRenaming("board", board.id) && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -450,14 +511,24 @@ export function Sidebar({
                     .join(" ")}
                 >
                   <div className="min-w-0 flex-1">
-                    <BoardCard
-                      layout="sidebarRow"
-                      sidebarShowLabel={expanded}
-                      board={fullBoard}
-                      {...getBoardCardProps()}
-                    />
+                    {expanded && isRenaming("board", fullBoard.id) ? (
+                      <RenameInput
+                        value={renameDraft}
+                        onChange={setRenameDraft}
+                        onSubmit={submitRename}
+                        onCancel={cancelRename}
+                      />
+                    ) : (
+                      <BoardCard
+                        layout="sidebarRow"
+                        sidebarShowLabel={expanded}
+                        board={fullBoard}
+                        {...getBoardCardProps()}
+                        onRename={(id, name) => startRename("board", id, name)}
+                      />
+                    )}
                   </div>
-                  {expanded && (
+                  {expanded && !isRenaming("board", fullBoard.id) && (
                     <button
                       type="button"
                       onClick={(e) => handleCloseBoard(e, board)}
@@ -486,7 +557,7 @@ export function Sidebar({
             </span>
           )}
           <div className="flex flex-col gap-0.5">
-            {(isOnChalkBoardPage
+            {(isOnChalkBoardPage || dashboardActiveBoardIsChalk
               ? BOARD_TOOLS.filter((t) => t.type === "sticky-note")
               : BOARD_TOOLS
             ).map((tool) => (
@@ -588,7 +659,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={toggleSidebar}
-            className="absolute -right-3 top-[4.25rem] z-10 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--land-rule)] bg-[var(--land-paper)] text-[var(--land-ink-2)] transition-colors duration-150 hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] motion-reduce:transition-none"
+            className="absolute -right-3 top-[4.25rem] z-40 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--land-rule)] bg-[var(--land-paper)] text-[var(--land-ink-2)] transition-colors duration-150 hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)] motion-reduce:transition-none"
             aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           >
             {expanded ? (

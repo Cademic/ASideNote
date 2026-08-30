@@ -1,4 +1,4 @@
-import { X, Pencil, Repeat, FileText, Calendar } from "lucide-react";
+import { X, Pencil, Repeat, FileText, Calendar, PartyPopper } from "lucide-react";
 import type { CalendarEventDto } from "../../types";
 
 const COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = {
@@ -8,6 +8,7 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = 
   emerald: { bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-700" },
   violet: { bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300", border: "border-violet-300 dark:border-violet-700" },
   orange: { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-300 dark:border-orange-700" },
+  holiday: { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", border: "border-red-300 dark:border-red-700" },
 };
 
 // Times are persisted as the user's picked wall-clock in UTC (see CreateEventDialog /
@@ -73,6 +74,8 @@ export function EventDetailsPopup({
 
   const colors = COLOR_MAP[event.color] ?? COLOR_MAP.sky;
   const isNote = event.eventType === "Note";
+  const isHoliday = event.eventType === "Holiday";
+  const typeLabel = isHoliday ? "Holiday" : isNote ? "Note" : "Event";
   const hasRecurrence = !!(event.recurrenceFrequency && event.recurrenceFrequency.trim());
 
   return (
@@ -90,7 +93,9 @@ export function EventDetailsPopup({
             <div
               className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${colors.bg} ${colors.text}`}
             >
-              {isNote ? (
+              {isHoliday ? (
+                <PartyPopper className="h-5 w-5" />
+              ) : isNote ? (
                 <FileText className="h-5 w-5" />
               ) : (
                 <Calendar className="h-5 w-5" />
@@ -104,7 +109,7 @@ export function EventDetailsPopup({
                 {event.title}
               </h2>
               <span className="text-xs font-medium text-foreground/50">
-                {isNote ? "Note" : "Event"}
+                {typeLabel}
                 {projectName && (
                   <span className="ml-1"> • {projectName}</span>
                 )}
@@ -112,15 +117,17 @@ export function EventDetailsPopup({
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-primary"
-              title="Edit event"
-              aria-label="Edit event"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+            {!isHoliday && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-primary"
+                title="Edit event"
+                aria-label="Edit event"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -148,7 +155,7 @@ export function EventDetailsPopup({
 
           <div>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-foreground/50">
-              {isNote && event.isAllDay ? "Date" : "Date & Time"}
+              {(isNote || isHoliday) && event.isAllDay ? "Date" : "Date & Time"}
             </h3>
             <div className="text-sm text-foreground">
               {event.isAllDay ? (

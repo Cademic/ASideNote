@@ -76,6 +76,9 @@ export function DashboardMiddleColumn({
           {greeting}
           {firstName && `, ${firstName}`}
         </h2>
+        <p className="mt-1 text-sm text-[var(--land-ink-3)]">
+          Welcome to ASideNote Dashboard
+        </p>
       </div>
 
       {/* Projects — below the timeline on mobile, above it on desktop */}
@@ -94,7 +97,7 @@ export function DashboardMiddleColumn({
             </button>
           )}
         </div>
-        <div className="px-2 pb-4 lg:max-h-[45vh] lg:overflow-y-auto">
+        <div className="scrollbar-thin px-2 pb-4 lg:max-h-[45vh] lg:overflow-y-auto">
           <ProjectsTree
             projects={projects}
             folders={folders}
@@ -139,7 +142,7 @@ export function DashboardMiddleColumn({
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-5 pb-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div className="scrollbar-thin px-5 pb-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           <UpcomingTimeline
             items={upcoming}
             viewDate={viewDate}

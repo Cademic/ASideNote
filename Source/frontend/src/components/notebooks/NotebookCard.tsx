@@ -6,7 +6,7 @@ import {
 } from "../../lib/useDropdownViewport";
 import { ProjectMoveFlyout } from "../dashboard/ProjectMoveFlyout";
 import { createPortal } from "react-dom";
-import { BookOpen, ChevronRight, Folder, FolderMinus, FolderOpen, MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, ExternalLink, Folder, FolderMinus, FolderOpen, MoreVertical, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import type { NotebookSummaryDto, ProjectSummaryDto } from "../../types";
 import { getSidebarEllipsisMenuAnchor } from "../../lib/sidebar-menu-anchor";
@@ -330,6 +330,18 @@ export function NotebookCard({
             ref={ellipsisMenuPanelRef}
             className={`absolute right-0 ${menuDropdownTopClass} z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg`}
           >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeMenu();
+                window.open(notebookPath, "_blank", "noopener,noreferrer");
+              }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open in new tab
+            </button>
             {onRename && (
               <button
                 type="button"
@@ -464,6 +476,18 @@ export function NotebookCard({
               className="fixed z-[100] max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
               style={{ left: menuAnchor.x, top: menuAnchor.y }}
             >
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  window.open(notebookPath, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open in new tab
+              </button>
               {onRename && (
                 <button
                   type="button"

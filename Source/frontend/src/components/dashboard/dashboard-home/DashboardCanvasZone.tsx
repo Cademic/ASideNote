@@ -7,6 +7,10 @@ const EmbeddedBoard = lazy(() =>
   import("../../../pages/NoteBoardPage").then((m) => ({ default: m.NoteBoardPage })),
 );
 
+const EmbeddedChalkBoard = lazy(() =>
+  import("../../../pages/ChalkBoardPage").then((m) => ({ default: m.ChalkBoardPage })),
+);
+
 interface DashboardCanvasZoneProps {
   board: BoardSummaryDto | null;
   /** Opens the full board page for the previewed board. */
@@ -15,10 +19,11 @@ interface DashboardCanvasZoneProps {
 }
 
 export function DashboardCanvasZone({ board, onOpenBoard, onCreate }: DashboardCanvasZoneProps) {
+  const isChalk = board?.boardType === "ChalkBoard";
   return (
     <section className="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-[var(--land-paper)]">
       {board && (
-        <div className="flex items-center gap-2 border-b border-[var(--land-rule)] px-4 py-3">
+        <div className="flex items-center gap-2 px-4 py-3">
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--land-ink)]">
             {board.name}
           </span>
@@ -42,7 +47,16 @@ export function DashboardCanvasZone({ board, onOpenBoard, onCreate }: DashboardC
               </div>
             }
           >
-            <EmbeddedBoard key={board.id} boardId={board.id} variant="embedded" disableRealtime />
+            {isChalk ? (
+              <EmbeddedChalkBoard
+                key={board.id}
+                boardId={board.id}
+                variant="embedded"
+                disableRealtime
+              />
+            ) : (
+              <EmbeddedBoard key={board.id} boardId={board.id} variant="embedded" disableRealtime />
+            )}
           </Suspense>
         ) : (
           <CanvasEmptyState onCreate={onCreate} />

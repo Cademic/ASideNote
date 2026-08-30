@@ -6,6 +6,7 @@ import {
   ChevronRight,
   FileText,
   FolderOpen,
+  PartyPopper,
 } from "lucide-react";
 import type { CalendarEventDto, ProjectSummaryDto } from "../../types";
 import { resolveEventProjectName } from "../../utils/calendar-event-project-name";
@@ -21,6 +22,7 @@ const BAR_COLORS: Record<string, { bg: string; border: string; text: string }> =
   emerald: { bg: "bg-emerald-50 dark:bg-emerald-900", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-700 dark:text-emerald-100" },
   violet:  { bg: "bg-violet-50 dark:bg-violet-900", border: "border-violet-300 dark:border-violet-700", text: "text-violet-700 dark:text-violet-100" },
   orange:  { bg: "bg-orange-50 dark:bg-orange-900", border: "border-orange-300 dark:border-orange-700", text: "text-orange-700 dark:text-orange-100" },
+  holiday: { bg: "bg-red-50 dark:bg-red-900",     border: "border-red-300 dark:border-red-700",     text: "text-red-700 dark:text-red-100" },
 };
 
 /* ─── Date helpers ─────────────────────────────────────── */
@@ -61,7 +63,7 @@ interface WeekItem {
   id: string;
   title: string;
   color: string;
-  kind: "event" | "note" | "project";
+  kind: "event" | "note" | "project" | "holiday";
   startCol: number;
   span: number;
   continuesLeft: boolean;
@@ -196,7 +198,12 @@ export function CalendarTimeline({
           id: event.id,
           title: event.title,
           color: event.color,
-          kind: event.eventType === "Note" ? "note" : "event",
+          kind:
+            event.eventType === "Note"
+              ? "note"
+              : event.eventType === "Holiday"
+                ? "holiday"
+                : "event",
           startCol,
           span: Math.min(span, 7 - startCol),
           continuesLeft,
@@ -369,8 +376,10 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
                 const badge =
                   item.kind === "project"
                     ? "Project"
-                    : (projectLabel ??
-                        (item.isUpcoming ? "Upcoming" : item.kind === "note" ? "Note" : "Event"));
+                    : item.kind === "holiday"
+                      ? "Holiday"
+                      : (projectLabel ??
+                          (item.isUpcoming ? "Upcoming" : item.kind === "note" ? "Note" : "Event"));
                 const roundLeft = !item.continuesLeft;
                 const roundRight = !item.continuesRight;
 
@@ -393,6 +402,8 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
                       <FolderOpen className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
                     ) : item.kind === "note" ? (
                       <FileText className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
+                    ) : item.kind === "holiday" ? (
+                      <PartyPopper className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
                     ) : (
                       <Calendar className={`h-3.5 w-3.5 flex-shrink-0 ${colors.text}`} />
                     )}

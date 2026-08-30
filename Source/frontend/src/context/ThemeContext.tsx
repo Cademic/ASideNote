@@ -31,6 +31,19 @@ export function resolveTheme(mode: ThemeMode): EffectiveTheme {
 }
 
 const STORAGE_KEY = "asidenote.theme";
+
+/** Browser-UI tint (iOS Safari address bar, Android task switcher). Keep in sync
+ *  with the <meta name="theme-color"> default and the inline script in index.html. */
+const THEME_COLOR_LIGHT = "#f7f2e9";
+const THEME_COLOR_DARK = "#0d0d0d";
+
+function applyThemeColorMeta(next: EffectiveTheme) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute("content", next === "dark" ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
+  }
+}
+
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 interface ThemeProviderProps {
@@ -56,6 +69,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const htmlElement = document.documentElement;
     htmlElement.classList.add("theme-transition");
     htmlElement.classList.toggle("dark", next === "dark");
+    applyThemeColorMeta(next);
 
     if (transitionTimerRef.current !== null) {
       window.clearTimeout(transitionTimerRef.current);

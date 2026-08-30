@@ -296,6 +296,8 @@ body {
   --land-ink-3: #8a7f6b;
   --land-rule: #e3daca;
   --land-amber: #e8a33d;
+  /* Ink drawn on top of the amber accent (e.g. AnimatedCheckbox tick). */
+  --land-amber-ink: #412402;
   --land-coral: #f0997b;
   --land-yellow: #f2d45b;
   --land-mint: #9fe1cb;
@@ -448,13 +450,10 @@ body {
 }
 
 /* Dashboard Active Canvas — the embedded board sits flush inside its panel: square corners,
-   no floating drop shadow, flat menu-bar chip. Scoped to .dashboard-editorial so the standalone
-   /boards/:id route keeps its rounded, elevated frame. */
+   no frame, no shadow. */
 .dashboard-editorial .corkboard-frame {
   border-radius: 0;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: none;
 }
 
 .dashboard-editorial .corkboard-surface {
@@ -721,41 +720,19 @@ body {
   margin-bottom: 3.4cqw;
 }
 
-/* Cork Board Styles */
+/* Cork Board Styles — no wood frame: the surface bleeds edge-to-edge, flush with the
+   app navbar and sidebar. */
 .corkboard-frame {
   position: relative;
-  padding: 12px;
-  border-radius: 5px;
-  background:
-    /* Subtle vertical wood-grain lines */
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 30px,
-      rgba(0, 0, 0, 0.04) 30px,
-      rgba(0, 0, 0, 0.04) 31px
-    ),
-    /* Base wood gradient */
-    linear-gradient(
-      160deg,
-      #a67c52 0%,
-      #8b5e3c 15%,
-      #7a4f30 30%,
-      #6b4226 50%,
-      #7a4f30 70%,
-      #8b5e3c 85%,
-      #a67c52 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 4px 16px rgba(0, 0, 0, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .corkboard-surface {
-  border-radius: 2px;
-  box-shadow: inset 0 0 8px 2px rgba(0, 0, 0, 0.3);
+  border-radius: 0;
+  box-shadow: none;
   background-color: #c4a265;
   background-image:
     radial-gradient(ellipse at 10% 20%, rgba(139, 94, 60, 0.15) 0%, transparent 50%),
@@ -768,29 +745,8 @@ body {
 }
 
 .dark .corkboard-frame {
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 30px,
-      rgba(0, 0, 0, 0.06) 30px,
-      rgba(0, 0, 0, 0.06) 31px
-    ),
-    linear-gradient(
-      160deg,
-      #4a4a4d 0%,
-      #3c3c3f 15%,
-      #333336 30%,
-      #2a2a2c 50%,
-      #333336 70%,
-      #3c3c3f 85%,
-      #4a4a4d 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.5),
-    0 2px 4px rgba(0, 0, 0, 0.3);
+  background: transparent;
+  box-shadow: none;
 }
 
 .dark .corkboard-surface {
@@ -811,7 +767,7 @@ body {
   background-image:
     radial-gradient(ellipse at 10% 20%, rgba(0, 0, 0, 0.03) 0%, transparent 50%),
     radial-gradient(ellipse at 90% 80%, rgba(0, 0, 0, 0.02) 0%, transparent 50%) !important;
-  box-shadow: inset 0 0 8px 2px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: none !important;
 }
 
 .dark .corkboard-surface--whiteboard {
@@ -826,7 +782,7 @@ body {
   background-image:
     radial-gradient(ellipse at 10% 20%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
     radial-gradient(ellipse at 90% 80%, rgba(255, 255, 255, 0.01) 0%, transparent 50%) !important;
-  box-shadow: inset 0 0 8px 2px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: none !important;
 }
 
 .dark .corkboard-surface--blackboard {
@@ -875,38 +831,18 @@ body {
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* Chalk Board Styles */
+/* Chalk Board Styles — no frame: the surface bleeds edge-to-edge, flush with the
+   app navbar and sidebar. */
 .chalkboard-frame {
-  padding: 12px;
-  border-radius: 5px;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 30px,
-      rgba(0, 0, 0, 0.04) 30px,
-      rgba(0, 0, 0, 0.04) 31px
-    ),
-    linear-gradient(
-      160deg,
-      #a67c52 0%,
-      #8b5e3c 15%,
-      #7a4f30 30%,
-      #6b4226 50%,
-      #7a4f30 70%,
-      #8b5e3c 85%,
-      #a67c52 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 4px 16px rgba(0, 0, 0, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .chalkboard-surface {
-  border-radius: 2px;
-  box-shadow: inset 0 0 8px 2px rgba(0, 0, 0, 0.3);
+  border-radius: 0;
+  box-shadow: none;
   /* Avoid browser scroll anchoring fighting programmatic scroll ↔ pan sync (jumps to “center”). */
   overflow-anchor: none;
   /* Matches .note-board-page .corkboard-surface's width so the top toolbar's fixed inset (see
@@ -932,58 +868,16 @@ body {
   background: rgba(255, 255, 255, 0.45);
 }
 
-/* Chalkboard frame – gray metallic (shared by whiteboard/blackboard) */
+/* Chalkboard whiteboard/blackboard — no frame, flush with app chrome. */
 .chalkboard-frame--blackboard,
 .chalkboard-frame--whiteboard {
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 30px,
-      rgba(0, 0, 0, 0.06) 30px,
-      rgba(0, 0, 0, 0.06) 31px
-    ),
-    linear-gradient(
-      160deg,
-      #8b92a0 0%,
-      #6b7280 15%,
-      #5b6170 30%,
-      #4b5263 50%,
-      #5b6170 70%,
-      #6b7280 85%,
-      #8b92a0 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
-    0 4px 16px rgba(0, 0, 0, 0.25),
-    0 2px 4px rgba(0, 0, 0, 0.12);
+  background: transparent;
+  box-shadow: none;
 }
 
 .dark .chalkboard-frame {
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 30px,
-      rgba(0, 0, 0, 0.06) 30px,
-      rgba(0, 0, 0, 0.06) 31px
-    ),
-    linear-gradient(
-      160deg,
-      #4a4a4d 0%,
-      #3c3c3f 15%,
-      #333336 30%,
-      #2a2a2c 50%,
-      #333336 70%,
-      #3c3c3f 85%,
-      #4a4a4d 100%
-    );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.5),
-    0 2px 4px rgba(0, 0, 0, 0.3);
+  background: transparent;
+  box-shadow: none;
 }
 
 /* ProseMirror (TipTap) — required for correct rendering */
@@ -1496,6 +1390,20 @@ body {
   border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Board toolbar pinned flush below the app navbar — square, edge-to-edge, no float. */
+.notepad-card.board-toolbar-bar {
+  border-radius: 0;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: none;
+}
+
+.dark .notepad-card.board-toolbar-bar {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Notepad body — ruled lines + red margin line */
 .notepad-body {
   background-image: repeating-linear-gradient(
@@ -1659,6 +1567,21 @@ body {
   background: var(--land-paper, #fffdf8);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* Dark-mode literal fallbacks. The MarketingHeader mobile menu is portaled to
+   <body>, outside the .landing-editorial / .app-editorial scope that defines the
+   --land-* tokens, so var(...) falls back to its literal. Without these rules the
+   fallback stays the light cream (#fffdf8) while the text color correctly flips to
+   light — rendering the menu as invisible light-on-light. When a wrapper IS present
+   the token still wins, so scoped surfaces are unchanged. */
+.dark .navbar-surface,
+.dark .navbar-surface--glossy {
+  background: var(--land-paper, #1e1e1e);
+}
+
+.dark .navbar-surface {
+  border-bottom-color: var(--land-rule, #2e2e2c);
 }
 
 /* ========================================

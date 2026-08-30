@@ -1,22 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import axios from "axios";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
-import { getBoards, createBoard } from "../api/boards";
-import { getProjects, getProjectById, createProject } from "../api/projects";
-import { getNotebooks, createNotebook } from "../api/notebooks";
-import {
-  deleteCalendarEvent,
-  getCalendarEvents,
-} from "../api/calendar-events";
+import { getBoards } from "../api/boards";
+import { getProjects, getProjectById } from "../api/projects";
+import { getNotebooks } from "../api/notebooks";
+import { deleteCalendarEvent, getCalendarEvents } from "../api/calendar-events";
 import {
   saveCalendarEventFromForm,
   type CalendarEventFormData,
 } from "../utils/calendar-event-save";
-import { CreateBoardDialog } from "../components/dashboard/CreateBoardDialog";
 import { CreateEventDialog } from "../components/calendar/CreateEventDialog";
 import { EventDetailsPopup } from "../components/calendar/EventDetailsPopup";
 import { DashboardLayout } from "../components/dashboard/dashboard-home/DashboardLayout";
+import { DashboardSkeleton } from "../components/dashboard/dashboard-home/DashboardSkeleton";
 import type {
   BoardSummaryDto,
   CalendarEventDto,
@@ -26,6 +22,9 @@ import type {
 } from "../types";
 import { resolveEventProjectName } from "../utils/calendar-event-project-name";
 import { buildUpcomingItems } from "../utils/dashboard-upcoming";
+import { useHolidayEvents } from "../hooks/useHolidayEvents";
+import { useAuth } from "../context/AuthContext";
+import { readLastOpenedBoard } from "../lib/lastOpenedBoard";
 
 /**
  * Merge two lists by `id`, keeping the entry from `base` when both contain the
@@ -43,11 +42,10 @@ function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const {
-    setDashboardBoardActive,
-    createNonce,
-    consumeCreate,
-  } = useOutletContext<AppLayoutContext>();
+  const { user } = useAuth();
+  const currentUserId = user?.userId ?? null;
+  const { setDashboardActiveBoardType, requestCreate } =
+    useOutletContext<AppLayoutContext>();
 
   const [boards, setBoards] = useState<BoardSummaryDto[]>([]);
   const [activeProjects, setActiveProjects] = useState<ProjectSummaryDto[]>([]);
@@ -55,20 +53,21 @@ export function DashboardPage() {
   // Boards / notebooks linked to accessible projects — includes items shared by
   // other project members that /boards and /notebooks (own-items-only) omit.
   const [projectBoards, setProjectBoards] = useState<BoardSummaryDto[]>([]);
-  const [projectNotebooks, setProjectNotebooks] = useState<NotebookSummaryDto[]>([]);
+  const [projectNotebooks, setProjectNotebooks] = useState<
+    NotebookSummaryDto[]
+  >([]);
   const [projectFolders, setProjectFolders] = useState<ProjectFolderDto[]>([]);
-  const [totalNotebooks, setTotalNotebooks] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createBoardError, setCreateBoardError] = useState<string | null>(null);
-  const [createNotebookError, setCreateNotebookError] = useState<string | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventDto[]>([]);
-  const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(null);
+  const [detailsEvent, setDetailsEvent] = useState<CalendarEventDto | null>(
+    null,
+  );
   const [calendarEventDialogOpen, setCalendarEventDialogOpen] = useState(false);
   const [calendarEventDialogDate, setCalendarEventDialogDate] = useState("");
   const [calendarEventDialogTime, setCalendarEventDialogTime] = useState("");
-  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEventDto | null>(null);
+  const [editingCalendarEvent, setEditingCalendarEvent] =
+    useState<CalendarEventDto | null>(null);
 
   const refreshCalendarEvents = useCallback(async () => {
     const today = new Date();
@@ -91,13 +90,17 @@ export function DashboardPage() {
       setError(null);
       const [boardResult, projectResult, notebookResult] = await Promise.all([
         getBoards({ limit: 100 }),
-        getProjects({ status: "Active" }).catch(() => [] as ProjectSummaryDto[]),
-        getNotebooks({ limit: 100 }).catch(() => ({ items: [] as NotebookSummaryDto[], total: 0 })),
+        getProjects({ status: "Active" }).catch(
+          () => [] as ProjectSummaryDto[],
+        ),
+        getNotebooks({ limit: 100 }).catch(() => ({
+          items: [] as NotebookSummaryDto[],
+          total: 0,
+        })),
       ]);
       setBoards(boardResult.items);
       setActiveProjects(projectResult);
       setNotebooks(notebookResult.items);
-      setTotalNotebooks(notebookResult.total ?? 0);
 
       // One detail call per accessible project: it carries the project's folders
       // plus every board and notebook linked to it — including ones owned by other
@@ -125,15 +128,30 @@ export function DashboardPage() {
 
   /** Boards, most-recently-updated first. */
   const allBoards = useMemo(
-    () => [...boards].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    () =>
+      [...boards].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
     [boards],
   );
 
-  /** The board shown in the Active Canvas: the user's most-recently-updated note board. */
-  const activeCanvasBoard = useMemo(
-    () => allBoards.find((b) => b.boardType === "NoteBoard") ?? null,
-    [allBoards],
-  );
+  /**
+   * The board shown in the Active Canvas: the board the user last opened
+   * full-screen (persisted per user) — a note board OR a chalkboard, whichever
+   * they last visited — falling back to their most-recently-updated note board
+   * when nothing is remembered or that board is no longer accessible. The
+   * fallback stays note-boards-only; a chalkboard only lands here when it is the
+   * remembered last-opened board.
+   */
+  const activeCanvasBoard = useMemo(() => {
+    const noteBoards = allBoards.filter((b) => b.boardType === "NoteBoard");
+    const lastOpenedId = readLastOpenedBoard(currentUserId);
+    const remembered = lastOpenedId
+      ? allBoards.find((b) => b.id === lastOpenedId)
+      : undefined;
+    return remembered ?? noteBoards[0] ?? null;
+  }, [allBoards, currentUserId]);
 
   /**
    * Boards / notebooks for the projects tree: the user's own items plus any
@@ -153,14 +171,27 @@ export function DashboardPage() {
   const activeProjectsSorted = useMemo(
     () =>
       [...activeProjects].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       ),
     [activeProjects],
   );
 
+  // Built-in holidays for the same 90-day window `refreshCalendarEvents` fetches
+  // (togglable in Settings), merged into the Upcoming timeline alongside real events.
+  const [holidayFrom, holidayTo] = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 90);
+    return [start.toISOString(), end.toISOString()];
+  }, []);
+  const holidayEvents = useHolidayEvents(holidayFrom, holidayTo);
+
   const upcoming = useMemo(
-    () => buildUpcomingItems(calendarEvents, activeProjects),
-    [calendarEvents, activeProjects],
+    () =>
+      buildUpcomingItems([...calendarEvents, ...holidayEvents], activeProjects),
+    [calendarEvents, holidayEvents, activeProjects],
   );
 
   const projectNameMap = useMemo(() => {
@@ -169,26 +200,28 @@ export function DashboardPage() {
     return map;
   }, [activeProjects]);
 
-  // Tell the sidebar a live board is mounted so it shows the sticky-note / index-card / image tools.
+  // Tell the sidebar which board (if any) is live in the Active Canvas so it can
+  // show the matching Board Tools — all stationery for a note board, just the
+  // sticky-note tool for a chalkboard.
   useEffect(() => {
-    setDashboardBoardActive(activeCanvasBoard != null);
-    return () => setDashboardBoardActive(false);
-  }, [activeCanvasBoard, setDashboardBoardActive]);
-
-  // The rail "Create" button bumps createNonce — open the create dialog, then consume the
-  // request so it doesn't re-fire when the dashboard remounts after navigating away and back.
-  useEffect(() => {
-    if (createNonce > 0) {
-      setIsCreateOpen(true);
-      consumeCreate();
-    }
-  }, [createNonce, consumeCreate]);
+    setDashboardActiveBoardType(
+      activeCanvasBoard?.boardType === "ChalkBoard"
+        ? "ChalkBoard"
+        : activeCanvasBoard != null
+          ? "NoteBoard"
+          : null,
+    );
+    return () => setDashboardActiveBoardType(null);
+  }, [activeCanvasBoard, setDashboardActiveBoardType]);
 
   function handleOpenNotebook(id: string) {
     navigate(`/notebooks/${id}`);
   }
 
-  function handleOpenUpcoming(item: { event?: CalendarEventDto; project?: ProjectSummaryDto }) {
+  function handleOpenUpcoming(item: {
+    event?: CalendarEventDto;
+    project?: ProjectSummaryDto;
+  }) {
     if (item.event) setDetailsEvent(item.event);
     else if (item.project) navigate(`/projects/${item.project.id}`);
   }
@@ -212,7 +245,9 @@ export function DashboardPage() {
 
   async function handleCalendarEventSave(data: CalendarEventFormData) {
     try {
-      await saveCalendarEventFromForm(data, { editEvent: editingCalendarEvent });
+      await saveCalendarEventFromForm(data, {
+        editEvent: editingCalendarEvent,
+      });
       setCalendarEventDialogOpen(false);
       setEditingCalendarEvent(null);
       await refreshCalendarEvents();
@@ -224,7 +259,8 @@ export function DashboardPage() {
   async function handleCalendarEventDelete() {
     if (!editingCalendarEvent) return;
     try {
-      const eventId = editingCalendarEvent.recurrenceSourceId ?? editingCalendarEvent.id;
+      const eventId =
+        editingCalendarEvent.recurrenceSourceId ?? editingCalendarEvent.id;
       await deleteCalendarEvent(eventId);
       setCalendarEventDialogOpen(false);
       setEditingCalendarEvent(null);
@@ -234,81 +270,10 @@ export function DashboardPage() {
     }
   }
 
-  async function handleCreateBoard(name: string, description: string, boardType: string) {
-    try {
-      setCreateBoardError(null);
-      const created = await createBoard({ name, description: description || undefined, boardType });
-      setBoards((prev) => [created, ...prev]);
-      setIsCreateOpen(false);
-      const path =
-        created.boardType === "ChalkBoard" ? `/chalkboards/${created.id}` : `/boards/${created.id}`;
-      navigate(path);
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 409) {
-        setCreateBoardError(err.response.data?.message ?? "A board with that name already exists.");
-      } else {
-        setCreateBoardError("Failed to create board. Please try again.");
-        console.error("Failed to create board:", err);
-      }
-    }
-  }
-
-  async function handleCreateProject(
-    name: string,
-    description: string,
-    color: string,
-    startDate?: string,
-    endDate?: string,
-    deadline?: string,
-  ) {
-    try {
-      setCreateBoardError(null);
-      const created = await createProject({
-        name,
-        description: description || undefined,
-        color,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        deadline: deadline || undefined,
-      });
-      setIsCreateOpen(false);
-      navigate(`/projects/${created.id}`);
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 409) {
-        setCreateBoardError(err.response.data?.message ?? "A project with that name already exists.");
-      } else {
-        setCreateBoardError("Failed to create project. Please try again.");
-        console.error("Failed to create project:", err);
-      }
-    }
-  }
-
-  async function handleCreateNotebook(name: string) {
-    try {
-      setCreateNotebookError(null);
-      const created = await createNotebook({ name });
-      setTotalNotebooks((t) => t + 1);
-      setIsCreateOpen(false);
-      navigate(`/notebooks/${created.id}`);
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 409) {
-        setCreateNotebookError(
-          err.response.data?.message ?? "Maximum 5 notebooks allowed. Delete one to create another.",
-        );
-      } else {
-        setCreateNotebookError("Failed to create notebook. Please try again.");
-        console.error("Failed to create notebook:", err);
-      }
-    }
-  }
-
   if (isLoading) {
     return (
-      <div className="dashboard-editorial flex h-full items-center justify-center bg-[var(--land-cream)]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--land-amber)] border-t-transparent" />
-          <span className="text-sm text-[var(--land-ink-2)]">Loading your workspace...</span>
-        </div>
+      <div className="dashboard-editorial w-full min-w-0 bg-[var(--land-cream)] lg:h-full lg:min-h-0 lg:overflow-hidden">
+        <DashboardSkeleton />
       </div>
     );
   }
@@ -343,25 +308,15 @@ export function DashboardPage() {
         onOpenUpcoming={handleOpenUpcoming}
         onCreateEventAt={handleCreateNoteAt}
         onOpenActiveBoard={() => {
-          if (activeCanvasBoard) navigate(`/boards/${activeCanvasBoard.id}`);
+          if (!activeCanvasBoard) return;
+          navigate(
+            activeCanvasBoard.boardType === "ChalkBoard"
+              ? `/chalkboards/${activeCanvasBoard.id}`
+              : `/boards/${activeCanvasBoard.id}`,
+          );
         }}
         onWorkspaceChanged={fetchDashboard}
-        onCreate={() => setIsCreateOpen(true)}
-      />
-
-      <CreateBoardDialog
-        isOpen={isCreateOpen}
-        error={createBoardError}
-        createNotebookError={createNotebookError}
-        canCreateNotebook={totalNotebooks < 5}
-        onClose={() => {
-          setIsCreateOpen(false);
-          setCreateBoardError(null);
-          setCreateNotebookError(null);
-        }}
-        onCreateBoard={handleCreateBoard}
-        onCreateProject={handleCreateProject}
-        onCreateNotebook={handleCreateNotebook}
+        onCreate={() => requestCreate()}
       />
 
       {detailsEvent && (

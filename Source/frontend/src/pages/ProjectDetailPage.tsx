@@ -639,7 +639,7 @@ export function ProjectDetailPage() {
     setDeleteConfirmOpen(false);
     try {
       await deleteProject(projectId);
-      navigate("/projects");
+      navigate("/gallery");
     } catch {
       // Silently fail
     }
@@ -654,7 +654,7 @@ export function ProjectDetailPage() {
     setLeaveConfirmOpen(false);
     try {
       await leaveProject(projectId);
-      navigate("/projects");
+      navigate("/gallery");
     } catch {
       // Silently fail
     }
@@ -701,7 +701,7 @@ export function ProjectDetailPage() {
           </p>
           <button
             type="button"
-            onClick={() => navigate("/projects")}
+            onClick={() => navigate("/gallery")}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Back to Projects
@@ -721,7 +721,7 @@ export function ProjectDetailPage() {
         {/* Back nav */}
         <button
           type="button"
-          onClick={() => navigate("/projects")}
+          onClick={() => navigate("/gallery")}
           className="mb-4 flex items-center gap-1.5 text-sm text-foreground/50 transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />

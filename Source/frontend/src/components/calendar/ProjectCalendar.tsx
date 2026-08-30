@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getCalendarEvents,
   deleteCalendarEvent,
@@ -13,6 +13,7 @@ import { CalendarTimeline } from "./CalendarTimeline";
 import { CreateEventDialog } from "./CreateEventDialog";
 import { EventDetailsPopup } from "./EventDetailsPopup";
 import type { CalendarEventDto, ProjectSummaryDto } from "../../types";
+import { useHolidayEvents } from "../../hooks/useHolidayEvents";
 
 function toLocalDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -93,6 +94,21 @@ export function ProjectCalendar({
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // Built-in holidays for the visible month window (togglable in Settings).
+  const [holidayFrom, holidayTo] = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return [
+      new Date(year, month - 1, 1).toISOString(),
+      new Date(year, month + 2, 0).toISOString(),
+    ];
+  }, [currentDate]);
+  const holidayEvents = useHolidayEvents(holidayFrom, holidayTo);
+  const allEvents = useMemo(
+    () => [...events, ...holidayEvents],
+    [events, holidayEvents],
+  );
 
   function handlePreviousMonth() {
     setCurrentDate(
@@ -187,7 +203,7 @@ export function ProjectCalendar({
       {layout === "grid" ? (
         <CalendarGrid
           currentDate={currentDate}
-          events={events}
+          events={allEvents}
           projects={projectAsEntry}
           onClickDay={handleClickDay}
           onClickEvent={handleClickEvent}
@@ -195,7 +211,7 @@ export function ProjectCalendar({
       ) : (
         <CalendarTimeline
           currentDate={currentDate}
-          events={events}
+          events={allEvents}
           projects={projectAsEntry}
           onClickDay={handleClickDay}
           onClickEvent={handleClickEvent}

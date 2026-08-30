@@ -42,13 +42,6 @@ export function useSidebarWorkspaceActions({
   const [notebooks, setNotebooks] = useState<NotebookSummaryDto[]>([]);
   const [boardCache, setBoardCache] = useState<Record<string, BoardSummaryDto>>({});
 
-  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [projectRenameTarget, setProjectRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [projectRenameValue, setProjectRenameValue] = useState("");
-  const [notebookRenameTarget, setNotebookRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  const [notebookRenameValue, setNotebookRenameValue] = useState("");
-
   const [deleteTarget, setDeleteTarget] = useState<BoardSummaryDto | null>(null);
   const [projectDeleteTarget, setProjectDeleteTarget] = useState<ProjectSummaryDto | null>(null);
   const [projectLeaveTarget, setProjectLeaveTarget] = useState<ProjectSummaryDto | null>(null);
@@ -106,16 +99,12 @@ export function useSidebarWorkspaceActions({
     }
   }, [isAuthenticated, openedBoardIdsMissingDto]);
 
-  function handleRenameBoard(id: string, currentName: string) {
-    setRenameTarget({ id, name: currentName });
-    setRenameValue(currentName);
-  }
-
-  async function confirmRenameBoard() {
-    if (!renameTarget || !renameValue.trim()) return;
-    const { id } = renameTarget;
-    const newName = renameValue.trim();
-    setRenameTarget(null);
+  /** Commit an inline board rename from the sidebar (optimistic, reverts on failure). */
+  async function renameBoard(id: string, name: string) {
+    const newName = name.trim();
+    if (!newName) return;
+    const current = boards.find((b) => b.id === id) ?? boardCache[id];
+    if (current && current.name === newName) return;
     setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, name: newName } : b)));
     setBoardCache((prev) => {
       const cur = prev[id];
@@ -124,6 +113,7 @@ export function useSidebarWorkspaceActions({
     });
     try {
       await updateBoard(id, { name: newName });
+      refreshPinnedBoards();
     } catch {
       void fetchWorkspace();
     }
@@ -249,17 +239,12 @@ export function useSidebarWorkspaceActions({
     }
   }
 
-  function handleRenameProject(id: string, currentName: string) {
-    setProjectRenameTarget({ id, name: currentName });
-    setProjectRenameValue(currentName);
-  }
-
-  async function confirmRenameProject() {
-    if (!projectRenameTarget || !projectRenameValue.trim()) return;
-    const { id } = projectRenameTarget;
-    const newName = projectRenameValue.trim();
+  /** Commit an inline project rename from the sidebar (optimistic, reverts on failure). */
+  async function renameProject(id: string, name: string) {
+    const newName = name.trim();
+    if (!newName) return;
     const project = activeProjects.find((p) => p.id === id);
-    setProjectRenameTarget(null);
+    if (project && project.name === newName) return;
     setActiveProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: newName } : p)));
     try {
       await updateProject(id, {
@@ -267,6 +252,7 @@ export function useSidebarWorkspaceActions({
         status: project?.status ?? "Active",
         progress: project?.progress ?? 0,
       });
+      refreshPinnedProjects();
     } catch {
       void fetchWorkspace();
     }
@@ -324,19 +310,16 @@ export function useSidebarWorkspaceActions({
     }
   }
 
-  function handleRenameNotebook(id: string, currentName: string) {
-    setNotebookRenameTarget({ id, name: currentName });
-    setNotebookRenameValue(currentName);
-  }
-
-  async function confirmRenameNotebook() {
-    if (!notebookRenameTarget || !notebookRenameValue.trim()) return;
-    const { id } = notebookRenameTarget;
-    const newName = notebookRenameValue.trim();
-    setNotebookRenameTarget(null);
+  /** Commit an inline notebook rename from the sidebar (optimistic, reverts on failure). */
+  async function renameNotebook(id: string, name: string) {
+    const newName = name.trim();
+    if (!newName) return;
+    const current = notebooks.find((n) => n.id === id);
+    if (current && current.name === newName) return;
     setNotebooks((prev) => prev.map((n) => (n.id === id ? { ...n, name: newName } : n)));
     try {
       await updateNotebook(id, { name: newName });
+      refreshPinnedNotebooks();
     } catch {
       void fetchWorkspace();
     }
@@ -435,7 +418,6 @@ export function useSidebarWorkspaceActions({
 
   function getProjectCardProps() {
     return {
-      onRename: handleRenameProject,
       onTogglePin: handleToggleProjectPin,
       onDelete: handleDeleteProject,
       onLeave: handleLeaveProject,
@@ -446,7 +428,6 @@ export function useSidebarWorkspaceActions({
   function getBoardCardProps() {
     return {
       onDelete: handleDeleteBoard,
-      onRename: handleRenameBoard,
       onMoveToProject: handleMoveToProject,
       onTogglePin: handleToggleBoardPin,
       activeProjects: activeProjectsSorted,
@@ -456,7 +437,6 @@ export function useSidebarWorkspaceActions({
   function getNotebookCardProps() {
     return {
       onOpen: openNotebook,
-      onRename: handleRenameNotebook,
       onTogglePin: handleToggleNotebookPin,
       onDelete: handleDeleteNotebook,
       onAddToProject: handleAddNotebookToProject,
@@ -506,123 +486,6 @@ export function useSidebarWorkspaceActions({
         onConfirm={confirmDeleteNotebook}
         onCancel={() => setNotebookDeleteTarget(null)}
       />
-
-      {renameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setRenameTarget(null)} />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Board</h2>
-            <input
-              type="text"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void confirmRenameBoard();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmRenameBoard()}
-                disabled={!renameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {projectRenameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setProjectRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Project</h2>
-            <input
-              type="text"
-              value={projectRenameValue}
-              onChange={(e) => setProjectRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void confirmRenameProject();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setProjectRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmRenameProject()}
-                disabled={!projectRenameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {notebookRenameTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40"
-            onClick={() => setNotebookRenameTarget(null)}
-          />
-          <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Rename Notebook</h2>
-            <input
-              type="text"
-              value={notebookRenameValue}
-              onChange={(e) => setNotebookRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void confirmRenameNotebook();
-              }}
-              maxLength={100}
-              className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setNotebookRenameTarget(null)}
-                className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmRenameNotebook()}
-                disabled={!notebookRenameValue.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-40"
-              >
-                Rename
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 
@@ -633,6 +496,9 @@ export function useSidebarWorkspaceActions({
     getProjectCardProps,
     getBoardCardProps,
     getNotebookCardProps,
+    renameProject,
+    renameBoard,
+    renameNotebook,
     fetchWorkspace,
     dialogs,
   };

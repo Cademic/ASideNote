@@ -14,6 +14,7 @@ import { StickyNote } from "../components/dashboard/StickyNote";
 import { ZoomControls } from "../components/dashboard/ZoomControls";
 import { getBoardById } from "../api/boards";
 import { getDrawing, saveDrawing } from "../api/drawings";
+import { persistLastOpenedBoard } from "../lib/lastOpenedBoard";
 import { getNotes, createNote, patchNote, deleteNote } from "../api/notes";
 import { useTouchViewport } from "../hooks/useTouchViewport";
 import { useBoardRealtime, type BoardItemUpdatePayload } from "../hooks/useBoardRealtime";
@@ -45,8 +46,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function ChalkBoardPage() {
-  const { boardId } = useParams<{ boardId: string }>();
+interface ChalkBoardPageProps {
+  /** When provided, overrides the route param — used when the board is embedded (e.g. dashboard Active Canvas). */
+  boardId?: string;
+  /** "route" (default) = full-screen board page; "embedded" = mounted inside another page's layout. */
+  variant?: "route" | "embedded";
+  /** Skip the SignalR hub connection — the dashboard preview is read-mostly and shouldn't hold a room. */
+  disableRealtime?: boolean;
+}
+
+export function ChalkBoardPage({
+  boardId: boardIdProp,
+  variant = "route",
+  disableRealtime = false,
+}: ChalkBoardPageProps = {}) {
+  const { boardId: routeBoardId } = useParams<{ boardId: string }>();
+  const boardId = boardIdProp ?? routeBoardId;
+  const isEmbedded = variant === "embedded";
   const { setBoardName, openBoard, setBoardPresence, connectedUsers } = useOutletContext<AppLayoutContext>();
   const { user } = useAuth();
   const currentUserId = user?.userId ?? undefined;
@@ -231,10 +247,12 @@ export function ChalkBoardPage() {
     panViewportToBoardPoint(CHALK_BOARD_MAX_X / 2, CHALK_BOARD_MAX_Y / 2);
   }, [isLoading]);
 
-  // Persist viewport to localStorage (debounced)
+  // Persist viewport to localStorage (debounced). Embedded (dashboard) mounts
+  // seed from the saved viewport but never write it back, so the smaller panel
+  // view can't clobber the value the full-screen /chalkboards/:id route uses.
   const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!boardId) return;
+    if (!boardId || isEmbedded) return;
     if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
     viewportTimerRef.current = setTimeout(() => {
       localStorage.setItem(`board-viewport-${boardId}`, JSON.stringify({ zoom, panX, panY }));
@@ -242,7 +260,7 @@ export function ChalkBoardPage() {
     return () => {
       if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
     };
-  }, [boardId, zoom, panX, panY]);
+  }, [boardId, zoom, panX, panY, isEmbedded]);
 
   // Sync backgroundTheme and autoEnlargeNotes when boardId changes
   useEffect(() => {
@@ -884,12 +902,16 @@ export function ChalkBoardPage() {
     });
   }, []);
 
-  const { sendFocus, isHubConnected } = useBoardRealtime(boardId ?? undefined, fetchData, {
-    enabled: !!board?.projectId,
-    onNoteUpdated: mergeNotePayload,
-    onPresenceUpdate: setBoardPresence,
-    onUserFocusingItem: handleUserFocusingItem,
-  });
+  const { sendFocus, isHubConnected } = useBoardRealtime(
+    disableRealtime ? undefined : (boardId ?? undefined),
+    fetchData,
+    {
+      enabled: !disableRealtime && !!board?.projectId,
+      onNoteUpdated: mergeNotePayload,
+      onPresenceUpdate: setBoardPresence,
+      onUserFocusingItem: handleUserFocusingItem,
+    },
+  );
 
   useEffect(() => {
     const primary = primaryEditingNoteIdRef.current;
@@ -930,11 +952,12 @@ export function ChalkBoardPage() {
     }
   }, [initialCanvasJson]);
 
-  // Push board name to navbar
+  // Push board name to navbar — skipped when embedded so the breadcrumb stays "Dashboard"
   useEffect(() => {
+    if (isEmbedded) return;
     setBoardName(board?.name ?? null);
     return () => setBoardName(null);
-  }, [board?.name, setBoardName]);
+  }, [board?.name, setBoardName, isEmbedded]);
 
   // Register this board in the "Opened Boards" sidebar section
   useEffect(() => {
@@ -942,6 +965,14 @@ export function ChalkBoardPage() {
       openBoard({ id: board.id, name: board.name, boardType: board.boardType });
     }
   }, [board, openBoard]);
+
+  // Remember this as the user's last-opened board so the dashboard's Active
+  // Canvas re-shows it. Skipped for the dashboard's own embedded preview — only
+  // a real full-screen visit counts as "opening" a board.
+  useEffect(() => {
+    if (isEmbedded || !board || !currentUserId) return;
+    persistLastOpenedBoard(currentUserId, board.id);
+  }, [isEmbedded, board, currentUserId]);
 
   // Listen for sidebar tool clicks
   useEffect(() => {
@@ -1544,13 +1575,12 @@ export function ChalkBoardPage() {
           .filter(Boolean)
           .join(" ")}
       >
-        {/* Menu card inside frame, overlapping chalkboard surface under top border.
-            right-[18px] clears the chalkboard-surface scrollbar so the toolbar's rounded card
-            never paints over it — sized above the custom 10px scrollbar width in index.css since
-            not every browser/build honors ::-webkit-scrollbar sizing (some render a ~15-17px
-            native gutter regardless), so this leaves margin for that case too. */}
-        <div className="pointer-events-none absolute left-0 right-[18px] top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
-          <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
+        {/* Flush toolbar bar: sits directly under the app navbar (no floating card, no top gap),
+            but inset 18px on both sides so it never paints over the chalkboard-surface scrollbar
+            — sized above the custom 10px scrollbar in index.css since some browsers render a
+            ~15-17px native gutter regardless. */}
+        <div className="pointer-events-none absolute left-[0px] right-[15px] top-0 z-30 flex items-start">
+          <div className="notepad-card board-toolbar-bar pointer-events-auto min-w-0 flex-1 !overflow-visible">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
               <div className="min-w-0 w-full flex-1">
@@ -1595,7 +1625,9 @@ export function ChalkBoardPage() {
             </div>
           </div>
         </div>
-        <BoardPresenceButton users={connectedUsers} isHubConnected={isHubConnected} currentUserId={currentUserId} />
+        {!isEmbedded && (
+          <BoardPresenceButton users={connectedUsers} isHubConnected={isHubConnected} currentUserId={currentUserId} />
+        )}
         <input
           ref={loadFileInputRef}
           type="file"

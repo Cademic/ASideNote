@@ -2,6 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Start your note taking journey off right" />
+    <!-- Default (light) browser-UI tint. The script below flips it to the dark
+         surface color before first paint; ThemeContext keeps it in sync when the
+         user toggles the theme at runtime. Keep the two colors in sync with
+         THEME_COLOR_* in src/context/ThemeContext.tsx. -->
+    <meta name="theme-color" content="#f7f2e9" />
     <!-- Keep in sync with STORAGE_KEY in src/context/ThemeContext.tsx. Runs before
          any CSS loads so the browser's default canvas color-scheme (and Tailwind's
          .dark class) are correct on first paint, instead of flashing white/light. -->
@@ -15,12 +22,11 @@
               window.matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.classList.toggle("dark", isDark);
           document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+          var themeMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeMeta) themeMeta.setAttribute("content", isDark ? "#0d0d0d" : "#f7f2e9");
         } catch (e) {}
       })();
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Start your note taking journey off right" />
-    <meta name="theme-color" content="#f7f2e9" />
     <link rel="canonical" href="https://asidenote.net/" />
     <link rel="icon" type="image/ico" href="/favicon.ico" />
 

@@ -146,7 +146,8 @@ public sealed class UserService : IUserService
         {
             Theme = prefs.Theme,
             EmailNotifications = prefs.EmailNotificationsJson,
-            HasCompletedTutorial = prefs.HasCompletedTutorial
+            HasCompletedTutorial = prefs.HasCompletedTutorial,
+            ShowHolidays = prefs.ShowHolidays
         };
     }
 
@@ -165,6 +166,8 @@ public sealed class UserService : IUserService
             };
             if (request.HasCompletedTutorial.HasValue)
                 prefs.HasCompletedTutorial = request.HasCompletedTutorial.Value;
+            if (request.ShowHolidays.HasValue)
+                prefs.ShowHolidays = request.ShowHolidays.Value;
             await _prefsRepo.AddAsync(prefs, cancellationToken);
         }
         else
@@ -173,6 +176,8 @@ public sealed class UserService : IUserService
             prefs.UpdatedAt = DateTime.UtcNow;
             if (request.HasCompletedTutorial.HasValue)
                 prefs.HasCompletedTutorial = request.HasCompletedTutorial.Value;
+            if (request.ShowHolidays.HasValue)
+                prefs.ShowHolidays = request.ShowHolidays.Value;
             _prefsRepo.Update(prefs);
         }
 

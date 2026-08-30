@@ -1,18 +1,15 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "../components/auth/ProtectedRoute";
 import { AppLayout } from "../components/layout/AppLayout";
 import { LandingPage } from "../pages/LandingPage";
 import { AdminRoute } from "../components/auth/AdminRoute";
 
 const DashboardPage = lazy(() => import("../pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const GalleryPage = lazy(() => import("../pages/GalleryPage").then((m) => ({ default: m.GalleryPage })));
 const NoteBoardPage = lazy(() => import("../pages/NoteBoardPage").then((m) => ({ default: m.NoteBoardPage })));
-const ProjectsPage = lazy(() => import("../pages/ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
 const ProjectDetailPage = lazy(() => import("../pages/ProjectDetailPage").then((m) => ({ default: m.ProjectDetailPage })));
 const CalendarsPage = lazy(() => import("../pages/CalendarsPage").then((m) => ({ default: m.CalendarsPage })));
-const ChalkBoardsPage = lazy(() => import("../pages/ChalkBoardsPage").then((m) => ({ default: m.ChalkBoardsPage })));
-const BoardsPage = lazy(() => import("../pages/BoardsPage").then((m) => ({ default: m.BoardsPage })));
-const NotebooksPage = lazy(() => import("../pages/NotebooksPage").then((m) => ({ default: m.NotebooksPage })));
 const SettingsPage = lazy(() => import("../pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const ProfilePage = lazy(() => import("../pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const LoginPage = lazy(() => import("../pages/LoginPage").then((m) => ({ default: m.LoginPage })));
@@ -61,15 +58,17 @@ export function AppRouter() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/notebooks" element={<NotebooksPage />} />
+            <Route path="/gallery" element={<GalleryPage />} />
+            {/* Legacy list routes now live under /gallery — keep redirects for bookmarks. */}
+            <Route path="/projects" element={<Navigate to="/gallery" replace />} />
+            <Route path="/boards" element={<Navigate to="/gallery" replace />} />
+            <Route path="/notebooks" element={<Navigate to="/gallery" replace />} />
+            <Route path="/chalkboards" element={<Navigate to="/gallery" replace />} />
             <Route path="/notebooks/:notebookId" element={<NotebookEditorPage />} />
-            <Route path="/boards" element={<BoardsPage />} />
             <Route path="/boards/:boardId" element={<NoteBoardPage />} />
             <Route path="/chalkboards/:boardId" element={<ChalkBoardPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/calendar" element={<CalendarsPage />} />
-            <Route path="/chalkboards" element={<ChalkBoardsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/:username" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
