@@ -435,12 +435,12 @@ export function CorkBoard({
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden corkboard-frame">
       {topBar ? (
-        // right-[18px] clears the corkboard-surface scrollbar so the toolbar's rounded card never
-        // paints over it — sized above the custom 10px scrollbar width in index.css since not
-        // every browser/build honors ::-webkit-scrollbar sizing (some render a ~15-17px native
-        // gutter regardless), so this leaves margin for that case too.
-        <div className="pointer-events-none absolute left-0 right-[18px] top-2 z-30 flex items-start px-2 sm:top-3 sm:px-3">
-          <div className="notepad-card pointer-events-auto min-w-0 flex-1 !overflow-visible rounded-lg border border-black/10 shadow-md dark:border-white/10">
+        // Flush toolbar bar: sits directly under the app navbar (no floating card, no top gap),
+        // but inset 18px on both sides so it never paints over the corkboard-surface scrollbar
+        // — sized above the custom 10px scrollbar in index.css since some browsers render a
+        // ~15-17px native gutter regardless.
+        <div className="pointer-events-none absolute left-[0px] right-[15px] top-0 z-30 flex items-start">
+          <div className="notepad-card board-toolbar-bar pointer-events-auto min-w-0 flex-1 !overflow-visible">
             <div className="notepad-spiral-strip" />
             <div className="flex w-full min-w-0 items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-3 sm:py-2">
               <div className="min-w-0 w-full flex-1">{topBar}</div>

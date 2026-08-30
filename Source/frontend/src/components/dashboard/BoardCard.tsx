@@ -21,6 +21,7 @@ import {
   PinOff,
   Trash2,
   ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { BoardSummaryDto, ProjectSummaryDto } from "../../types";
@@ -380,6 +381,18 @@ export function BoardCard({
             ref={ellipsisMenuPanelRef}
             className={`absolute right-0 ${menuDropdownTopClass} z-20 max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg`}
           >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeMenu();
+                window.open(boardPath, "_blank", "noopener,noreferrer");
+              }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open in new tab
+            </button>
             {onRename && (
               <button
                 type="button"
@@ -516,6 +529,18 @@ export function BoardCard({
               className="fixed z-[100] max-h-[min(70vh,calc(100vh-2rem))] w-48 max-w-[min(12rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-background py-1 shadow-lg"
               style={{ left: menuAnchor.x, top: menuAnchor.y }}
             >
+              <button
+                type="button"
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-surface"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeMenu();
+                  window.open(boardPath, "_blank", "noopener,noreferrer");
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open in new tab
+              </button>
               {onRename && (
                 <button
                   type="button"

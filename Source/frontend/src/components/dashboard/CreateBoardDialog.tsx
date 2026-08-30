@@ -2,15 +2,38 @@ import { useEffect, useState } from "react";
 import { X, ClipboardList, PenTool, FolderOpen, BookOpen } from "lucide-react";
 
 const PROJECT_COLORS = [
-  { value: "violet", label: "Violet", bg: "bg-violet-400", ring: "ring-violet-500" },
+  {
+    value: "violet",
+    label: "Violet",
+    bg: "bg-violet-400",
+    ring: "ring-violet-500",
+  },
   { value: "sky", label: "Sky", bg: "bg-sky-400", ring: "ring-sky-500" },
-  { value: "amber", label: "Amber", bg: "bg-amber-400", ring: "ring-amber-500" },
+  {
+    value: "amber",
+    label: "Amber",
+    bg: "bg-amber-400",
+    ring: "ring-amber-500",
+  },
   { value: "rose", label: "Rose", bg: "bg-rose-400", ring: "ring-rose-500" },
-  { value: "emerald", label: "Emerald", bg: "bg-emerald-400", ring: "ring-emerald-500" },
-  { value: "orange", label: "Orange", bg: "bg-orange-400", ring: "ring-orange-500" },
+  {
+    value: "emerald",
+    label: "Emerald",
+    bg: "bg-emerald-400",
+    ring: "ring-emerald-500",
+  },
+  {
+    value: "orange",
+    label: "Orange",
+    bg: "bg-orange-400",
+    ring: "ring-orange-500",
+  },
 ];
 
 type DialogTab = "board" | "project" | "notebook";
+
+/** Public alias for the tab union — callers use this to pre-select a tab. */
+export type CreateDialogTab = DialogTab;
 
 interface CreateBoardDialogProps {
   isOpen: boolean;
@@ -29,13 +52,25 @@ interface CreateBoardDialogProps {
   ) => void;
   onCreateNotebook?: (name: string) => void;
   defaultBoardType?: string;
+  /** Which tab to open on. Ignored when `hideProjectTab` is set. Defaults to "board". */
+  initialTab?: DialogTab;
   /** Hide Board / Project / Notebook tabs — board form only (e.g. when already inside a project). */
   hideProjectTab?: boolean;
 }
 
 const BOARD_TYPES = [
-  { value: "NoteBoard", label: "Note Board", icon: ClipboardList, description: "Pin sticky notes and index cards" },
-  { value: "ChalkBoard", label: "Chalk Board", icon: PenTool, description: "Freehand drawing canvas" },
+  {
+    value: "NoteBoard",
+    label: "Note Board",
+    icon: ClipboardList,
+    description: "Pin sticky notes and index cards",
+  },
+  {
+    value: "ChalkBoard",
+    label: "Chalk Board",
+    icon: PenTool,
+    description: "Freehand drawing canvas",
+  },
 ];
 
 function todayStr(): string {
@@ -59,9 +94,10 @@ export function CreateBoardDialog({
   onCreateProject,
   onCreateNotebook,
   defaultBoardType = "NoteBoard",
+  initialTab = "board",
   hideProjectTab = false,
 }: CreateBoardDialogProps) {
-  const [tab, setTab] = useState<DialogTab>("board");
+  const [tab, setTab] = useState<DialogTab>(initialTab);
 
   // Board fields
   const [boardName, setBoardName] = useState("");
@@ -81,7 +117,7 @@ export function CreateBoardDialog({
   const [notebookName, setNotebookName] = useState("");
 
   function resetFields() {
-    setTab("board");
+    setTab(hideProjectTab ? "board" : initialTab);
     setBoardName("");
     setBoardDescription("");
     setBoardType(defaultBoardType);
@@ -103,8 +139,8 @@ export function CreateBoardDialog({
   useEffect(() => {
     if (!isOpen) return;
     setBoardType(defaultBoardType);
-    if (hideProjectTab) setTab("board");
-  }, [isOpen, defaultBoardType, hideProjectTab]);
+    setTab(hideProjectTab ? "board" : initialTab);
+  }, [isOpen, defaultBoardType, hideProjectTab, initialTab]);
 
   function handleSubmitBoard(e: React.FormEvent) {
     e.preventDefault();
@@ -220,7 +256,9 @@ export function CreateBoardDialog({
           <form onSubmit={handleSubmitBoard} className="flex flex-col gap-4">
             {/* Board type selector */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground/60">Board Type</label>
+              <label className="mb-1.5 block text-xs font-medium text-foreground/60">
+                Board Type
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 {BOARD_TYPES.map((type) => (
                   <button
@@ -243,7 +281,10 @@ export function CreateBoardDialog({
 
             {/* Name */}
             <div>
-              <label htmlFor="board-name" className="mb-1.5 block text-xs font-medium text-foreground/60">
+              <label
+                htmlFor="board-name"
+                className="mb-1.5 block text-xs font-medium text-foreground/60"
+              >
                 Name
               </label>
               <input
@@ -260,8 +301,12 @@ export function CreateBoardDialog({
 
             {/* Description */}
             <div>
-              <label htmlFor="board-desc" className="mb-1.5 block text-xs font-medium text-foreground/60">
-                Description <span className="text-foreground/30">(optional)</span>
+              <label
+                htmlFor="board-desc"
+                className="mb-1.5 block text-xs font-medium text-foreground/60"
+              >
+                Description{" "}
+                <span className="text-foreground/30">(optional)</span>
               </label>
               <textarea
                 id="board-desc"
@@ -299,7 +344,10 @@ export function CreateBoardDialog({
           <form onSubmit={handleSubmitProject} className="flex flex-col gap-4">
             {/* Name */}
             <div>
-              <label htmlFor="project-name" className="mb-1.5 block text-xs font-medium text-foreground/60">
+              <label
+                htmlFor="project-name"
+                className="mb-1.5 block text-xs font-medium text-foreground/60"
+              >
                 Project Name
               </label>
               <input
@@ -316,8 +364,12 @@ export function CreateBoardDialog({
 
             {/* Description */}
             <div>
-              <label htmlFor="project-desc" className="mb-1.5 block text-xs font-medium text-foreground/60">
-                Description <span className="text-foreground/30">(optional)</span>
+              <label
+                htmlFor="project-desc"
+                className="mb-1.5 block text-xs font-medium text-foreground/60"
+              >
+                Description{" "}
+                <span className="text-foreground/30">(optional)</span>
               </label>
               <textarea
                 id="project-desc"
@@ -360,7 +412,9 @@ export function CreateBoardDialog({
                 onChange={(e) => setHasTimeConstraints(e.target.checked)}
                 className="h-4 w-4 rounded border-border accent-primary"
               />
-              <span className="text-sm text-foreground/70">Set time constraints</span>
+              <span className="text-sm text-foreground/70">
+                Set time constraints
+              </span>
             </label>
 
             {/* Date fields */}
@@ -368,7 +422,10 @@ export function CreateBoardDialog({
               <div className="flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="project-start" className="mb-1.5 block text-xs font-medium text-foreground/60">
+                    <label
+                      htmlFor="project-start"
+                      className="mb-1.5 block text-xs font-medium text-foreground/60"
+                    >
                       Start Date
                     </label>
                     <input
@@ -380,7 +437,10 @@ export function CreateBoardDialog({
                     />
                   </div>
                   <div>
-                    <label htmlFor="project-end" className="mb-1.5 block text-xs font-medium text-foreground/60">
+                    <label
+                      htmlFor="project-end"
+                      className="mb-1.5 block text-xs font-medium text-foreground/60"
+                    >
                       End Date
                     </label>
                     <input
@@ -394,8 +454,12 @@ export function CreateBoardDialog({
                 </div>
 
                 <div>
-                  <label htmlFor="project-deadline" className="mb-1.5 block text-xs font-medium text-foreground/60">
-                    Deadline <span className="text-foreground/30">(optional)</span>
+                  <label
+                    htmlFor="project-deadline"
+                    className="mb-1.5 block text-xs font-medium text-foreground/60"
+                  >
+                    Deadline{" "}
+                    <span className="text-foreground/30">(optional)</span>
                   </label>
                   <input
                     id="project-deadline"
@@ -440,7 +504,10 @@ export function CreateBoardDialog({
               </p>
             )}
             <div>
-              <label htmlFor="notebook-name" className="mb-1.5 block text-xs font-medium text-foreground/60">
+              <label
+                htmlFor="notebook-name"
+                className="mb-1.5 block text-xs font-medium text-foreground/60"
+              >
                 Notebook Name
               </label>
               <input
@@ -473,7 +540,6 @@ export function CreateBoardDialog({
             </div>
           </form>
         )}
-
       </div>
     </div>
   );

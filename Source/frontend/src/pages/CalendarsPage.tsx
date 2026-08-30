@@ -21,6 +21,7 @@ import type {
 } from "../types";
 import { resolveEventProjectName } from "../utils/calendar-event-project-name";
 import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
+import { useHolidayEvents } from "../hooks/useHolidayEvents";
 
 function toLocalDateStr(date: Date): string {
   const year = date.getFullYear();
@@ -157,6 +158,21 @@ export function CalendarsPage() {
     }
   }
 
+  // Built-in holidays for the visible month window (togglable in Settings).
+  const [holidayFrom, holidayTo] = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return [
+      new Date(year, month - 1, 1).toISOString(),
+      new Date(year, month + 2, 0).toISOString(),
+    ];
+  }, [currentDate]);
+  const holidayEvents = useHolidayEvents(holidayFrom, holidayTo);
+  const allEvents = useMemo(
+    () => [...events, ...holidayEvents],
+    [events, holidayEvents],
+  );
+
   const projectsOnCalendar = useMemo(
     () => projects.filter(isProjectVisibleOnUserCalendar),
     [projects],
@@ -228,7 +244,7 @@ export function CalendarsPage() {
         {layout === "grid" ? (
           <CalendarGrid
             currentDate={currentDate}
-            events={events}
+            events={allEvents}
             projects={projectsOnCalendar}
             onClickDay={handleClickDay}
             onClickEvent={handleClickEvent}
@@ -238,7 +254,7 @@ export function CalendarsPage() {
         ) : (
           <CalendarTimeline
             currentDate={currentDate}
-            events={events}
+            events={allEvents}
             projects={projectsOnCalendar}
             onClickDay={handleClickDay}
             onClickEvent={handleClickEvent}
@@ -261,6 +277,12 @@ export function CalendarsPage() {
             <span className="inline-block h-2 w-2 rounded-full bg-orange-400" />
             Notes
           </span>
+          {holidayEvents.length > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+              Holidays
+            </span>
+          )}
         </div>
       </div>
 

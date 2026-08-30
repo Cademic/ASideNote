@@ -152,6 +152,12 @@ export function UpcomingTimeline({
             const dot = item.event
               ? resolveCalendarEventColor(item.event.color).dot
               : "bg-[var(--land-amber)]";
+            const isHoliday = item.event?.eventType === "Holiday";
+            const kindLabel = item.project
+              ? "Project"
+              : isHoliday
+                ? "Holiday"
+                : "All day";
             return (
               <button
                 key={item.event?.id ?? item.project?.id ?? i}
@@ -161,9 +167,10 @@ export function UpcomingTimeline({
               >
                 <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
                 <span className="w-12 shrink-0 font-label text-[10px] uppercase tracking-wide text-[var(--land-ink-3)]">
-                  {item.project ? "Project" : "All day"}
+                  {kindLabel}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--land-ink)]">
+                  {isHoliday && "🎉 "}
                   {item.title}
                 </span>
               </button>

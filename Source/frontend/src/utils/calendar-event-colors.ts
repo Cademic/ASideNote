@@ -40,6 +40,12 @@ const CALENDAR_EVENT_COLORS: Record<string, CalendarEventColorClasses> = {
     text: "text-orange-800 dark:text-orange-200",
     dot: "bg-orange-500",
   },
+  // Reserved for the built-in holidays (see utils/holidays.ts).
+  holiday: {
+    bg: "bg-red-100 dark:bg-red-950/50",
+    text: "text-red-800 dark:text-red-200",
+    dot: "bg-red-500",
+  },
 };
 
 export function resolveCalendarEventColor(

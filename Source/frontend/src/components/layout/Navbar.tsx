@@ -27,39 +27,20 @@ function getBreadcrumbs(pathname: string, itemName: string | null): BreadcrumbSe
 
   if (pathname === "/dashboard") return segments;
 
-  if (pathname.startsWith("/notebooks")) {
-    segments.push({ label: "Notebooks", path: "/notebooks" });
-    if (/^\/notebooks\/[^/]+$/.test(pathname) && itemName) {
-      segments.push({ label: itemName, path: pathname });
-    }
-    return segments;
-  }
-
-  if (pathname.startsWith("/boards")) {
-    segments.push({ label: "Boards", path: "/boards" });
-    if (/^\/boards\/[^/]+$/.test(pathname) && itemName) {
-      segments.push({ label: itemName, path: pathname });
-    }
-    return segments;
-  }
-
-  if (pathname.startsWith("/projects")) {
-    segments.push({ label: "Projects", path: "/projects" });
-    if (/^\/projects\/[^/]+$/.test(pathname) && itemName) {
-      segments.push({ label: itemName, path: pathname });
-    }
-    return segments;
-  }
-
-  if (pathname.startsWith("/chalkboards")) {
-    segments.push({ label: "Chalk Boards", path: "/chalkboards" });
-    if (/^\/chalkboards\/[^/]+$/.test(pathname) && itemName) {
+  // Projects / boards / chalkboards / notebooks all live under the Gallery now.
+  if (/^\/(notebooks|boards|projects|chalkboards)(\/|$)/.test(pathname)) {
+    segments.push({ label: "Gallery", path: "/gallery" });
+    if (
+      /^\/(notebooks|boards|projects|chalkboards)\/[^/]+$/.test(pathname) &&
+      itemName
+    ) {
       segments.push({ label: itemName, path: pathname });
     }
     return segments;
   }
 
   const sectionLabels: Record<string, string> = {
+    "/gallery": "Gallery",
     "/profile": "Profile",
     "/calendar": "Calendar",
     "/settings": "Settings",
@@ -274,7 +255,7 @@ export function Navbar({ boardName, connectedUsers = [], onToggleSidebar, showMe
               role="menuitem"
               onClick={() => {
                 setDropdownOpen(false);
-                if (location.pathname !== "/boards") navigate("/boards");
+                if (location.pathname !== "/gallery") navigate("/gallery");
                 tutorial.start();
               }}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--land-ink)] hover:bg-[var(--land-cream)]"

@@ -412,7 +412,7 @@ export function NotebookEditorPage() {
   }, [editor, save]);
 
   const handleClose = useCallback(() => {
-    navigate("/notebooks");
+    navigate("/gallery");
   }, [navigate]);
 
   const handleFileMenuOpen = useCallback(() => {
@@ -704,7 +704,7 @@ export function NotebookEditorPage() {
         <p className="text-sm text-foreground/60">Missing notebook.</p>
         <button
           type="button"
-          onClick={() => navigate("/notebooks")}
+          onClick={() => navigate("/gallery")}
           className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-[transform,colors,box-shadow] duration-150 ease-out-smooth hover:bg-amber-600 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-amber-600 dark:hover:bg-amber-500 motion-reduce:transition-none motion-reduce:hover:transform-none"
         >
           Back to Notebooks

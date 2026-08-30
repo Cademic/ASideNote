@@ -4,7 +4,9 @@ import axios from "axios";
 import { Save, Loader2, LogOut, Trash2, Lock } from "lucide-react";
 import { getProfile, updateProfile, getPreferences, updatePreferences, changePassword as changePasswordApi, deleteAccount as deleteAccountApi } from "../api/users";
 import { useAuth } from "../context/AuthContext";
+import { usePreferences } from "../context/PreferencesContext";
 import { useThemeContext, resolveTheme, type ThemeMode } from "../context/ThemeContext";
+import { Switch } from "../components/ui/Switch";
 import { useAnimatedThemeTransition } from "../hooks/useAnimatedThemeTransition";
 import { AVATAR_KEYS, getAvatarUrl } from "../constants/avatars";
 import type { UserProfileDto } from "../types";
@@ -27,6 +29,7 @@ export function SettingsPage() {
   const { user: authUser, updateUser, logout } = useAuth();
   const navigate = useNavigate();
   const { setThemeMode } = useThemeContext();
+  const { refetch: refetchPreferences } = usePreferences();
   const { originRef: saveThemeButtonRef, runTransition: runThemeTransition } = useAnimatedThemeTransition<HTMLButtonElement>();
   const profileSectionRef = useRef<HTMLDivElement>(null);
 
@@ -45,6 +48,7 @@ export function SettingsPage() {
 
   // Form state — preferences
   const [theme, setTheme] = useState<ThemeMode>("system");
+  const [showHolidays, setShowHolidays] = useState(true);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsSaveError, setPrefsSaveError] = useState<string | null>(null);
 
@@ -86,6 +90,7 @@ export function SettingsPage() {
       if (prefsRes) {
         setTheme(backendToTheme(prefsRes.theme));
         setThemeMode(backendToTheme(prefsRes.theme));
+        setShowHolidays(prefsRes.showHolidays ?? true);
       }
     } finally {
       setLoading(false);
@@ -158,12 +163,13 @@ export function SettingsPage() {
     try {
       await updatePreferences({
         theme: themeToBackend(theme),
+        showHolidays,
       });
       runThemeTransition(() => {
         document.documentElement.classList.toggle("dark", resolveTheme(theme) === "dark");
         setThemeMode(theme);
       });
-      await loadData();
+      await Promise.all([loadData(), refetchPreferences()]);
     } catch {
       setPrefsSaveError("Failed to save preferences.");
     } finally {
@@ -397,6 +403,27 @@ export function SettingsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Holidays */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <label
+                  htmlFor="show-holidays"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Show holidays
+                </label>
+                <p className="mt-1 text-xs text-foreground/50">
+                  Display US holidays and common observances on your calendars.
+                </p>
+              </div>
+              <Switch
+                id="show-holidays"
+                checked={showHolidays}
+                onCheckedChange={setShowHolidays}
+                aria-label="Show holidays on calendars"
+              />
             </div>
 
             {prefsSaveError && (

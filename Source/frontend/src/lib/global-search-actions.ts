@@ -1,21 +1,19 @@
 import type { ComponentType } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import {
-  BookOpen,
   Calendar,
-  FolderOpen,
   LayoutDashboard,
+  LayoutGrid,
   Plus,
   Settings as SettingsIcon,
-  StickyNote,
 } from "lucide-react";
 
 /**
  * Command-palette actions shown alongside search results. `keywords` widens what
  * the query has to match; `run` performs the action.
  *
- * The list pages have no "open create dialog" URL param, so the create actions
- * navigate to the relevant list page where the create button lives.
+ * The Gallery has no "open create dialog" URL param, so the create actions
+ * navigate to the Gallery where the create menu lives.
  */
 export interface QuickAction {
   id: string;
@@ -29,30 +27,30 @@ export const QUICK_ACTIONS: QuickAction[] = [
   {
     id: "new-board",
     label: "Create board",
-    keywords: "new board note cork add create",
+    keywords: "new board note cork add create gallery",
     icon: Plus,
-    run: (navigate) => navigate("/boards"),
+    run: (navigate) => navigate("/gallery"),
   },
   {
     id: "new-chalkboard",
     label: "Create chalk board",
-    keywords: "new chalkboard drawing canvas add create",
+    keywords: "new chalkboard drawing canvas add create gallery",
     icon: Plus,
-    run: (navigate) => navigate("/chalkboards"),
+    run: (navigate) => navigate("/gallery"),
   },
   {
     id: "new-notebook",
     label: "Create notebook",
-    keywords: "new notebook document write add create",
+    keywords: "new notebook document write add create gallery",
     icon: Plus,
-    run: (navigate) => navigate("/notebooks"),
+    run: (navigate) => navigate("/gallery"),
   },
   {
     id: "new-project",
     label: "Create project",
-    keywords: "new project workspace add create",
+    keywords: "new project workspace add create gallery",
     icon: Plus,
-    run: (navigate) => navigate("/projects"),
+    run: (navigate) => navigate("/gallery"),
   },
   {
     id: "go-dashboard",
@@ -62,25 +60,11 @@ export const QUICK_ACTIONS: QuickAction[] = [
     run: (navigate) => navigate("/dashboard"),
   },
   {
-    id: "go-boards",
-    label: "Go to Boards",
-    keywords: "boards list",
-    icon: StickyNote,
-    run: (navigate) => navigate("/boards"),
-  },
-  {
-    id: "go-notebooks",
-    label: "Go to Notebooks",
-    keywords: "notebooks list",
-    icon: BookOpen,
-    run: (navigate) => navigate("/notebooks"),
-  },
-  {
-    id: "go-projects",
-    label: "Go to Projects",
-    keywords: "projects list",
-    icon: FolderOpen,
-    run: (navigate) => navigate("/projects"),
+    id: "go-gallery",
+    label: "Go to Gallery",
+    keywords: "gallery boards notebooks projects chalkboards list",
+    icon: LayoutGrid,
+    run: (navigate) => navigate("/gallery"),
   },
   {
     id: "go-calendar",

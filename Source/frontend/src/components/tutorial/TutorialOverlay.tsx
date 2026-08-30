@@ -75,7 +75,7 @@ export function TutorialOverlay() {
     // skip over it going back, since by then a board (if any) already exists.
     if (TUTORIAL_STEPS[newIndex]?.id === "board-title") newIndex -= 1;
     if (newIndex < 0) return;
-    if (newIndex === 0) navigate("/boards");
+    if (newIndex === 0) navigate("/gallery");
     tutorial.goToStep(newIndex);
   }, [tutorial, navigate]);
 

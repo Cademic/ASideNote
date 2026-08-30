@@ -91,6 +91,51 @@ public sealed class UserServiceTests
     }
 
     [Fact]
+    public async Task GetPreferencesAsync_NoRowYet_ReturnsShowHolidaysTrue()
+    {
+        var (service, _, userId) = CreateService();
+
+        var result = await service.GetPreferencesAsync(userId);
+
+        Assert.True(result.ShowHolidays);
+    }
+
+    [Fact]
+    public async Task UpdatePreferencesAsync_SetsShowHolidays_WhenProvided()
+    {
+        var (service, _, userId) = CreateService();
+
+        await service.UpdatePreferencesAsync(userId, new UpdatePreferencesRequest
+        {
+            Theme = "System",
+            ShowHolidays = false
+        });
+
+        var result = await service.GetPreferencesAsync(userId);
+        Assert.False(result.ShowHolidays);
+    }
+
+    [Fact]
+    public async Task UpdatePreferencesAsync_PreservesShowHolidays_WhenOmitted()
+    {
+        var (service, _, userId) = CreateService();
+        await service.UpdatePreferencesAsync(userId, new UpdatePreferencesRequest
+        {
+            Theme = "System",
+            ShowHolidays = false
+        });
+
+        await service.UpdatePreferencesAsync(userId, new UpdatePreferencesRequest
+        {
+            Theme = "Light"
+        });
+
+        var result = await service.GetPreferencesAsync(userId);
+        Assert.False(result.ShowHolidays);
+        Assert.Equal("Light", result.Theme);
+    }
+
+    [Fact]
     public void Validator_RejectsInvalidTheme_WithHasCompletedTutorialPresent()
     {
         var validator = new UpdatePreferencesRequestValidator();

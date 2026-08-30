@@ -7,6 +7,7 @@ const COLOR_MAP: Record<string, { bg: string; text: string; dot: string }> = {
   emerald: { bg: "bg-emerald-100 dark:bg-emerald-900", text: "text-emerald-700 dark:text-emerald-100", dot: "bg-emerald-400" },
   violet: { bg: "bg-violet-100 dark:bg-violet-900", text: "text-violet-700 dark:text-violet-100", dot: "bg-violet-400" },
   orange: { bg: "bg-orange-100 dark:bg-orange-900", text: "text-orange-700 dark:text-orange-100", dot: "bg-orange-400" },
+  holiday: { bg: "bg-red-100 dark:bg-red-900", text: "text-red-700 dark:text-red-100", dot: "bg-red-400" },
 };
 
 /** Compact clock label (e.g. "9:05a") for timed events shown in a dense grid cell. */
@@ -49,6 +50,7 @@ export function CalendarEventItem({ event, onClick, compact, projectName }: Cale
     >
       <span className="block min-w-0 truncate">
         {event.eventType === "Note" && "📝 "}
+        {event.eventType === "Holiday" && "🎉 "}
         {timeLabel && <span className="opacity-60">{timeLabel} </span>}
         {projectName && (
           <span className="opacity-60">{projectName}: </span>

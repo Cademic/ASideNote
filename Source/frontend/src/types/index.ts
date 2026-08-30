@@ -64,11 +64,13 @@ export interface UserPreferencesDto {
   theme: string;
   emailNotifications: string | null;
   hasCompletedTutorial: boolean;
+  showHolidays: boolean;
 }
 
 export interface UpdatePreferencesRequest {
   theme: string;
   hasCompletedTutorial?: boolean;
+  showHolidays?: boolean;
 }
 
 export interface ChangePasswordRequest {
@@ -684,3 +686,16 @@ export interface AdminAnalyticsDto {
   userCreationByMonth: AdminPeriodCountDto[];
   userLoginsByMonth: AdminPeriodCountDto[];
 }
+
+// --- Gallery (client-only view models) ---
+
+export type {
+  GalleryKind,
+  GalleryOwnership,
+  GalleryProjectStatus,
+  GalleryItem,
+  GalleryFilterState,
+  GallerySortKey,
+  GallerySortDir,
+  GallerySortState,
+} from "./gallery";

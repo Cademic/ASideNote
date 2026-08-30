@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Folder, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { RenameInput } from "../../ui/RenameInput";
 import type {
   BoardSummaryDto,
   NotebookSummaryDto,
@@ -115,39 +116,6 @@ function TreeDropZone({
     >
       {children}
     </div>
-  );
-}
-
-function RenameInput({
-  value,
-  onChange,
-  onSubmit,
-  onCancel,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <input
-      autoFocus
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          onSubmit();
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          onCancel();
-        }
-      }}
-      onBlur={onSubmit}
-      className="min-w-0 flex-1 rounded border border-[var(--land-rule)] bg-[var(--land-paper)] px-2 py-1 text-sm text-[var(--land-ink)] focus:outline-none focus:ring-1 focus:ring-[var(--land-blue)]"
-    />
   );
 }
 

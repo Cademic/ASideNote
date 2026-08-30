@@ -54,6 +54,7 @@ import { importBoardReplacingExisting } from "../lib/boardImport";
 import { corkZoomAroundScreenPoint, corkScrollInnerLayout, corkScrollToPan } from "../lib/boardViewportScroll";
 import { corkPanToCenterWorldPoint, corkScreenToWorld } from "../lib/boardViewportMath";
 import { persistBoardViewport, readBoardViewport, readBoardViewportDefaults } from "../lib/boardViewportStorage";
+import { persistLastOpenedBoard } from "../lib/lastOpenedBoard";
 import { useFileImport } from "../hooks/useFileImport";
 import { ContextMenu, type ContextMenuItem } from "../components/ui/ContextMenu";
 import { Pencil, Copy, Trash2, Layers, StickyNote as StickyNoteIcon, CreditCard, Image as ImageIcon } from "lucide-react";
@@ -884,6 +885,14 @@ export function NoteBoardPage({ boardId: boardIdProp, variant = "route", disable
       openBoard({ id: board.id, name: board.name, boardType: board.boardType });
     }
   }, [board, openBoard]);
+
+  // Remember this as the user's last-opened board so the dashboard's Active
+  // Canvas re-shows it. Skipped for the dashboard's own embedded preview — only
+  // a real full-screen visit counts as "opening" a board.
+  useEffect(() => {
+    if (isEmbedded || !board || !currentUserId) return;
+    persistLastOpenedBoard(currentUserId, board.id);
+  }, [isEmbedded, board, currentUserId]);
 
   // Listen for sidebar tool clicks (custom event from Sidebar component)
   useEffect(() => {
