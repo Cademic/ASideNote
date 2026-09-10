@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 
 interface GalleryRenameDialogProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export function GalleryRenameDialog({
   initialName,
   initialDescription,
   showDescription,
-  nameMaxLength = 100,
+  nameMaxLength = 50,
   descriptionMaxLength = 500,
   onConfirm,
   onCancel,
@@ -29,6 +30,7 @@ export function GalleryRenameDialog({
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const nameRef = useRef<HTMLInputElement>(null);
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, onCancel);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,15 +43,6 @@ export function GalleryRenameDialog({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 
@@ -68,7 +61,11 @@ export function GalleryRenameDialog({
         role="presentation"
       />
 
-      <div className="relative mx-4 w-full max-w-md min-w-0 overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative mx-4 w-full max-w-md min-w-0 overflow-hidden rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 animate-dialog-enter motion-reduce:animate-none"
+      >
         <button
           type="button"
           onClick={onCancel}
@@ -78,7 +75,7 @@ export function GalleryRenameDialog({
           <X className="h-4 w-4" />
         </button>
 
-        <h3 className="mb-4 pr-6 text-sm font-semibold text-foreground break-words">
+        <h3 id={titleId} className="mb-4 pr-6 text-sm font-semibold text-foreground break-words">
           Edit {kindLabel}
         </h3>
 

@@ -18,7 +18,7 @@ import {
   ListChecks,
   ExternalLink,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { ProjectSummaryDto } from "../../types";
 import { updateProject, updateMyProjectCalendarPreference } from "../../api/projects";
 import {
@@ -38,6 +38,12 @@ interface ProjectCardProps {
   onProjectUpdated?: () => void;
   layout?: "card" | "sidebarRow";
   sidebarShowLabel?: boolean;
+  /**
+   * `layout="sidebarRow"` only. Shows the amber pin glyph when the project is
+   * pinned. The dashboard Projects tree turns this off — pinning there is "pin to
+   * sidebar", so the pinned state is shown in the sidebar, not back in the tree.
+   */
+  showPinIndicator?: boolean;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -104,6 +110,7 @@ export function ProjectCard({
   onProjectUpdated,
   layout = "card",
   sidebarShowLabel = true,
+  showPinIndicator = true,
 }: ProjectCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -457,7 +464,7 @@ export function ProjectCard({
           ? [
               "group relative flex w-full min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 motion-reduce:transition-none",
               isProjectRouteActive
-                ? "bg-[var(--land-blue)] text-[var(--land-blue-fg)]"
+                ? "sidebar-nav-active bg-amber-50 text-amber-800 dark:bg-sky-950/40 dark:text-sky-300"
                 : "text-[var(--land-ink-2)] hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]",
             ].join(" ")
           : "paper-card group relative flex cursor-pointer flex-col rounded-lg p-5 pt-7 text-left transition-[transform,box-shadow] duration-200 ease-out-smooth hover:-translate-y-1.5 hover:shadow-lg active:translate-y-0 active:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none focus:outline-none focus:ring-2 focus:ring-primary/20",
@@ -465,34 +472,26 @@ export function ProjectCard({
       ].join(" ")}
     >
       {isSidebarRow ? (
-        <div
-          role="button"
-          tabIndex={0}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
-          onClick={() => navigate(projectPath)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              navigate(projectPath);
-            }
-          }}
+        <Link
+          to={projectPath}
+          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left${sidebarShowLabel ? "" : " justify-center"}`}
         >
-          {project.isPinned && sidebarShowLabel && (
+          {project.isPinned && sidebarShowLabel && showPinIndicator && (
             <Pin
               className={`h-3.5 w-3.5 shrink-0 ${
-                isProjectRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
+                isProjectRouteActive ? "text-amber-600 dark:text-sky-400" : "text-amber-500"
               }`}
             />
           )}
           <FolderOpen
             className={`h-4 w-4 shrink-0 ${
-              isProjectRouteActive ? "text-[var(--land-blue-fg)]" : "text-[var(--land-ink-3)]"
+              isProjectRouteActive ? "text-amber-600 dark:text-sky-400" : "text-[var(--land-ink-3)]"
             }`}
           />
           {sidebarShowLabel && (
             <span className="min-w-0 flex-1 truncate text-xs font-medium">{project.name}</span>
           )}
-        </div>
+        </Link>
       ) : (
         <>
           {/* Colored tape strip at top */}
@@ -518,9 +517,8 @@ export function ProjectCard({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             if (isSidebarRow) {
@@ -537,29 +535,14 @@ export function ProjectCard({
             setMenuAnchor("ellipsis");
             setMenuOpen((v) => !v);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              if (isSidebarRow) {
-                const trigger = e.currentTarget as HTMLElement;
-                if (menuOpen) {
-                  setMenuOpen(false);
-                  setMenuAnchor("ellipsis");
-                } else {
-                  setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
-                  setMenuOpen(true);
-                }
-                return;
-              }
-              setMenuAnchor("ellipsis");
-              setMenuOpen((v) => !v);
-            }
-          }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Project actions"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 motion-reduce:transition-none"
           title="Project actions"
         >
           <MoreVertical className="h-4 w-4" />
-        </div>
+        </button>
 
         {menuOpen && menuAnchor === "ellipsis" && !isSidebarRow && (
           <div

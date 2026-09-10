@@ -26,6 +26,7 @@ import { ROTATION_PRESETS } from "./noteToolbarConstants";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 import { sanitizeHtml } from "../../utils/sanitize-html";
 import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
+import { useBoardItemKeyboardMove } from "../../hooks/useBoardItemKeyboardMove";
 
 /** More visible swatch colors for the dropdown (actual card uses pastel INDEX_CARD_COLORS) */
 const INDEX_CARD_SWATCH: Record<string, string> = {
@@ -437,6 +438,37 @@ function IndexCardComponent({
 
   const edgeThickness = 6;
 
+  // Arrow keys move the card (keyboard equivalent of dragging); Enter edits.
+  const handleKeyboardMove = useBoardItemKeyboardMove({
+    position,
+    setPosition,
+    size,
+    onMoveEnd: useCallback(
+      (x: number, y: number) => onDragStopRef.current(card.id, x, y),
+      [card.id],
+    ),
+    onActivate: useCallback(() => {
+      pendingClickRef.current = { field: "content", yRatio: 1 };
+      onStartEdit(card.id);
+    }, [card.id, onStartEdit]),
+    onDelete: useCallback(() => {
+      const hasContent =
+        !!(card.content && stripHtmlForPlainText(card.content).length > 0);
+      if (hasContent) setShowDeleteConfirm(true);
+      else onDelete(card.id);
+    }, [card.content, card.id, onDelete]),
+    onBringToFront: useCallback(
+      () => onBringToFront?.(card.id),
+      [onBringToFront, card.id],
+    ),
+    disabled: isEditing || isResizing,
+    boardMinX,
+    boardMinY,
+    boardMaxX,
+    boardMaxY,
+  });
+  const plainTitle = card.title ? stripHtmlForPlainText(card.title) : "";
+
   // Close menu on outside click
   useEffect(() => {
     if (!menuOpen) return;
@@ -469,12 +501,16 @@ function IndexCardComponent({
         ref={nodeRef}
         data-board-item="card"
         data-card-id={card.id}
-        className="absolute overflow-visible will-change-transform"
+        role="group"
+        tabIndex={isEditing ? -1 : 0}
+        aria-label={`Index card${plainTitle ? `: ${plainTitle}` : ""}. Arrow keys move, Enter edits, Delete removes.`}
+        className="absolute overflow-visible rounded-md will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
           zIndex,
         }}
+        onKeyDown={handleKeyboardMove}
         onMouseDown={() => onBringToFront?.(card.id)}
         onDragStart={(e) => {
           // Selected text inside the card is natively draggable in the browser. Without

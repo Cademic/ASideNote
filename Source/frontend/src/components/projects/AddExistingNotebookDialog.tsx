@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X, BookOpen, Search, Check } from "lucide-react";
 import { getNotebooks } from "../../api/notebooks";
 import type { NotebookSummaryDto } from "../../types";
@@ -77,6 +78,8 @@ export function AddExistingNotebookDialog({
     }
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
@@ -89,16 +92,19 @@ export function AddExistingNotebookDialog({
       />
 
       <div
+        ref={dialogRef}
+        {...ariaProps}
         className="relative mx-4 flex w-full max-w-lg flex-col rounded-2xl border border-border bg-surface shadow-2xl animate-dialog-enter motion-reduce:animate-none"
         style={{ maxHeight: "80vh" }}
       >
         <div className="flex items-center justify-between border-b border-border/40 px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 id={titleId} className="text-lg font-semibold text-foreground">
             Add Existing Notebook
           </h2>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="rounded-lg p-1 text-foreground/50 transition-colors hover:bg-background hover:text-foreground"
           >
             <X className="h-5 w-5" />

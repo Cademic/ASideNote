@@ -28,6 +28,12 @@ interface NotebookCardProps {
   onSetProjectFolder?: (notebookId: string, folderId: string | null) => void;
   layout?: "card" | "sidebarRow";
   sidebarShowLabel?: boolean;
+  /**
+   * `layout="sidebarRow"` only. Shows the amber pin glyph when the notebook is
+   * pinned. The dashboard Projects tree turns this off — pinning there is "pin to
+   * sidebar", so the pinned state is shown in the sidebar, not back in the tree.
+   */
+  showPinIndicator?: boolean;
 }
 
 function formatRelativeDate(dateStr: string): string {
@@ -58,6 +64,7 @@ export function NotebookCard({
   onSetProjectFolder,
   layout = "card",
   sidebarShowLabel = true,
+  showPinIndicator = true,
 }: NotebookCardProps) {
   const location = useLocation();
   const notebookPath = `/notebooks/${notebook.id}`;
@@ -216,19 +223,12 @@ export function NotebookCard({
       ].join(" ")}
     >
       {isSidebarRow ? (
-        <div
-          role="button"
-          tabIndex={0}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none focus:ring-2 focus:ring-primary/20 rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
+        <button
+          type="button"
+          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left${sidebarShowLabel ? "" : " justify-center"}`}
           onClick={() => onOpen(notebook.id)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onOpen(notebook.id);
-            }
-          }}
         >
-          {notebook.isPinned && sidebarShowLabel && (
+          {notebook.isPinned && sidebarShowLabel && showPinIndicator && (
             <Pin
               className={`h-3.5 w-3.5 shrink-0 ${
                 isNotebookRouteActive ? "text-[var(--land-blue-fg)]" : "text-amber-500"
@@ -243,7 +243,7 @@ export function NotebookCard({
           {sidebarShowLabel && (
             <span className="min-w-0 flex-1 truncate text-xs font-medium">{notebook.name}</span>
           )}
-        </div>
+        </button>
       ) : (
         <>
           {/* Tape strip — reddish-brown / notebook cover */}
@@ -278,9 +278,8 @@ export function NotebookCard({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setShowProjectList(false);
@@ -299,31 +298,14 @@ export function NotebookCard({
             setMenuAnchor("ellipsis");
             setMenuOpen((v) => !v);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              setShowProjectList(false);
-              setShowFolderList(false);
-              if (isSidebarRow) {
-                const trigger = e.currentTarget as HTMLElement;
-                if (menuOpen) {
-                  setMenuOpen(false);
-                  setMenuAnchor("ellipsis");
-                } else {
-                  setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
-                  setMenuOpen(true);
-                }
-                return;
-              }
-              setMenuAnchor("ellipsis");
-              setMenuOpen((v) => !v);
-            }
-          }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Notebook actions"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 motion-reduce:transition-none"
           title="Notebook actions"
         >
           <MoreVertical className="h-4 w-4" />
-        </div>
+        </button>
 
         {menuOpen && showMenu && menuAnchor === "ellipsis" && !isSidebarRow && (
           <div

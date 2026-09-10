@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X } from "lucide-react";
 
 interface CreateNotebookDialogProps {
@@ -24,14 +25,20 @@ export function CreateNotebookDialog({ isOpen, error, onClose, onCreate }: Creat
     onClose();
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, handleClose);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none" onClick={handleClose} aria-hidden="true" />
-      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl animate-dialog-enter motion-reduce:animate-none"
+      >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Create notebook</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-foreground">Create notebook</h2>
           <button
             type="button"
             onClick={handleClose}
@@ -50,7 +57,7 @@ export function CreateNotebookDialog({ isOpen, error, onClose, onCreate }: Creat
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={100}
+            maxLength={50}
             placeholder="My notebook"
             className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             autoFocus

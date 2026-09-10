@@ -1097,7 +1097,7 @@ export function ProjectDetailPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void confirmRenameBoard();
               }}
-              maxLength={100}
+              maxLength={50}
               className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               autoFocus
             />
@@ -1138,7 +1138,7 @@ export function ProjectDetailPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void confirmRenameNotebook();
               }}
-              maxLength={100}
+              maxLength={50}
               className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               autoFocus
             />
@@ -1964,7 +1964,7 @@ function SettingsTab({
             type="text"
             value={editName}
             onChange={(e) => onNameChange(e.target.value)}
-            maxLength={100}
+            maxLength={50}
             readOnly={readOnly}
             disabled={readOnly}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-default disabled:opacity-70"

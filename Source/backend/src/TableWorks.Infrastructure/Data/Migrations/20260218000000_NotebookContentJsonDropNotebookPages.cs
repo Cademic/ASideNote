@@ -1,4 +1,6 @@
 using System;
+using ASideNote.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ASideNote.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260218000000_NotebookContentJsonDropNotebookPages")]
     public partial class NotebookContentJsonDropNotebookPages : Migration
     {
         /// <inheritdoc />

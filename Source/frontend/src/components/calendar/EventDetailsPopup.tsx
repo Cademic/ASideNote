@@ -1,5 +1,6 @@
 import { X, Pencil, Repeat, FileText, Calendar, PartyPopper } from "lucide-react";
 import type { CalendarEventDto } from "../../types";
+import { useModalDialog } from "../../hooks/useModalDialog";
 
 const COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = {
   sky: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-700 dark:text-sky-300", border: "border-sky-300 dark:border-sky-700" },
@@ -70,6 +71,10 @@ export function EventDetailsPopup({
   onClose,
   onEdit,
 }: EventDetailsPopupProps) {
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, onClose, {
+    moveFocusIn: true,
+  });
+
   if (!isOpen) return null;
 
   const colors = COLOR_MAP[event.color] ?? COLOR_MAP.sky;
@@ -82,10 +87,9 @@ export function EventDetailsPopup({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
       <div
+        ref={dialogRef}
+        {...ariaProps}
         className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background shadow-xl max-h-[90vh] overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="event-details-title"
       >
         {/* Header with Edit icon */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-background px-6 py-4">
@@ -103,7 +107,7 @@ export function EventDetailsPopup({
             </div>
             <div className="min-w-0 flex-1">
               <h2
-                id="event-details-title"
+                id={titleId}
                 className="text-lg font-semibold text-foreground truncate"
               >
                 {event.title}

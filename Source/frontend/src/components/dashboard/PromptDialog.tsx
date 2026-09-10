@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 interface PromptDialogProps {
   isOpen: boolean;
@@ -26,6 +27,16 @@ export function PromptDialog({
 }: PromptDialogProps) {
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
+  // Trap focus + restore to opener + scroll lock + Escape. The input focus/select
+  // below is kept for the text pre-selection the trap doesn't do.
+  useFocusTrap(dialogRef, {
+    active: isOpen,
+    onEscape: onCancel,
+    moveFocusIn: false,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -38,15 +49,6 @@ export function PromptDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, onCancel]);
 
   if (!isOpen) return null;
 
@@ -65,16 +67,23 @@ export function PromptDialog({
         role="presentation"
       />
 
-      <div className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-2xl overflow-hidden animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-border bg-surface p-6 shadow-2xl overflow-hidden animate-dialog-enter motion-reduce:animate-none"
+      >
         <button
           type="button"
           onClick={onCancel}
+          aria-label="Close"
           className="absolute right-4 top-4 rounded-lg p-1 text-foreground/50 transition-colors hover:bg-background hover:text-foreground"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden />
         </button>
 
-        <h3 className="mb-4 pr-6 text-sm font-semibold text-foreground break-words">{title}</h3>
+        <h3 id={titleId} className="mb-4 pr-6 text-sm font-semibold text-foreground break-words">{title}</h3>
 
         <input
           ref={inputRef}

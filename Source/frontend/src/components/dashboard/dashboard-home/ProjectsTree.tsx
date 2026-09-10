@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRovingFocus } from "../../../hooks/useRovingFocus";
 import { createPortal } from "react-dom";
 import { ChevronRight, Folder, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { RenameInput } from "../../ui/RenameInput";
@@ -133,6 +134,10 @@ export function ProjectsTree({
   const [dropHighlight, setDropHighlight] = useState<string | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ folder: ProjectFolderDto; x: number; y: number } | null>(null);
   const folderMenuRef = useRef<HTMLDivElement>(null);
+  useRovingFocus(folderMenuRef, {
+    active: folderMenu !== null,
+    onTabOut: () => setFolderMenu(null),
+  });
 
   const actions = useProjectsTreeActions({ projects, boards, notebooks, onChanged: onWorkspaceChanged });
 
@@ -224,6 +229,7 @@ export function ProjectsTree({
             >
               <BoardCard
                 layout="sidebarRow"
+                showPinIndicator={false}
                 board={board}
                 {...actions.boardCardProps}
                 projectFolders={projectFolders}
@@ -254,6 +260,7 @@ export function ProjectsTree({
             >
               <NotebookCard
                 layout="sidebarRow"
+                showPinIndicator={false}
                 notebook={nb}
                 onOpen={onOpenNotebook}
                 {...actions.notebookCardProps}
@@ -424,6 +431,7 @@ export function ProjectsTree({
                   <div className="min-w-0 flex-1">
                     <ProjectCard
                       layout="sidebarRow"
+                      showPinIndicator={false}
                       project={project}
                       {...actions.projectCardProps}
                       onRename={(id, name) => startRename("project", id, name)}
@@ -461,10 +469,13 @@ export function ProjectsTree({
             className="fixed z-[100] w-44 max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-border bg-background py-1 shadow-lg"
             style={{ left: folderMenu.x, top: folderMenu.y }}
             role="menu"
+            tabIndex={-1}
+            aria-label={`${folderMenu.folder.name} folder actions`}
           >
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
               onClick={() => {
                 const f = folderMenu.folder;
@@ -478,6 +489,7 @@ export function ProjectsTree({
             <button
               type="button"
               role="menuitem"
+              tabIndex={-1}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
               onClick={() => {
                 const f = folderMenu.folder;

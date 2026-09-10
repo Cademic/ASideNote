@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { Folder, X } from "lucide-react";
 
 interface CreateProjectFolderDialogProps {
@@ -38,6 +39,8 @@ export function CreateProjectFolderDialog({
     onClose();
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, handleClose);
+
   if (!isOpen) return null;
 
   const submitClass =
@@ -52,7 +55,11 @@ export function CreateProjectFolderDialog({
         onClick={handleClose}
         aria-hidden="true"
       />
-      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background p-6 shadow-xl animate-dialog-enter motion-reduce:animate-none"
+      >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div
@@ -70,7 +77,7 @@ export function CreateProjectFolderDialog({
                 }
               />
             </div>
-            <h2 className="text-lg font-semibold text-foreground">New folder</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">New folder</h2>
           </div>
           <button
             type="button"
@@ -91,7 +98,7 @@ export function CreateProjectFolderDialog({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={100}
+            maxLength={50}
             placeholder="e.g. Sprint 3, Research"
             disabled={isSaving}
             className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"

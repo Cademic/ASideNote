@@ -23,7 +23,7 @@ import {
   ChevronRight,
   ExternalLink,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { BoardSummaryDto, ProjectSummaryDto } from "../../types";
 import { getSidebarEllipsisMenuAnchor } from "../../lib/sidebar-menu-anchor";
 
@@ -44,6 +44,12 @@ interface BoardCardProps {
   layout?: "card" | "sidebarRow";
   /** When `layout="sidebarRow"`, hide the label when the sidebar is collapsed (icon-only). */
   sidebarShowLabel?: boolean;
+  /**
+   * `layout="sidebarRow"` only. Shows the amber pin glyph when the board is
+   * pinned. The dashboard Projects tree turns this off — pinning there is "pin to
+   * sidebar", so the pinned state is shown in the sidebar, not back in the tree.
+   */
+  showPinIndicator?: boolean;
 }
 
 const BOARD_TYPE_CONFIG: Record<
@@ -102,6 +108,7 @@ export function BoardCard({
   activeProjects = [],
   layout = "card",
   sidebarShowLabel = true,
+  showPinIndicator = true,
 }: BoardCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -262,19 +269,11 @@ export function BoardCard({
       ].join(" ")}
     >
       {isSidebarRow ? (
-        <div
-          role="button"
-          tabIndex={0}
-          className={`flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none rounded-md${sidebarShowLabel ? "" : " justify-center"}`}
-          onClick={() => navigate(boardPath)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              navigate(boardPath);
-            }
-          }}
+        <Link
+          to={boardPath}
+          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left${sidebarShowLabel ? "" : " justify-center"}`}
         >
-          {board.isPinned && sidebarShowLabel && (
+          {board.isPinned && sidebarShowLabel && showPinIndicator && (
             <Pin
               className={`h-3.5 w-3.5 shrink-0 ${
                 isBoardRouteActive ? "text-amber-600 dark:text-sky-400" : "text-amber-500"
@@ -289,7 +288,7 @@ export function BoardCard({
           {sidebarShowLabel && (
             <span className="min-w-0 flex-1 truncate text-xs font-medium">{board.name}</span>
           )}
-        </div>
+        </Link>
       ) : (
         <>
           {/* Colored tape strip at top */}
@@ -328,9 +327,8 @@ export function BoardCard({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             setShowProjectList(false);
@@ -349,31 +347,14 @@ export function BoardCard({
             setMenuAnchor("ellipsis");
             setMenuOpen((v) => !v);
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              setShowProjectList(false);
-              setShowFolderList(false);
-              if (isSidebarRow) {
-                const trigger = e.currentTarget as HTMLElement;
-                if (menuOpen) {
-                  setMenuOpen(false);
-                  setMenuAnchor("ellipsis");
-                } else {
-                  setMenuAnchor(getSidebarEllipsisMenuAnchor(trigger, SIDEBAR_MENU_WIDTH_PX));
-                  setMenuOpen(true);
-                }
-                return;
-              }
-              setMenuAnchor("ellipsis");
-              setMenuOpen((v) => !v);
-            }
-          }}
-          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 motion-reduce:transition-none"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label="Board actions"
+          className="rounded-lg p-1 text-foreground/30 opacity-0 transition-[colors,opacity] duration-150 hover:bg-surface hover:text-foreground/60 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 motion-reduce:transition-none"
           title="Board actions"
         >
           <MoreVertical className="h-4 w-4" />
-        </div>
+        </button>
 
         {/* Dropdown menu (dashboard cards only — sidebar uses fixed portal) */}
         {menuOpen && menuAnchor === "ellipsis" && !isSidebarRow && (

@@ -16,7 +16,7 @@ public sealed class CreateBoardRequestValidator : AbstractValidator<CreateBoardR
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Board name is required.")
-            .MaximumLength(100).WithMessage("Board name must not exceed 100 characters.");
+            .MaximumLength(50).WithMessage("Board name must not exceed 50 characters.");
 
         RuleFor(x => x.Description)
             .MaximumLength(500).WithMessage("Description must not exceed 500 characters.")

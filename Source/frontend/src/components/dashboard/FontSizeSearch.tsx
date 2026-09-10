@@ -95,6 +95,7 @@ function FontSizeSearchActive({
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [dropdownStyle, setDropdownStyle] = useState<{ left: number; top: number } | null>(null);
   const [panelMinWidth, setPanelMinWidth] = useState(120);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,8 +182,16 @@ function FontSizeSearchActive({
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
+    setActiveIndex(-1);
     if (!open) setOpen(true);
   };
+
+  useEffect(() => {
+    if (activeIndex < 0 || !open) return;
+    panelRef.current
+      ?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
@@ -192,8 +201,33 @@ function FontSizeSearchActive({
       inputRef.current?.blur();
       return;
     }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? 0 : i - 1));
+      return;
+    }
+    if (e.key === "Home" && open) {
+      e.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (e.key === "End" && open) {
+      e.preventDefault();
+      setActiveIndex(filtered.length - 1);
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
+      if (open && activeIndex >= 0 && filtered[activeIndex] !== undefined) {
+        applyPx(filtered[activeIndex]);
+        return;
+      }
       const raw = query.trim().replace(/px$/i, "");
       const n = parseInt(raw, 10);
       if (!Number.isNaN(n) && n >= minSize && n <= maxSize) {
@@ -238,12 +272,16 @@ function FontSizeSearchActive({
         {showEmpty ? (
           <div className={emptyText}>No sizes match</div>
         ) : (
-          filtered.map((s) => (
+          filtered.map((s, i) => (
             <button
               key={s}
+              id={`${listboxId}-opt-${i}`}
+              data-option-index={i}
               type="button"
               role="option"
-              className={`flex w-full ${rowText}`}
+              aria-selected={i === activeIndex}
+              className={`flex w-full ${rowText} ${i === activeIndex ? "bg-sky-100 dark:bg-sky-900/40" : ""}`}
+              onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 applyPx(s);
@@ -265,6 +303,10 @@ function FontSizeSearchActive({
         role="combobox"
         aria-expanded={open}
         aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          open && activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined
+        }
         inputMode="numeric"
         placeholder="Size…"
         title="Font size (px) — type to filter"
@@ -329,6 +371,9 @@ export function FontSizeSearchMenu({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listboxId = useId();
+  const listRef = useRef<HTMLDivElement>(null);
 
   const merged = useMemo(
     () => mergePresetsWithCurrent(presets, currentSizePx, minSize, maxSize),
@@ -341,39 +386,92 @@ export function FontSizeSearchMenu({
     return merged.filter((s) => String(s).includes(q));
   }, [merged, query]);
 
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
+  const pick = (s: number) => {
+    onPick(Math.min(maxSize, Math.max(minSize, s)));
+    setQuery("");
+  };
+
   return (
     <div className={`flex min-w-[200px] flex-col gap-1 px-2 py-1.5 ${className}`}>
       <input
         type="search"
+        role="combobox"
+        aria-expanded
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={activeIndex >= 0 ? `${listboxId}-opt-${activeIndex}` : undefined}
         placeholder="Search size…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setActiveIndex(-1);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((i) => (i <= 0 ? 0 : i - 1));
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            setActiveIndex(0);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            setActiveIndex(filtered.length - 1);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (activeIndex >= 0 && filtered[activeIndex] !== undefined) {
+              pick(filtered[activeIndex]);
+            } else {
+              const n = parseInt(query.trim().replace(/px$/i, ""), 10);
+              if (!Number.isNaN(n) && n >= minSize && n <= maxSize) pick(n);
+            }
+          }
+        }}
         onMouseDown={(e) => e.stopPropagation()}
         className={`${defaultInputMenu} w-full`}
         autoComplete="off"
         aria-label="Search font sizes"
       />
       <div
+        ref={listRef}
+        id={listboxId}
+        role="listbox"
         className="max-h-48 overflow-y-auto rounded border border-border/60 bg-background py-0.5"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {filtered.length === 0 ? (
           <div className="px-2 py-1.5 text-sm text-muted-foreground">No sizes match</div>
         ) : (
-          filtered.map((s) => (
+          filtered.map((s, i) => (
             <button
               key={s}
+              id={`${listboxId}-opt-${i}`}
+              data-option-index={i}
               type="button"
+              role="option"
+              aria-selected={s === currentSizePx}
               className={`flex w-full px-2 py-1.5 text-left text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 ${
-                s === currentSizePx ? "bg-sky-50 dark:bg-sky-900/30" : ""
+                i === activeIndex
+                  ? "bg-sky-100 dark:bg-sky-900/40"
+                  : s === currentSizePx
+                    ? "bg-sky-50 dark:bg-sky-900/30"
+                    : ""
               }`}
+              onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const n = Math.min(maxSize, Math.max(minSize, s));
-                onPick(n);
-                setQuery("");
+                pick(s);
               }}
             >
               {s}px

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X, UserPlus, Users } from "lucide-react";
 import { addMember } from "../../api/projects";
 import { getFriends } from "../../api/users";
@@ -92,6 +93,8 @@ export function AddMemberDialog({
     onClose();
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, handleClose);
+
   if (!isOpen) return null;
 
   return (
@@ -103,10 +106,15 @@ export function AddMemberDialog({
         role="presentation"
       />
 
-      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none"
+      >
         <button
           type="button"
           onClick={handleClose}
+          aria-label="Close"
           className="absolute right-4 top-4 rounded-lg p-1 text-foreground/50 transition-colors hover:bg-background hover:text-foreground"
         >
           <X className="h-5 w-5" />
@@ -114,7 +122,7 @@ export function AddMemberDialog({
 
         <div className="mb-4 flex items-center gap-2">
           <UserPlus className="h-5 w-5 text-foreground/60" />
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 id={titleId} className="text-lg font-semibold text-foreground">
             Add Team Member
           </h2>
         </div>

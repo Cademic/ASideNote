@@ -21,10 +21,10 @@ import type {
   ProjectSummaryDto,
 } from "../types";
 import { resolveEventProjectName } from "../utils/calendar-event-project-name";
-import { buildUpcomingItems } from "../utils/dashboard-upcoming";
+import { buildProjectMarkerEvents } from "../utils/calendar-project-markers";
+import { isProjectVisibleOnUserCalendar } from "../utils/calendar-project-visibility";
 import { useHolidayEvents } from "../hooks/useHolidayEvents";
-import { useAuth } from "../context/AuthContext";
-import { readLastOpenedBoard } from "../lib/lastOpenedBoard";
+import { useDelayedLoading } from "../hooks/useDelayedLoading";
 
 /**
  * Merge two lists by `id`, keeping the entry from `base` when both contain the
@@ -42,10 +42,12 @@ function mergeById<T extends { id: string }>(base: T[], extra: T[]): T[] {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const currentUserId = user?.userId ?? null;
-  const { setDashboardActiveBoardType, requestCreate } =
-    useOutletContext<AppLayoutContext>();
+  const {
+    requestCreate,
+    refreshPinnedBoards,
+    refreshPinnedProjects,
+    refreshPinnedNotebooks,
+  } = useOutletContext<AppLayoutContext>();
 
   const [boards, setBoards] = useState<BoardSummaryDto[]>([]);
   const [activeProjects, setActiveProjects] = useState<ProjectSummaryDto[]>([]);
@@ -66,6 +68,8 @@ export function DashboardPage() {
   const [calendarEventDialogOpen, setCalendarEventDialogOpen] = useState(false);
   const [calendarEventDialogDate, setCalendarEventDialogDate] = useState("");
   const [calendarEventDialogTime, setCalendarEventDialogTime] = useState("");
+  const [calendarEventDialogAllDay, setCalendarEventDialogAllDay] =
+    useState(false);
   const [editingCalendarEvent, setEditingCalendarEvent] =
     useState<CalendarEventDto | null>(null);
 
@@ -122,41 +126,31 @@ export function DashboardPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  /**
+   * Called after every Projects-tree mutation. Re-fetches the dashboard's own
+   * data and also refreshes the app sidebar's pinned lists, so pinning /
+   * unpinning (or deleting a pinned item) from the tree is reflected in the
+   * sidebar without a reload.
+   */
+  const handleWorkspaceChanged = useCallback(async () => {
+    await fetchDashboard();
+    refreshPinnedBoards();
+    refreshPinnedProjects();
+    refreshPinnedNotebooks();
+  }, [
+    fetchDashboard,
+    refreshPinnedBoards,
+    refreshPinnedProjects,
+    refreshPinnedNotebooks,
+  ]);
+
   useEffect(() => {
     void refreshCalendarEvents();
   }, [refreshCalendarEvents]);
 
-  /** Boards, most-recently-updated first. */
-  const allBoards = useMemo(
-    () =>
-      [...boards].sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-      ),
-    [boards],
-  );
-
-  /**
-   * The board shown in the Active Canvas: the board the user last opened
-   * full-screen (persisted per user) — a note board OR a chalkboard, whichever
-   * they last visited — falling back to their most-recently-updated note board
-   * when nothing is remembered or that board is no longer accessible. The
-   * fallback stays note-boards-only; a chalkboard only lands here when it is the
-   * remembered last-opened board.
-   */
-  const activeCanvasBoard = useMemo(() => {
-    const noteBoards = allBoards.filter((b) => b.boardType === "NoteBoard");
-    const lastOpenedId = readLastOpenedBoard(currentUserId);
-    const remembered = lastOpenedId
-      ? allBoards.find((b) => b.id === lastOpenedId)
-      : undefined;
-    return remembered ?? noteBoards[0] ?? null;
-  }, [allBoards, currentUserId]);
-
   /**
    * Boards / notebooks for the projects tree: the user's own items plus any
-   * shared items linked to projects they can access. Kept separate from `boards`
-   * so the Active Canvas still tracks only the user's own note boards.
+   * shared items linked to projects they can access.
    */
   const treeBoards = useMemo(
     () => mergeById(boards, projectBoards),
@@ -188,10 +182,22 @@ export function DashboardPage() {
   }, []);
   const holidayEvents = useHolidayEvents(holidayFrom, holidayTo);
 
-  const upcoming = useMemo(
+  // Project start/end shown as all-day markers on the timeline, matching the
+  // Calendar. Only projects the user keeps on their personal calendar.
+  const projectMarkerEvents = useMemo(
     () =>
-      buildUpcomingItems([...calendarEvents, ...holidayEvents], activeProjects),
-    [calendarEvents, holidayEvents, activeProjects],
+      buildProjectMarkerEvents(
+        activeProjects.filter(isProjectVisibleOnUserCalendar),
+        { labelWithProjectName: true },
+      ),
+    [activeProjects],
+  );
+
+  // Calendar events + project markers + built-in holidays — feeds the dashboard
+  // day schedule, which renders the same grid as the Calendar page's Day view.
+  const timelineEvents = useMemo(
+    () => [...calendarEvents, ...projectMarkerEvents, ...holidayEvents],
+    [calendarEvents, projectMarkerEvents, holidayEvents],
   );
 
   const projectNameMap = useMemo(() => {
@@ -200,19 +206,9 @@ export function DashboardPage() {
     return map;
   }, [activeProjects]);
 
-  // Tell the sidebar which board (if any) is live in the Active Canvas so it can
-  // show the matching Board Tools — all stationery for a note board, just the
-  // sticky-note tool for a chalkboard.
-  useEffect(() => {
-    setDashboardActiveBoardType(
-      activeCanvasBoard?.boardType === "ChalkBoard"
-        ? "ChalkBoard"
-        : activeCanvasBoard != null
-          ? "NoteBoard"
-          : null,
-    );
-    return () => setDashboardActiveBoardType(null);
-  }, [activeCanvasBoard, setDashboardActiveBoardType]);
+  // Hold the skeleton back until the load is actually slow, so a quick fetch
+  // swaps straight to the real page instead of flashing the placeholder.
+  const showSkeleton = useDelayedLoading(isLoading);
 
   function handleOpenNotebook(id: string) {
     navigate(`/notebooks/${id}`);
@@ -222,8 +218,14 @@ export function DashboardPage() {
     event?: CalendarEventDto;
     project?: ProjectSummaryDto;
   }) {
-    if (item.event) setDetailsEvent(item.event);
-    else if (item.project) navigate(`/projects/${item.project.id}`);
+    // Project start/end markers link back to the project, not the event popup.
+    if (item.event?.eventType === "Project" && item.event.projectId) {
+      navigate(`/projects/${item.event.projectId}`);
+    } else if (item.event) {
+      setDetailsEvent(item.event);
+    } else if (item.project) {
+      navigate(`/projects/${item.project.id}`);
+    }
   }
 
   function handleEditFromEventDetails() {
@@ -235,11 +237,16 @@ export function DashboardPage() {
     setCalendarEventDialogOpen(true);
   }
 
-  /** Clicking an empty hour in the dashboard timeline: new note prefilled to that slot. */
-  function handleCreateNoteAt(dateStr: string, time: string) {
+  /**
+   * Clicking an empty slot in the dashboard timeline: new note prefilled to that
+   * slot. Clicking the all-day strip passes `allDay` so the dialog opens as an
+   * all-day event instead of a timed one.
+   */
+  function handleCreateNoteAt(dateStr: string, time: string, allDay = false) {
     setEditingCalendarEvent(null);
     setCalendarEventDialogDate(dateStr);
     setCalendarEventDialogTime(time);
+    setCalendarEventDialogAllDay(allDay);
     setCalendarEventDialogOpen(true);
   }
 
@@ -270,17 +277,21 @@ export function DashboardPage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || showSkeleton) {
     return (
-      <div className="dashboard-editorial w-full min-w-0 bg-[var(--land-cream)] lg:h-full lg:min-h-0 lg:overflow-hidden">
-        <DashboardSkeleton />
+      <div className="dashboard-editorial w-full min-w-0 bg-background lg:h-full lg:min-h-0 lg:overflow-hidden">
+        {showSkeleton && (
+          <div className="animate-page-enter motion-reduce:animate-none lg:h-full lg:min-h-0 lg:overflow-hidden">
+            <DashboardSkeleton />
+          </div>
+        )}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="dashboard-editorial flex h-full items-center justify-center bg-[var(--land-cream)]">
+      <div className="dashboard-editorial animate-page-enter motion-reduce:animate-none flex h-full items-center justify-center bg-background">
         <div className="text-center">
           <p className="mb-2 text-sm text-red-600">{error}</p>
           <button
@@ -296,26 +307,18 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-editorial w-full min-w-0 bg-[var(--land-cream)] lg:h-full lg:min-h-0 lg:overflow-hidden">
+    <div className="dashboard-editorial animate-page-enter motion-reduce:animate-none w-full min-w-0 bg-background lg:h-full lg:min-h-0 lg:overflow-hidden">
       <DashboardLayout
         projects={activeProjectsSorted}
         folders={projectFolders}
         boards={treeBoards}
         notebooks={treeNotebooks}
-        upcoming={upcoming}
-        activeBoard={activeCanvasBoard}
+        events={timelineEvents}
+        projectNameMap={projectNameMap}
         onOpenNotebook={handleOpenNotebook}
         onOpenUpcoming={handleOpenUpcoming}
         onCreateEventAt={handleCreateNoteAt}
-        onOpenActiveBoard={() => {
-          if (!activeCanvasBoard) return;
-          navigate(
-            activeCanvasBoard.boardType === "ChalkBoard"
-              ? `/chalkboards/${activeCanvasBoard.id}`
-              : `/boards/${activeCanvasBoard.id}`,
-          );
-        }}
-        onWorkspaceChanged={fetchDashboard}
+        onWorkspaceChanged={handleWorkspaceChanged}
         onCreate={() => requestCreate()}
       />
 
@@ -340,7 +343,7 @@ export function DashboardPage() {
         initialDate={calendarEventDialogDate}
         initialTime={calendarEventDialogTime || undefined}
         initialEventType="Note"
-        initialAllDay={false}
+        initialAllDay={calendarEventDialogAllDay}
         editEvent={editingCalendarEvent}
       />
     </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X, CalendarClock } from "lucide-react";
 
 const PROJECT_COLORS = [
@@ -73,6 +74,8 @@ export function CreateProjectDialog({
     onClose();
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, handleClose);
+
   if (!isOpen) return null;
 
   return (
@@ -86,17 +89,22 @@ export function CreateProjectDialog({
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl animate-dialog-enter motion-reduce:animate-none"
+      >
         {/* Close button */}
         <button
           type="button"
           onClick={handleClose}
+          aria-label="Close"
           className="absolute right-4 top-4 rounded-lg p-1 text-foreground/50 transition-colors hover:bg-background hover:text-foreground"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="mb-4 text-lg font-semibold text-foreground">
+        <h2 id={titleId} className="mb-4 text-lg font-semibold text-foreground">
           Create New Project
         </h2>
 
@@ -122,7 +130,7 @@ export function CreateProjectDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Project"
-              maxLength={100}
+              maxLength={50}
               autoFocus
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />

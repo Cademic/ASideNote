@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Keyboard focus visibility ───────────────────────────────────────────────
+   ~84 components use Tailwind's `focus:outline-none` and many never pair it
+   with a ring, leaving keyboard users with no visible focus target. This
+   guarantees a visible indicator for any element reached via keyboard, without
+   affecting mouse clicks (`:focus-visible` does not match pointer focus).
+   `!important` is required to beat `.focus:outline-none`'s specificity.
+   Opt out on elements that render their own ring with
+   `data-a11y-focus="self"` (see SidebarRail). */
+*:focus-visible {
+  outline: 2px solid hsl(var(--color-primary)) !important;
+  outline-offset: 2px !important;
+}
+
+[data-a11y-focus="self"]:focus-visible {
+  outline: none !important;
+}
+
+/* Elements focused programmatically (route containers, dialog shells) should be
+   able to hold focus for screen readers without painting a page-wide box. */
+[data-a11y-focus="none"]:focus,
+[data-a11y-focus="none"]:focus-visible {
+  outline: none !important;
+}
+
 /* Smooth cross-fade when toggling light/dark mode */
 html.theme-transition,
 html.theme-transition *,
@@ -447,22 +471,6 @@ body {
 
 .editorial-rail-btn:active {
   filter: brightness(0.94);
-}
-
-/* Dashboard Active Canvas — the embedded board sits flush inside its panel: square corners,
-   no frame, no shadow. */
-.dashboard-editorial .corkboard-frame {
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.dashboard-editorial .corkboard-surface {
-  border-radius: 0;
-}
-
-.dashboard-editorial .corkboard-frame .notepad-card {
-  border-radius: 0;
-  box-shadow: none;
 }
 
 /* ---- Hero — animated glass gradient backdrop ----
@@ -1667,6 +1675,14 @@ body {
   background: none;
 }
 
+/* Keyboard focus on a nav row: lift it above its siblings so the focus outline
+   is never painted over by an adjacent row's hover fill (rows sit in a 2px gap,
+   and the outline's 2px offset otherwise butts straight into the neighbour). */
+.sidebar-nav-item:focus-visible {
+  z-index: 20;
+  outline-offset: -1px !important;
+}
+
 /* Active nav item — darker accent left tab (amber in light, sky in dark) */
 .sidebar-nav-active {
   position: relative;
@@ -1697,14 +1713,6 @@ body {
 
 .sidebar-rail:hover {
   background: var(--land-cream, hsl(var(--color-primary) / 0.15));
-}
-
-/* Collapsed-mode nav tooltip */
-.sidebar-tooltip {
-  background: var(--land-paper, hsl(var(--color-surface)));
-  color: var(--land-ink, hsl(var(--color-foreground)));
-  border: 1px solid var(--land-rule, hsl(var(--color-border) / 0.5));
-  box-shadow: none;
 }
 
 /* ========================================
