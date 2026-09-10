@@ -11,6 +11,8 @@ interface CalendarDayCellProps {
   events: CalendarEventDto[];
   projects: ProjectSummaryDto[];
   onClickDay: (date: Date) => void;
+  /** Drill into a focused view for the date (month view → day view). Falls back to {@link onClickDay}. */
+  onSelectDate?: (date: Date) => void;
   onClickEvent: (event: CalendarEventDto) => void;
   onClickProject?: (project: ProjectSummaryDto) => void;
   compact?: boolean;
@@ -25,12 +27,14 @@ export function CalendarDayCell({
   events,
   projects,
   onClickDay,
+  onSelectDate,
   onClickEvent,
   onClickProject,
   compact,
   projectNameMap,
 }: CalendarDayCellProps) {
   const dayNumber = date.getDate();
+  const openDay = onSelectDate ?? onClickDay;
   const maxItems = compact ? 0 : 3;
   const visibleEvents = events.slice(0, maxItems);
   const visibleProjects = projects.slice(0, Math.max(0, maxItems - visibleEvents.length));
@@ -71,19 +75,35 @@ export function CalendarDayCell({
     );
   }
 
+  const dayLabel = date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div
-      className={`navbar-day-cell group relative flex min-h-[100px] min-w-0 flex-col overflow-hidden border-b border-r border-border/40 p-1.5 transition-colors hover:brightness-[0.97] dark:hover:brightness-110 ${
+      role="button"
+      tabIndex={0}
+      onClick={() => openDay(date)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openDay(date);
+        }
+      }}
+      aria-label={`View ${dayLabel}`}
+      className={`group relative flex h-full min-h-0 min-w-0 cursor-pointer flex-col overflow-hidden border-b border-r border-border bg-background p-1.5 transition-colors hover:bg-[var(--land-cream,#f7f2e9)] ${
         !isCurrentMonth ? "opacity-40" : ""
       }`}
     >
       {/* Day number + add button */}
       <div className="mb-1 flex shrink-0 items-center justify-between">
         <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+          className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold ${
             isToday
               ? "bg-primary text-primary-foreground"
-              : "text-foreground/60"
+              : "text-foreground/70"
           }`}
         >
           {dayNumber}
@@ -94,10 +114,11 @@ export function CalendarDayCell({
             e.stopPropagation();
             onClickDay(date);
           }}
-          className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/20 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/50 group-hover:opacity-100 motion-reduce:transition-none"
+          className="flex h-5 w-5 items-center justify-center rounded-md text-foreground/20 opacity-0 transition-[colors,opacity] duration-150 hover:bg-foreground/5 hover:text-foreground/50 group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none"
           title="Add event"
+          aria-label={`Add event on ${dayLabel}`}
         >
-          <Plus className="h-3 w-3" />
+          <Plus className="h-3 w-3" aria-hidden />
         </button>
       </div>
 
@@ -112,19 +133,15 @@ export function CalendarDayCell({
         ))}
       </div>
 
-      {/* Events — staggered with slight left offset for overlapping items */}
+      {/* Events */}
       <div className="flex min-w-0 flex-col gap-0.5 overflow-hidden">
-        {visibleEvents.map((event, idx) => (
-          <div
+        {visibleEvents.map((event) => (
+          <CalendarEventItem
             key={event.id}
-            style={{ marginLeft: idx > 0 ? `${Math.min(idx * 4, 12)}px` : undefined }}
-          >
-            <CalendarEventItem
-              event={event}
-              onClick={onClickEvent}
-              projectName={resolveEventProjectName(event, projectNameMap)}
-            />
-          </div>
+            event={event}
+            onClick={onClickEvent}
+            projectName={resolveEventProjectName(event, projectNameMap)}
+          />
         ))}
       </div>
 
@@ -132,8 +149,11 @@ export function CalendarDayCell({
       {overflow > 0 && (
         <button
           type="button"
-          onClick={() => onClickDay(date)}
-          className="mt-0.5 text-left text-[10px] font-medium text-foreground/40 hover:text-foreground/60"
+          onClick={(e) => {
+            e.stopPropagation();
+            openDay(date);
+          }}
+          className="mt-0.5 text-left text-[11px] font-medium text-foreground/50 hover:text-foreground"
         >
           +{overflow} more
         </button>

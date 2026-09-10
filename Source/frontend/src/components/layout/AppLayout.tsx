@@ -16,6 +16,9 @@ import {
 } from "../../api/notebooks";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
+import { announce } from "../../lib/announce";
+import { isEditableTarget } from "../../lib/is-editable-target";
+import { KeyboardShortcutsDialog } from "../a11y/KeyboardShortcutsDialog";
 import {
   CreateBoardDialog,
   type CreateDialogTab,
@@ -61,13 +64,6 @@ export interface AppLayoutContext {
   /** Desktop only: true when sidebar is expanded (user-resizable width), false when collapsed (w-16). */
   isSidebarOpen: boolean;
   /**
-   * The board type mounted in the dashboard's Active Canvas ("NoteBoard" /
-   * "ChalkBoard"), or null when none is live. Non-null makes the sidebar show
-   * board tools; "ChalkBoard" narrows them to the sticky-note tool.
-   */
-  dashboardActiveBoardType: "NoteBoard" | "ChalkBoard" | null;
-  setDashboardActiveBoardType: (type: "NoteBoard" | "ChalkBoard" | null) => void;
-  /**
    * Opens the shared create dialog in place — no navigation. Driven from the
    * sidebar rail "Create" button and the Gallery "New" affordances. Pass a tab
    * to pre-select Board / Project / Notebook.
@@ -108,9 +104,6 @@ function AppLayoutInner() {
   const [pinnedNotebooks, setPinnedNotebooks] = useState<NotebookSummaryDto[]>(
     [],
   );
-  const [dashboardActiveBoardType, setDashboardActiveBoardType] = useState<
-    "NoteBoard" | "ChalkBoard" | null
-  >(null);
 
   // Shared create dialog — hosted here so "Create" opens on whatever page the
   // user is on (no redirect to the dashboard).
@@ -255,6 +248,27 @@ function AppLayoutInner() {
   useEffect(() => {
     if (isMobile) setOpenMobile(false);
   }, [isMobile, location.pathname, setOpenMobile]);
+
+  /* ── Announce route changes to screen readers ──────────────
+     SPA navigation doesn't move focus or speak the new page; read out the
+     page <title> (set per-route via react-helmet-async) once it has updated. */
+  useEffect(() => {
+    const id = window.setTimeout(() => announce(document.title), 200);
+    return () => window.clearTimeout(id);
+  }, [location.pathname]);
+
+  /* ── "?" opens the keyboard-shortcuts reference ──────────── */
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      setShortcutsOpen((v) => !v);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   /* ── Board page: show chevron only after drawer finishes sliding closed ─ */
   useEffect(() => {
@@ -469,8 +483,6 @@ function AppLayoutInner() {
     openNotebook,
     refreshPinnedNotebooks,
     isSidebarOpen,
-    dashboardActiveBoardType,
-    setDashboardActiveBoardType,
     requestCreate,
   };
 
@@ -483,6 +495,10 @@ function AppLayoutInner() {
 
   return (
     <div className="app-editorial flex h-screen [height:100dvh] overflow-hidden bg-background text-foreground">
+      <KeyboardShortcutsDialog
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
       <TutorialOverlay />
       {sidebarWorkspace.dialogs}
       <CreateBoardDialog
@@ -520,8 +536,6 @@ function AppLayoutInner() {
           onRenameBoard={sidebarWorkspace.renameBoard}
           onRenameNotebook={sidebarWorkspace.renameNotebook}
           resolveBoardDto={sidebarWorkspace.resolveBoardDto}
-          dashboardBoardToolsActive={dashboardActiveBoardType !== null}
-          dashboardActiveBoardIsChalk={dashboardActiveBoardType === "ChalkBoard"}
           onRequestCreate={requestCreate}
         />
       )}

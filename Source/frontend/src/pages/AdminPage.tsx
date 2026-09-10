@@ -439,7 +439,7 @@ export function AdminPage() {
           {/* Pie chart + User creation + User logins */}
           <div className="mt-6 grid gap-6 lg:grid-cols-3">
             {/* Pie chart: User Activity */}
-            <div className="rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
+            <div className="min-w-0 rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-medium text-foreground/80">
                 User Activity
               </h3>
@@ -484,19 +484,19 @@ export function AdminPage() {
                         className="h-36 w-36 shrink-0 rounded-full border-4 border-white shadow-inner dark:border-slate-800"
                         style={{ background: conic }}
                       />
-                      <ul className="min-w-0 space-y-1.5 text-xs">
+                      <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
                         {segments.map((s) => (
                           <li
                             key={s.label}
                             className="flex items-center justify-between gap-2"
                           >
-                            <span className="flex items-center gap-1.5">
+                            <span className="flex min-w-0 items-center gap-1.5">
                               <span
-                                className={`h-2.5 w-2.5 rounded-full ${s.color}`}
+                                className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.color}`}
                               />
-                              {s.label}
+                              <span className="truncate">{s.label}</span>
                             </span>
-                            <span className="tabular-nums font-medium">
+                            <span className="shrink-0 tabular-nums font-medium">
                               {s.count}
                             </span>
                           </li>
@@ -513,7 +513,7 @@ export function AdminPage() {
             </div>
 
             {/* User creation by month */}
-            <div className="rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
+            <div className="min-w-0 rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-medium text-foreground/80">
                 User Creation Activity
               </h3>
@@ -529,12 +529,12 @@ export function AdminPage() {
                     ...data.map((d) => d.count)
                   );
                   return (
-                    <div className="flex h-48 flex-col">
+                    <div className="flex h-48 min-w-0 flex-col overflow-hidden">
                       <div className="flex min-h-0 flex-1 items-end justify-between gap-0.5">
                         {data.map((d) => (
                           <div
                             key={d.period}
-                            className="flex h-full flex-1 flex-col justify-end"
+                            className="flex h-full min-w-0 flex-1 flex-col justify-end"
                             title={`${d.period}: ${d.count}`}
                           >
                             <div
@@ -551,7 +551,7 @@ export function AdminPage() {
                         {data.map((d) => (
                           <span
                             key={d.period}
-                            className="flex-1 truncate text-center text-[10px] text-foreground/50"
+                            className="min-w-0 flex-1 truncate text-center text-[10px] text-foreground/50"
                           >
                             {d.period.split(" ")[0]}
                           </span>
@@ -568,7 +568,7 @@ export function AdminPage() {
             </div>
 
             {/* User logins by month */}
-            <div className="rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
+            <div className="min-w-0 rounded-lg border border-border/50 bg-surface/60 p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-medium text-foreground/80">
                 User Login Activity
               </h3>
@@ -584,12 +584,12 @@ export function AdminPage() {
                     ...data.map((d) => d.count)
                   );
                   return (
-                    <div className="flex h-48 flex-col">
+                    <div className="flex h-48 min-w-0 flex-col overflow-hidden">
                       <div className="flex min-h-0 flex-1 items-end justify-between gap-0.5">
                         {data.map((d) => (
                           <div
                             key={d.period}
-                            className="flex h-full flex-1 flex-col justify-end"
+                            className="flex h-full min-w-0 flex-1 flex-col justify-end"
                             title={`${d.period}: ${d.count} logins`}
                           >
                             <div
@@ -606,7 +606,7 @@ export function AdminPage() {
                         {data.map((d) => (
                           <span
                             key={d.period}
-                            className="flex-1 truncate text-center text-[10px] text-foreground/50"
+                            className="min-w-0 flex-1 truncate text-center text-[10px] text-foreground/50"
                           >
                             {d.period.split(" ")[0]}
                           </span>

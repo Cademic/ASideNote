@@ -1050,6 +1050,9 @@ namespace ASideNote.Infrastructure.Data.Migrations
                     b.Property<bool>("HasCompletedTutorial")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ShowHolidays")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Theme")
                         .IsRequired()
                         .HasColumnType("text");

@@ -40,9 +40,9 @@ const STORAGE_KEY = "asidenote.sidebar.collapsed";
 const WIDTH_STORAGE_KEY = "asidenote.sidebar.width";
 
 /** Desktop expanded-width bounds (px). */
-export const MIN_SIDEBAR_WIDTH = 300;
+export const MIN_SIDEBAR_WIDTH = 220;
 export const MAX_SIDEBAR_WIDTH = 520;
-export const DEFAULT_SIDEBAR_WIDTH = 300;
+export const DEFAULT_SIDEBAR_WIDTH = 240;
 /** Collapsed icon-rail width (`w-16` = 4rem) — reported through the `--sidebar-width` var. */
 const COLLAPSED_SIDEBAR_WIDTH = 64;
 

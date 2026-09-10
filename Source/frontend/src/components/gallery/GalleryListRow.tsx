@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   ClipboardList,
@@ -104,7 +104,12 @@ export function GalleryListRow({
   return (
     <tr
       className="group cursor-pointer text-sm"
-      onClick={() => navigate(item.to)}
+      onClick={(e) => {
+        // Mouse convenience only — the item name is a real <Link> for keyboard /
+        // right-click. Ignore clicks that land on the kebab cell or its menu.
+        if ((e.target as Element).closest("[data-gallery-item-menu], a, button")) return;
+        navigate(item.to);
+      }}
       onContextMenu={openFromContextMenu}
     >
       <td className="max-w-0 py-2 pl-4 pr-3">
@@ -112,9 +117,12 @@ export function GalleryListRow({
           <Icon className={`h-4 w-4 shrink-0 ${iconClass}`} />
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="truncate font-medium text-foreground group-hover:underline">
+              <Link
+                to={item.to}
+                className="truncate font-medium text-foreground hover:underline focus-visible:underline"
+              >
                 {item.name}
-              </span>
+              </Link>
               {item.isPinned && (
                 <Pin className="h-3 w-3 shrink-0 text-amber-500" aria-label="Pinned" />
               )}

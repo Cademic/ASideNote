@@ -273,7 +273,7 @@ export function CalendarTimeline({
   const currentMonth = currentDate.getMonth();
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
+    <div className="overflow-hidden border border-border">
       {weeks.map((weekDays, weekIdx) => {
         const items = getItemsForWeek(weekDays);
         return (
@@ -311,7 +311,7 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
   return (
     <div className={!isLast ? "border-b border-border" : ""}>
       {/* Day header row */}
-      <div className="calendar-day-cell grid grid-cols-7 divide-x divide-white/10 dark:divide-white/5">
+      <div className="calendar-day-cell grid grid-cols-7 divide-x divide-border">
         {days.map((date, i) => {
           const isToday = isSameDay(date, today);
           const isCurrentMonth = date.getMonth() === currentMonth;
@@ -388,7 +388,7 @@ function WeekRow({ days, items, today, currentMonth, onDayClick, onItemClick, is
                     key={item.id}
                     type="button"
                     onClick={() => onItemClick(item)}
-                    className={`relative flex min-w-0 items-center gap-2 overflow-hidden ${colors.bg} px-3 py-2 text-left transition-[color,background-color,transform] duration-150 ease-out cursor-pointer hover:translate-x-1 hover:brightness-95 motion-reduce:transition-none motion-reduce:hover:translate-x-0 dark:hover:brightness-110 ${
+                    className={`relative flex min-w-0 items-center gap-2 overflow-hidden ${colors.bg} px-3 py-2 text-left transition-[color,background-color] duration-150 ease-out cursor-pointer hover:brightness-95 motion-reduce:transition-none dark:hover:brightness-110 ${
                       roundLeft ? "border-l-[3px] " + colors.border : ""
                     } ${roundLeft && roundRight ? "rounded" : roundLeft ? "rounded-l" : roundRight ? "rounded-r" : ""}`}
                     style={{

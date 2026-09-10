@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useCloseOnEscape } from "../../hooks/useCloseOnEscape";
 import { createPortal } from "react-dom";
 import { ChevronRight, Folder } from "lucide-react";
 import {
@@ -42,6 +43,7 @@ export function ProjectMoveFlyout({
   clearParentHoverTimer,
   scheduleParentClose,
 }: ProjectMoveFlyoutProps) {
+  useCloseOnEscape(show, onClose);
   const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
   const [folderCache, setFolderCache] = useState<
     Record<string, { id: string; name: string }[]>

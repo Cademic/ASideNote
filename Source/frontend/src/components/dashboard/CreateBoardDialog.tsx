@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X, ClipboardList, PenTool, FolderOpen, BookOpen } from "lucide-react";
 
 const PROJECT_COLORS = [
@@ -168,6 +169,8 @@ export function CreateBoardDialog({
     onCreateNotebook(notebookName.trim());
   }
 
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, handleClose);
+
   if (!isOpen) return null;
 
   const displayError = tab === "notebook" ? createNotebookError : error;
@@ -184,6 +187,8 @@ export function CreateBoardDialog({
 
       {/* Dialog */}
       <div
+        ref={dialogRef}
+        {...ariaProps}
         data-tutorial-target="create-board-dialog"
         className="relative w-full max-w-md rounded-2xl bg-surface border border-border shadow-2xl p-6 mx-4 animate-dialog-enter motion-reduce:animate-none"
       >
@@ -191,12 +196,13 @@ export function CreateBoardDialog({
         <button
           type="button"
           onClick={handleClose}
+          aria-label="Close"
           className="absolute top-4 right-4 rounded-lg p-1 text-foreground/50 hover:text-foreground hover:bg-background transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="mb-4 text-lg font-semibold text-foreground">
+        <h2 id={titleId} className="mb-4 text-lg font-semibold text-foreground">
           {hideProjectTab ? "New board" : "Get Started"}
         </h2>
 
@@ -293,7 +299,7 @@ export function CreateBoardDialog({
                 value={boardName}
                 onChange={(e) => setBoardName(e.target.value)}
                 placeholder="My Note Board"
-                maxLength={100}
+                maxLength={50}
                 autoFocus
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
@@ -356,7 +362,7 @@ export function CreateBoardDialog({
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="My Project"
-                maxLength={100}
+                maxLength={50}
                 autoFocus
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
@@ -516,7 +522,7 @@ export function CreateBoardDialog({
                 value={notebookName}
                 onChange={(e) => setNotebookName(e.target.value)}
                 placeholder="My notebook"
-                maxLength={100}
+                maxLength={50}
                 autoFocus
                 disabled={!canCreateNotebook}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"

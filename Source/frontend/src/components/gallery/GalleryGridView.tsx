@@ -93,18 +93,43 @@ export function GalleryGridView({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              <button
-                type="button"
-                onClick={() => onNew(kind)}
-                disabled={newDisabled}
-                className="group flex h-72 flex-col items-center justify-center gap-3 border-2 border-dashed border-border bg-surface/30 text-xs font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none"
-              >
-                <span className="flex h-10 w-10 items-center justify-center border-2 border-dashed border-foreground/25 transition-colors duration-150 group-hover:border-primary/50">
-                  <Plus className="h-4 w-4" />
-                </span>
-                {NEW_LABEL[kind]}
-              </button>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {kind === "project" ? (
+                <button
+                  type="button"
+                  onClick={() => onNew(kind)}
+                  className="group relative flex h-44 flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                >
+                  {/* dashed folder tab */}
+                  <span
+                    aria-hidden
+                    className="absolute left-4 top-1.5 h-8 w-[46%] rounded-t-lg border-2 border-b-0 border-dashed border-border transition-colors duration-150 group-hover:border-primary/50"
+                  />
+                  {/* dashed folder body */}
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 top-7 bottom-0 rounded-t-lg border-2 border-dashed border-border bg-surface/30 transition-colors duration-150 group-hover:border-primary/50 group-hover:bg-surface/60"
+                  />
+                  <span className="absolute inset-x-0 top-7 bottom-0 flex flex-col items-center justify-center gap-2 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 group-hover:text-primary">
+                    <span className="flex h-9 w-9 items-center justify-center border-2 border-dashed border-foreground/25 transition-colors duration-150 group-hover:border-primary/50">
+                      <Plus className="h-4 w-4" />
+                    </span>
+                    {NEW_LABEL[kind]}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onNew(kind)}
+                  disabled={newDisabled}
+                  className="group flex h-60 flex-col items-center justify-center gap-2.5 border-2 border-dashed border-border bg-surface/30 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center border-2 border-dashed border-foreground/25 transition-colors duration-150 group-hover:border-primary/50">
+                    <Plus className="h-4 w-4" />
+                  </span>
+                  {NEW_LABEL[kind]}
+                </button>
+              )}
 
               {items.map((item) => (
                 <GalleryCard

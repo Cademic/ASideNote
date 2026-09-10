@@ -8,6 +8,8 @@ import {
   PinOff,
   Trash2,
 } from "lucide-react";
+import { useRef } from "react";
+import { useRovingFocus } from "../../hooks/useRovingFocus";
 import type { GalleryItem } from "../../types/gallery";
 
 export interface GalleryItemMenuProps {
@@ -38,16 +40,22 @@ export function GalleryItemMenu({
 }: GalleryItemMenuProps) {
   const isProject = item.kind === "project";
   const canMoveToProject = !isProject;
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Arrow-key roving focus; first item focused on open, Tab closes.
+  useRovingFocus(menuRef, { onTabOut: onClose });
 
   return (
     <div
+      ref={menuRef}
       role="menu"
+      tabIndex={-1}
       data-gallery-item-menu
       className={`w-52 overflow-hidden border border-border bg-background py-1 text-left text-sm shadow-lg animate-dropdown-pop motion-reduce:animate-none ${className}`}
     >
       <button
         type="button"
         role="menuitem"
+        tabIndex={-1}
         onClick={() => {
           onClose();
           window.open(item.to, "_blank", "noopener,noreferrer");
@@ -60,6 +68,7 @@ export function GalleryItemMenu({
       <button
         type="button"
         role="menuitem"
+        tabIndex={-1}
         onClick={() => {
           onClose();
           onRename(item);
@@ -72,6 +81,7 @@ export function GalleryItemMenu({
       <button
         type="button"
         role="menuitem"
+        tabIndex={-1}
         onClick={() => {
           onClose();
           onTogglePin(item);
@@ -96,6 +106,7 @@ export function GalleryItemMenu({
               <button
                 type="button"
                 role="menuitem"
+                tabIndex={-1}
                 onClick={() => {
                   onClose();
                   onMoveToProject(item, null);
@@ -116,6 +127,7 @@ export function GalleryItemMenu({
                   key={project.id}
                   type="button"
                   role="menuitem"
+                  tabIndex={-1}
                   disabled={project.id === item.projectId}
                   onClick={() => {
                     onClose();
@@ -137,6 +149,7 @@ export function GalleryItemMenu({
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               onClose();
               onLeave(item);
@@ -150,6 +163,7 @@ export function GalleryItemMenu({
         <button
           type="button"
           role="menuitem"
+          tabIndex={-1}
           onClick={() => {
             onClose();
             onDelete(item);

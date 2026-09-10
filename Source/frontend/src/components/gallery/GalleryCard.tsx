@@ -153,7 +153,7 @@ export function GalleryCard({
   );
 
   const menu = menuOpen && (
-    <div className="absolute right-2 top-11 z-30" data-gallery-item-menu>
+    <div className="absolute right-2 top-10 z-30" data-gallery-item-menu>
       <GalleryItemMenu
         item={item}
         onClose={onCloseMenu}
@@ -188,33 +188,33 @@ export function GalleryCard({
           event.preventDefault();
           onOpenMenu();
         }}
-        className="group relative flex h-52 flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
+        className="group relative flex h-44 flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
       >
         {/* tab + back leaf */}
         <span
           aria-hidden
-          className={`absolute left-4 top-1.5 h-9 w-[46%] rounded-t-lg ${folder.back}`}
+          className={`absolute left-4 top-1 h-8 w-[46%] rounded-t-lg ${folder.back}`}
         />
         <span
           aria-hidden
-          className={`absolute inset-x-0 top-8 bottom-0 rounded-t-lg ${folder.back}`}
+          className={`absolute inset-x-0 top-7 bottom-0 rounded-t-lg ${folder.back}`}
         />
 
         {/* paper sheets peeking above the front leaf */}
         <span
           aria-hidden
-          className="absolute inset-x-5 top-[42px] bottom-6 rounded-[3px] bg-[#fdfdf7] shadow-sm transition-transform duration-200 ease-out group-hover:-translate-y-2 dark:bg-neutral-300 motion-reduce:transition-none motion-reduce:group-hover:transform-none"
+          className="absolute inset-x-5 top-[38px] bottom-6 rounded-[3px] bg-[#fdfdf7] shadow-sm transition-transform duration-200 ease-out group-hover:-translate-y-2 dark:bg-neutral-300 motion-reduce:transition-none motion-reduce:group-hover:transform-none"
         />
         <span
           aria-hidden
-          className="absolute inset-x-4 top-[48px] bottom-5 rounded-[3px] bg-[#f1ede0] transition-transform duration-200 ease-out group-hover:-translate-y-1 dark:bg-neutral-400 motion-reduce:transition-none motion-reduce:group-hover:transform-none"
+          className="absolute inset-x-4 top-[44px] bottom-5 rounded-[3px] bg-[#f1ede0] transition-transform duration-200 ease-out group-hover:-translate-y-1 dark:bg-neutral-400 motion-reduce:transition-none motion-reduce:group-hover:transform-none"
         />
 
         {/* front leaf — click target, carries the project info */}
         <button
           type="button"
           onClick={() => navigate(item.to)}
-          className={`absolute inset-x-0 top-14 bottom-0 flex flex-col rounded-t-lg ${folder.front} p-3.5 text-left shadow-[0_-6px_16px_rgba(0,0,0,0.22)] transition-shadow duration-150 group-hover:shadow-[0_-8px_22px_rgba(0,0,0,0.3)]`}
+          className={`absolute inset-x-0 top-12 bottom-0 flex flex-col rounded-t-lg ${folder.front} p-3 text-left shadow-[0_-6px_16px_rgba(0,0,0,0.22)] transition-shadow duration-150 group-hover:shadow-[0_-8px_22px_rgba(0,0,0,0.3)]`}
         >
           <span
             aria-hidden
@@ -295,13 +295,13 @@ export function GalleryCard({
         event.preventDefault();
         onOpenMenu();
       }}
-      className="group relative flex h-72 flex-col border border-border bg-background transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none"
+      className="group relative flex h-60 flex-col border border-border bg-background transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none"
     >
       <button
         type="button"
         onClick={() => navigate(item.to)}
         aria-label={`Open ${item.name}`}
-        className={`relative flex h-40 w-full items-center justify-center overflow-hidden ${kindThumb.panel}`}
+        className={`relative flex h-32 w-full items-center justify-center overflow-hidden ${kindThumb.panel}`}
       >
         {kindThumb.pattern && (
           <span
@@ -311,7 +311,7 @@ export function GalleryCard({
           />
         )}
         <Icon
-          className={`h-9 w-9 transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transform-none ${kindThumb.iconClass}`}
+          className={`h-8 w-8 transition-transform duration-150 ease-out group-hover:scale-110 motion-reduce:transform-none ${kindThumb.iconClass}`}
         />
       </button>
 

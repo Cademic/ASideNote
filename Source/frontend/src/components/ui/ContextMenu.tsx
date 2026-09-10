@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { constrainFixedBox, DROPDOWN_VIEWPORT_PADDING } from "../../lib/dropdown-viewport";
+import { useRovingFocus } from "../../hooks/useRovingFocus";
 
 export interface ContextMenuItem {
   label: React.ReactNode;
@@ -21,6 +22,10 @@ interface ContextMenuProps {
 export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
+
+  // Arrow-key roving focus, first-letter typeahead, focus first item on open,
+  // and return focus to the trigger on close. Escape / outside-click below.
+  useRovingFocus(menuRef, { onTabOut: onClose });
 
   const items = rawItems.flatMap((item, i) => {
     if (item.divider && i > 0) {
@@ -75,6 +80,7 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
         top: position.top,
       }}
       role="menu"
+      tabIndex={-1}
     >
       {items.map((item, i) => {
         if ("divider" in item && item.divider) {
@@ -86,6 +92,7 @@ export function ContextMenu({ x, y, items: rawItems, onClose }: ContextMenuProps
             key={i}
             type="button"
             role="menuitem"
+            tabIndex={-1}
             disabled={disabled}
             onClick={() => {
               if (!disabled) {

@@ -21,6 +21,7 @@ import { NoteBodyLimits } from "../../lib/tiptap-note-body-limits";
 import { stripHtmlForPlainText } from "../../lib/stripHtmlForPlainText";
 import { sanitizeHtml } from "../../utils/sanitize-html";
 import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
+import { useBoardItemKeyboardMove } from "../../hooks/useBoardItemKeyboardMove";
 
 interface StickyNoteProps {
   note: NoteSummaryDto;
@@ -593,6 +594,38 @@ function StickyNoteComponent({
 
   const edgeThickness = 6;
 
+  // Arrow keys move the note (keyboard equivalent of dragging); Enter edits.
+  const handleKeyboardMove = useBoardItemKeyboardMove({
+    position,
+    setPosition,
+    size,
+    onMoveEnd: useCallback(
+      (x: number, y: number) => onDragStopRef.current(note.id, x, y),
+      [note.id],
+    ),
+    onActivate: useCallback(() => {
+      pendingClickRef.current = { field: "content", yRatio: 1 };
+      onStartEdit(note.id);
+    }, [note.id, onStartEdit]),
+    onDelete: useCallback(() => {
+      const hasText =
+        stripHtmlForPlainText(note.title ?? "").trim().length > 0 ||
+        stripHtmlForPlainText(note.content ?? "").trim().length > 0;
+      if (hasText) setShowDeleteConfirm(true);
+      else onDelete(note.id);
+    }, [note.title, note.content, note.id, onDelete]),
+    onBringToFront: useCallback(
+      () => onBringToFront?.(note.id),
+      [onBringToFront, note.id],
+    ),
+    disabled: isEditing || isResizing,
+    boardMinX,
+    boardMinY,
+    boardMaxX,
+    boardMaxY,
+  });
+  const plainTitle = note.title ? stripHtmlForPlainText(note.title) : "";
+
   // Close menu on outside click
   useEffect(() => {
     if (!menuOpen) return;
@@ -656,12 +689,16 @@ function StickyNoteComponent({
         ref={nodeRef}
         data-board-item="note"
         data-note-id={note.id}
-        className="absolute overflow-visible will-change-transform"
+        role="group"
+        tabIndex={isEditing ? -1 : 0}
+        aria-label={`Sticky note${plainTitle ? `: ${plainTitle}` : ""}. Arrow keys move, Enter edits, Delete removes.`}
+        className="absolute overflow-visible rounded will-change-transform"
         style={{
           width: `${size.width}px`,
           minHeight: `${size.height}px`,
           zIndex,
         }}
+        onKeyDown={handleKeyboardMove}
         onMouseDown={() => onBringToFront?.(note.id)}
         onDragStart={(e) => {
           // Selected text inside the note is natively draggable in the browser. Without

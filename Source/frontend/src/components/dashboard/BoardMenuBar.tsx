@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
+import { useCloseOnEscape } from "../../hooks/useCloseOnEscape";
 import {
   Save,
   Upload,
@@ -92,6 +93,7 @@ export function BoardMenuBar({
   const chalkTouchStartedOnScrollableRef = useRef(false);
 
   const closeMenu = () => setOpenMenu(null);
+  useCloseOnEscape(openMenu !== null, closeMenu);
 
   useLayoutEffect(() => {
     if (!openMenu || !dropdownPanelRef.current) return;
@@ -229,6 +231,8 @@ export function BoardMenuBar({
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
+          aria-haspopup="true"
+          aria-expanded={openMenu === "file"}
           className={menuTriggerClass("file")}
         >
           File
@@ -269,6 +273,8 @@ export function BoardMenuBar({
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "edit" ? null : "edit")}
+          aria-haspopup="true"
+          aria-expanded={openMenu === "edit"}
           className={menuTriggerClass("edit")}
         >
           Edit
@@ -309,6 +315,8 @@ export function BoardMenuBar({
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "insert" ? null : "insert")}
+          aria-haspopup="true"
+          aria-expanded={openMenu === "insert"}
           className={menuTriggerClass("insert")}
         >
           Insert
@@ -362,6 +370,8 @@ export function BoardMenuBar({
         <button
           type="button"
           onClick={() => setOpenMenu(openMenu === "view" ? null : "view")}
+          aria-haspopup="true"
+          aria-expanded={openMenu === "view"}
           className={menuTriggerClass("view")}
         >
           View
@@ -493,6 +503,8 @@ export function BoardMenuBar({
                         <button
                           type="button"
                           onClick={() => setOpenMenu(openMenu === "file" ? null : "file")}
+                          aria-haspopup="true"
+                          aria-expanded={openMenu === "file"}
                           className={menuTriggerClass("file")}
                         >
                           File
@@ -500,6 +512,8 @@ export function BoardMenuBar({
                         <button
                           type="button"
                           onClick={() => setOpenMenu(openMenu === "edit" ? null : "edit")}
+                          aria-haspopup="true"
+                          aria-expanded={openMenu === "edit"}
                           className={menuTriggerClass("edit")}
                         >
                           Edit
@@ -507,6 +521,8 @@ export function BoardMenuBar({
                         <button
                           type="button"
                           onClick={() => setOpenMenu(openMenu === "insert" ? null : "insert")}
+                          aria-haspopup="true"
+                          aria-expanded={openMenu === "insert"}
                           className={menuTriggerClass("insert")}
                         >
                           Insert
@@ -514,6 +530,8 @@ export function BoardMenuBar({
                         <button
                           type="button"
                           onClick={() => setOpenMenu(openMenu === "view" ? null : "view")}
+                          aria-haspopup="true"
+                          aria-expanded={openMenu === "view"}
                           className={menuTriggerClass("view")}
                         >
                           View

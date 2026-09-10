@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useId, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -23,25 +24,16 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const messageId = useId();
 
-  // Focus the cancel button when dialog opens (safer default)
-  useEffect(() => {
-    if (isOpen) {
-      // Small delay to ensure DOM is rendered
-      const timer = setTimeout(() => confirmRef.current?.focus(), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [isOpen, onCancel]);
+  // Trap focus, restore it to the opener on close, lock scroll, close on Escape.
+  useFocusTrap(dialogRef, {
+    active: isOpen,
+    onEscape: onCancel,
+    initialFocusRef: confirmRef,
+  });
 
   if (!isOpen) return null;
 
@@ -58,14 +50,22 @@ export function ConfirmDialog({
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 overflow-hidden animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+        className="relative mx-4 w-full max-w-sm min-w-0 rounded-2xl border border-[var(--land-rule)] bg-[var(--land-paper)] p-6 overflow-hidden animate-dialog-enter motion-reduce:animate-none"
+      >
         {/* Close button */}
         <button
           type="button"
           onClick={onCancel}
+          aria-label="Close"
           className="absolute right-4 top-4 rounded-lg p-1 text-[var(--land-ink-3)] transition-colors hover:bg-[var(--land-cream)] hover:text-[var(--land-ink)]"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden />
         </button>
 
         {/* Icon + Content */}
@@ -88,8 +88,8 @@ export function ConfirmDialog({
           </div>
 
           <div className="min-w-0 flex-1 overflow-hidden pr-4">
-            <h3 className="text-sm font-semibold text-foreground break-words">{title}</h3>
-            <p className="mt-1.5 text-sm text-foreground/50 break-words">{message}</p>
+            <h3 id={titleId} className="text-sm font-semibold text-foreground break-words">{title}</h3>
+            <p id={messageId} className="mt-1.5 text-sm text-foreground/50 break-words">{message}</p>
           </div>
         </div>
 

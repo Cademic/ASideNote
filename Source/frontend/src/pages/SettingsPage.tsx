@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { Save, Loader2, LogOut, Trash2, Lock } from "lucide-react";
@@ -65,6 +66,11 @@ export function SettingsPage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteModal = useModalDialog(
+    deleteModalOpen,
+    () => setDeleteModalOpen(false),
+    { moveFocusIn: true },
+  );
 
   const loadData = useCallback(async () => {
     setProfileError(null);
@@ -535,9 +541,13 @@ export function SettingsPage() {
 
       {/* Delete account confirmation modal */}
       {deleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
-            <h2 id="delete-modal-title" className="mb-2 text-lg font-semibold text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            ref={deleteModal.dialogRef}
+            {...deleteModal.ariaProps}
+            className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl"
+          >
+            <h2 id={deleteModal.titleId} className="mb-2 text-lg font-semibold text-foreground">
               Delete account
             </h2>
             <p className="mb-4 text-sm text-foreground/70">

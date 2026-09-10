@@ -9,6 +9,8 @@ interface CalendarGridProps {
   events: CalendarEventDto[];
   projects: ProjectSummaryDto[];
   onClickDay: (date: Date) => void;
+  /** Drill into a focused view for the date (month view → day view). */
+  onSelectDate?: (date: Date) => void;
   onClickEvent: (event: CalendarEventDto) => void;
   onClickProject?: (project: ProjectSummaryDto) => void;
   /** Map of projectId -> project name for displaying on events */
@@ -72,6 +74,7 @@ export function CalendarGrid({
   events,
   projects,
   onClickDay,
+  onSelectDate,
   onClickEvent,
   onClickProject,
   projectNameMap,
@@ -99,13 +102,13 @@ export function CalendarGrid({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
-      {/* Weekday headers */}
-      <div className="calendar-day-cell grid grid-cols-7 divide-x divide-border/40 border-b border-border">
+    <div className="flex flex-col overflow-hidden border border-border">
+      {/* Weekday headers — same type + surface as the day/week time grid */}
+      <div className="grid shrink-0 grid-cols-7 border-b border-border bg-foreground/[0.02]">
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="px-2 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-foreground/50"
+            className="border-r border-border px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-foreground/50"
           >
             {day}
           </div>
@@ -113,7 +116,7 @@ export function CalendarGrid({
       </div>
 
       {/* Day cells */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 auto-rows-[minmax(7rem,1fr)]">
         {days.map((date, index) => (
           <CalendarDayCell
             key={index}
@@ -123,6 +126,7 @@ export function CalendarGrid({
             events={getEventsForDay(date)}
             projects={getProjectsForDay(date)}
             onClickDay={onClickDay}
+            onSelectDate={onSelectDate}
             onClickEvent={onClickEvent}
             onClickProject={onClickProject}
             projectNameMap={projectNameMap}

@@ -206,10 +206,10 @@ export function GalleryPage() {
                 <div className="skeleton h-3 w-56" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="skeleton h-8 w-16 rounded-lg" />
-              <div className="skeleton h-8 w-20 rounded-lg" />
-              <div className="skeleton h-8 w-40 rounded-lg" />
+            <div className="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide sm:min-w-fit sm:flex-shrink-0">
+              <div className="skeleton h-8 w-16 flex-shrink-0 rounded-lg" />
+              <div className="skeleton h-8 w-20 flex-shrink-0 rounded-lg" />
+              <div className="skeleton h-8 w-40 flex-shrink-0 rounded-lg" />
             </div>
           </div>
 
@@ -222,10 +222,10 @@ export function GalleryPage() {
                   <div className="skeleton h-5 w-28" />
                   <div className="skeleton h-5 w-6 rounded-full" />
                 </div>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  <div className="h-72 border-2 border-dashed border-border" />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                  <div className="h-60 border-2 border-dashed border-border" />
                   {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="skeleton h-52 self-end" />
+                    <div key={index} className="skeleton h-44 self-end" />
                   ))}
                 </div>
                 {section === 0 && (
@@ -273,17 +273,7 @@ export function GalleryPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-px sm:flex-shrink-0">
-            <button
-              type="button"
-              data-tutorial-target="new-board-button"
-              onClick={() => requestCreate()}
-              className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New
-            </button>
-
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto scroll-smooth scrollbar-hide py-px sm:min-w-fit sm:flex-shrink-0">
             <div className="flex-shrink-0">
               <GalleryFilterPanel
                 filters={filters}

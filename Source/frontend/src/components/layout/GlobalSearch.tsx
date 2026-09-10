@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { useGlobalSearch } from "../../context/GlobalSearchContext";
 import { useDebounce } from "../../hooks/useDebounce";
-import { fitFixedDropdownToViewport } from "../../lib/dropdown-viewport";
 import {
   buildSnippet,
   matchesTokens,
@@ -43,6 +42,8 @@ import {
 
 const DEBOUNCE_MS = 200;
 const MIN_PANEL_WIDTH = 380;
+/** Keep the panel this far from the viewport edges. */
+const PANEL_VIEWPORT_PADDING = 8;
 
 const KIND_ICON: Record<SearchEntryKind, ComponentType<{ className?: string }>> = {
   note: StickyNote,
@@ -269,14 +270,24 @@ export function GlobalSearch() {
   }, [focusNonce]);
 
   /* ── Position the fixed portal under the input ──────────── */
+  // Anchors the panel just below the input and clamps it horizontally into the
+  // viewport. The panel's own max-height (see its style) keeps it inside the
+  // viewport vertically, so it never needs to flip up over the search bar.
   const syncPosition = useCallback(() => {
     const el = inputRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    setDropdownStyle({ left: rect.left, top: rect.bottom + 6 });
-    setPanelWidth(
-      Math.min(Math.max(rect.width, MIN_PANEL_WIDTH), window.innerWidth - 16),
+    const width = Math.min(
+      Math.max(rect.width, MIN_PANEL_WIDTH),
+      window.innerWidth - 2 * PANEL_VIEWPORT_PADDING,
     );
+    let left = rect.left;
+    if (left + width > window.innerWidth - PANEL_VIEWPORT_PADDING) {
+      left = window.innerWidth - PANEL_VIEWPORT_PADDING - width;
+    }
+    if (left < PANEL_VIEWPORT_PADDING) left = PANEL_VIEWPORT_PADDING;
+    setDropdownStyle({ left, top: rect.bottom + 6 });
+    setPanelWidth(width);
   }, []);
 
   useLayoutEffect(() => {
@@ -286,16 +297,6 @@ export function GlobalSearch() {
     }
     syncPosition();
   }, [isOpen, syncPosition]);
-
-  useLayoutEffect(() => {
-    if (!isOpen || !dropdownStyle || !panelRef.current) return;
-    const el = panelRef.current;
-    const fit = () => fitFixedDropdownToViewport(el, setDropdownStyle);
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isOpen, dropdownStyle]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -423,7 +424,11 @@ export function GlobalSearch() {
               left: dropdownStyle.left,
               top: dropdownStyle.top,
               width: panelWidth,
-              maxHeight: "min(70vh, 32rem)",
+              // Never spill past the viewport bottom — the panel scrolls
+              // internally instead of flipping up over the search bar.
+              maxHeight: `min(70vh, 32rem, calc(100vh - ${
+                dropdownStyle.top + PANEL_VIEWPORT_PADDING
+              }px))`,
             }}
             onMouseDown={(e) => e.preventDefault()}
           >

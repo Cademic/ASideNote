@@ -153,6 +153,7 @@ export function SidebarRail() {
   return (
     <div
       {...separatorProps}
+      data-a11y-focus="self"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

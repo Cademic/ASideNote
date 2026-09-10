@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useModalDialog } from "../../hooks/useModalDialog";
 import { X, Repeat } from "lucide-react";
 import type { CalendarEventDto } from "../../types";
 import type { CalendarEventFormData } from "../../utils/calendar-event-save";
@@ -77,8 +78,10 @@ export function CreateEventDialog({
       setTitle("");
       setDescription("");
       setStartDate(initialDate ?? toLocalDateStr(new Date()));
-      // Inside a project calendar, default the end date to the project's end date
-      setEndDate(projectEndDate ? formatDateForInput(projectEndDate) : "");
+      // New items start life on a single day — a note stays there, an event's end
+      // date can be extended afterwards. (Notably NOT defaulted to a project's
+      // end date, which would make every new item span the whole project.)
+      setEndDate("");
       setStartTime(initialTime ?? "09:00");
       setEndTime(initialTime ? addOneHour(initialTime) : "10:00");
       setIsAllDay(initialAllDay ?? true);
@@ -88,11 +91,13 @@ export function CreateEventDialog({
       setRecurrenceInterval(1);
       setRecurrenceEndDate("");
     }
-  }, [isOpen, editEvent, initialDate, initialTime, initialEventType, initialAllDay, projectEndDate]);
+  }, [isOpen, editEvent, initialDate, initialTime, initialEventType, initialAllDay]);
 
   // Compute date boundaries when inside a project calendar
   const minDate = projectStartDate ? formatDateForInput(projectStartDate) : undefined;
   const maxDate = projectEndDate ? formatDateForInput(projectEndDate) : undefined;
+
+  const { dialogRef, titleId, ariaProps } = useModalDialog(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -100,9 +105,10 @@ export function CreateEventDialog({
     e.preventDefault();
     if (!title.trim()) return;
 
-    // A timed event with an end time but no explicit end date ends on the start
-    // day; an end time at or before the start time means it runs past midnight.
-    let resolvedEndDate = endDate;
+    // A note always lives on a single day. A timed event with an end time but no
+    // explicit end date ends on the start day; an end time at or before the start
+    // time means it runs past midnight.
+    let resolvedEndDate = eventType === "Note" ? "" : endDate;
     if (eventType === "Event" && !isAllDay && !resolvedEndDate) {
       resolvedEndDate = endTime > startTime ? startDate : addDays(startDate, 1);
     }
@@ -135,15 +141,20 @@ export function CreateEventDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40 animate-overlay-enter motion-reduce:animate-none" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto animate-dialog-enter motion-reduce:animate-none">
+      <div
+        ref={dialogRef}
+        {...ariaProps}
+        className="relative z-10 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl max-h-[90vh] overflow-y-auto animate-dialog-enter motion-reduce:animate-none"
+      >
         {/* Header */}
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 id={titleId} className="text-lg font-semibold text-foreground">
             {editEvent ? "Edit" : "New"} {eventType === "Note" ? "Note" : "Event"}
           </h2>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="rounded-lg p-1.5 text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             <X className="h-4 w-4" />
@@ -418,11 +429,18 @@ function formatDateForInput(isoStr: string): string {
   return `${year}-${month}-${day}`;
 }
 
-/** "HH:MM" one hour later, clamped to 23:00 so a late click doesn't roll past midnight. */
+/**
+ * "HH:MM" one hour later, clamped to 23:59 so a late click still yields an end
+ * time strictly after the start — keeping the item on a single day rather than
+ * rolling it into the all-day strip as a multi-day event.
+ */
 function addOneHour(time: string): string {
   const [h, m] = time.split(":").map(Number);
-  const nextHour = Math.min(23, (h ?? 0) + 1);
-  return `${String(nextHour).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")}`;
+  const total = (h ?? 0) * 60 + (m ?? 0) + 60;
+  if (total >= 24 * 60) return "23:59";
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(
+    total % 60,
+  ).padStart(2, "0")}`;
 }
 
 function extractTime(isoStr: string): string {

@@ -81,6 +81,7 @@ function FontFamilySearchActive({
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [dropdownStyle, setDropdownStyle] = useState<{ left: number; top: number } | null>(null);
   const [panelMinWidth, setPanelMinWidth] = useState<number>(192);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,6 +95,17 @@ function FontFamilySearchActive({
       (f) => f.label.toLowerCase().includes(q) || f.value.toLowerCase().includes(q),
     );
   }, [query]);
+
+  // Keep the active option in range and scrolled into view as the list changes.
+  useEffect(() => {
+    setActiveIndex((i) => Math.max(0, Math.min(i, filtered.length - 1)));
+  }, [filtered.length]);
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current
+      ?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
 
   const applyFont = useCallback(
     (value: string) => {
@@ -164,6 +176,7 @@ function FontFamilySearchActive({
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
+    setActiveIndex(0);
     if (!open) setOpen(true);
   };
 
@@ -173,6 +186,32 @@ function FontFamilySearchActive({
       setOpen(false);
       setQuery("");
       inputRef.current?.blur();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+      return;
+    }
+    if (e.key === "Home" && open) {
+      e.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (e.key === "End" && open) {
+      e.preventDefault();
+      setActiveIndex(filtered.length - 1);
+      return;
+    }
+    if (e.key === "Enter" && open && filtered[activeIndex]) {
+      e.preventDefault();
+      applyFont(filtered[activeIndex].value);
     }
   };
 
@@ -211,13 +250,17 @@ function FontFamilySearchActive({
         {showEmpty ? (
           <div className={emptyText}>No fonts match</div>
         ) : (
-          filtered.map((f) => (
+          filtered.map((f, i) => (
             <button
               key={f.value}
+              id={`${listboxId}-opt-${i}`}
+              data-option-index={i}
               type="button"
               role="option"
-              className={`flex w-full ${rowText}`}
+              aria-selected={i === activeIndex}
+              className={`flex w-full ${rowText} ${i === activeIndex ? "bg-sky-100 dark:bg-sky-900/40" : ""}`}
               style={{ fontFamily: f.value }}
+              onMouseEnter={() => setActiveIndex(i)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 applyFont(f.value);
@@ -240,6 +283,9 @@ function FontFamilySearchActive({
         aria-expanded={open}
         aria-controls={listboxId}
         aria-autocomplete="list"
+        aria-activedescendant={
+          open && filtered[activeIndex] ? `${listboxId}-opt-${activeIndex}` : undefined
+        }
         placeholder="Search fonts…"
         title="Font family — type to filter"
         value={open ? query : currentLabel}
@@ -290,6 +336,9 @@ export function FontFamilySearchMenu({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const listboxId = useId();
+  const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -299,14 +348,52 @@ export function FontFamilySearchMenu({
     );
   }, [query]);
 
+  useEffect(() => {
+    setActiveIndex((i) => Math.max(0, Math.min(i, filtered.length - 1)));
+  }, [filtered.length]);
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-option-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
   return (
     <div className={`flex flex-col gap-1 px-2 py-1.5 ${className}`}>
       <input
         type="search"
+        role="combobox"
+        aria-expanded
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          filtered[activeIndex] ? `${listboxId}-opt-${activeIndex}` : undefined
+        }
         placeholder="Search fonts…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setActiveIndex(0);
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActiveIndex((i) => Math.max(i - 1, 0));
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            setActiveIndex(0);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            setActiveIndex(filtered.length - 1);
+          } else if (e.key === "Enter" && filtered[activeIndex]) {
+            e.preventDefault();
+            onPick(filtered[activeIndex].value);
+            setQuery("");
+          }
+        }}
         onMouseDown={(e) => e.stopPropagation()}
         className={`${defaultInputMenu} w-full`}
         autoComplete="off"
@@ -314,23 +401,31 @@ export function FontFamilySearchMenu({
         aria-label="Search fonts"
       />
       <div
+        ref={listRef}
+        id={listboxId}
+        role="listbox"
         className="max-h-48 overflow-y-auto rounded border border-border/60 bg-background py-0.5"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {filtered.length === 0 ? (
           <div className="px-2 py-1.5 text-sm text-muted-foreground">No fonts match</div>
         ) : (
-          filtered.map((f) => {
+          filtered.map((f, i) => {
             const selected = currentFontValue === f.value;
             return (
               <button
                 key={f.value}
+                id={`${listboxId}-opt-${i}`}
+                data-option-index={i}
                 type="button"
+                role="option"
+                aria-selected={selected}
                 className={`flex w-full px-2 py-1.5 text-left text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20 ${
-                  selected ? "bg-sky-50 dark:bg-sky-900/30" : ""
+                  i === activeIndex ? "bg-sky-100 dark:bg-sky-900/40" : selected ? "bg-sky-50 dark:bg-sky-900/30" : ""
                 }`}
                 style={{ fontFamily: f.value }}
                 title={f.label}
+                onMouseEnter={() => setActiveIndex(i)}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

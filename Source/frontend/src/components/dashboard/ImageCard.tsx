@@ -1,9 +1,10 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Draggable, { type DraggableEventHandler } from "react-draggable";
 import { X, GripVertical } from "lucide-react";
 import type { BoardImageSummaryDto } from "../../types";
 import { useBoardItemResize, type ResizeDir } from "../../hooks/useBoardItemResize";
+import { useBoardItemKeyboardMove } from "../../hooks/useBoardItemKeyboardMove";
 
 const DEFAULT_WIDTH = 200;
 const DEFAULT_HEIGHT = 150;
@@ -120,6 +121,27 @@ function ImageCardComponent({
 
   const edgeThickness = 6;
 
+  // Arrow keys move the image (keyboard equivalent of dragging).
+  const handleKeyboardMove = useBoardItemKeyboardMove({
+    position,
+    setPosition,
+    size,
+    onMoveEnd: useCallback(
+      (x: number, y: number) => onDragStopRef.current(image.id, x, y),
+      [image.id],
+    ),
+    onDelete: useCallback(() => setShowDeleteConfirm(true), []),
+    onBringToFront: useCallback(
+      () => onBringToFront?.(image.id),
+      [onBringToFront, image.id],
+    ),
+    disabled: isResizing,
+    boardMinX,
+    boardMinY,
+    boardMaxX,
+    boardMaxY,
+  });
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
@@ -134,6 +156,9 @@ function ImageCardComponent({
       <div
         ref={nodeRef}
         data-board-item="image"
+        role="group"
+        tabIndex={0}
+        aria-label="Board image. Arrow keys move, Delete removes."
         className="absolute overflow-visible rounded-lg shadow-lg bg-white dark:bg-zinc-800 border border-black/10 dark:border-white/10 will-change-transform"
         style={{
           width: `${size.width}px`,
@@ -142,6 +167,7 @@ function ImageCardComponent({
           transformOrigin: "center center",
           rotate: `${image.rotation ?? 0}deg`,
         }}
+        onKeyDown={handleKeyboardMove}
         onMouseDown={() => onBringToFront?.(image.id)}
         onContextMenu={(e) => {
           e.preventDefault();

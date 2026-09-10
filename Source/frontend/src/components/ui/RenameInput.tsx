@@ -25,7 +25,7 @@ export function RenameInput({
     <input
       autoFocus
       value={value}
-      maxLength={100}
+      maxLength={50}
       onChange={(e) => onChange(e.target.value)}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {

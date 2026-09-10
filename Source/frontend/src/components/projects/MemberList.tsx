@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { useNudgeDropdownToViewport } from "../../lib/useDropdownViewport";
+import { useRovingFocus } from "../../hooks/useRovingFocus";
+import { useCloseOnEscape } from "../../hooks/useCloseOnEscape";
 import {
   Crown,
   Eye,
@@ -151,6 +153,11 @@ function MemberRow({
   const roleMenuPanelRef = useRef<HTMLDivElement>(null);
 
   useNudgeDropdownToViewport(isRoleOpen, roleMenuPanelRef);
+  useRovingFocus(roleMenuPanelRef, {
+    active: isRoleOpen,
+    onTabOut: () => setIsRoleOpen(false),
+  });
+  useCloseOnEscape(isRoleOpen, () => setIsRoleOpen(false));
 
   const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.Viewer;
   const Icon = config.icon;
@@ -207,6 +214,9 @@ function MemberRow({
           <button
             type="button"
             onClick={() => setIsRoleOpen(!isRoleOpen)}
+            aria-haspopup="menu"
+            aria-expanded={isRoleOpen}
+            aria-label={`Change role for ${member.email}, currently ${member.role}`}
             className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-opacity duration-150 ${config.bg} ${config.className} hover:opacity-80 motion-reduce:transition-none`}
           >
             <Icon className="h-3 w-3" />
@@ -224,6 +234,9 @@ function MemberRow({
               />
               <div
                 ref={roleMenuPanelRef}
+                role="menu"
+                tabIndex={-1}
+                aria-label="Member role"
                 className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,calc(100vh-2rem))] w-32 max-w-[min(8rem,calc(100vw-1rem))] overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg"
               >
                 {(["Editor", "Viewer"] as const).map((role) => {
@@ -233,6 +246,9 @@ function MemberRow({
                     <button
                       key={role}
                       type="button"
+                      role="menuitemradio"
+                      tabIndex={-1}
+                      aria-checked={member.role === role}
                       onClick={() => handleRoleChange(role)}
                       className={`flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors hover:bg-foreground/5 ${
                         member.role === role
