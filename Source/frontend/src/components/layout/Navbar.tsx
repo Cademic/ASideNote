@@ -104,11 +104,6 @@ export function Navbar({
     [location.pathname, boardName],
   );
 
-  // On the dashboard at mobile widths the breadcrumb is just "Dashboard" (redundant with the
-  // page's own welcome heading), so we drop it and let the workspace search take its place.
-  const isMobileDashboard =
-    Boolean(showMenuButton) && location.pathname === "/dashboard";
-
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -151,7 +146,7 @@ export function Navbar({
           </button>
         )}
         <nav
-          className={`${isMobileDashboard ? "hidden" : "flex"} items-center gap-1.5 min-w-0 flex-1 overflow-hidden`}
+          className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden"
           aria-label="Breadcrumb"
         >
           {breadcrumbs.map((seg, i) => {
@@ -195,15 +190,11 @@ export function Navbar({
         </nav>
       </div>
 
-      {/* Center: global workspace search — always shown on the mobile dashboard, where it
-          replaces the breadcrumb; elsewhere it stays a tablet-and-up affordance. Its
-          `max-w-md` box sits between two equal `flex-1` groups, so it stays centered
-          in the navbar regardless of how wide the breadcrumb or user menu get. */}
-      <div
-        className={`mx-2 flex-1 min-w-0 max-w-md justify-center md:mx-6 ${
-          isMobileDashboard ? "flex" : "hidden sm:flex"
-        }`}
-      >
+      {/* Center: global workspace search — a tablet-and-up affordance (hidden on mobile,
+          where navbar space is tight; ⌘K/Ctrl+K still opens it regardless). Its `max-w-md`
+          box sits between two equal `flex-1` groups, so it stays centered in the navbar
+          regardless of how wide the breadcrumb or user menu get. */}
+      <div className="mx-2 hidden flex-1 min-w-0 max-w-md justify-center sm:flex md:mx-6">
         <GlobalSearch />
       </div>
 

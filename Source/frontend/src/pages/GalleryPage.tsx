@@ -222,10 +222,10 @@ export function GalleryPage() {
                   <div className="skeleton h-5 w-28" />
                   <div className="skeleton h-5 w-6 rounded-full" />
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-                  <div className="h-60 border-2 border-dashed border-border" />
+                <div className="flex gap-3 overflow-hidden">
+                  <div className="h-64 w-56 shrink-0 border-2 border-dashed border-border" />
                   {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="skeleton h-44 self-end" />
+                    <div key={index} className="skeleton h-52 w-56 shrink-0 self-end" />
                   ))}
                 </div>
                 {section === 0 && (
