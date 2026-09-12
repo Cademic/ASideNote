@@ -353,7 +353,7 @@ export function CalendarTimeGrid({
                       }
                       className={`absolute overflow-hidden rounded border px-1.5 py-0.5 text-left leading-tight ${colors.bg} ${colors.text} ${colors.border} transition-[box-shadow,transform] duration-150 motion-reduce:transition-none ${
                         isHovered
-                          ? "scale-[1.04] shadow-lg ring-1 ring-black/10 dark:ring-white/20"
+                          ? "scale-[1.015] shadow-lg ring-1 ring-black/10 dark:ring-white/20"
                           : ""
                       }`}
                       style={{

@@ -119,7 +119,7 @@ export function GalleryListRow({
             <div className="flex items-center gap-1.5">
               <Link
                 to={item.to}
-                className="truncate font-medium text-foreground hover:underline focus-visible:underline"
+                className="min-w-0 flex-1 truncate font-medium text-foreground hover:underline focus-visible:underline"
               >
                 {item.name}
               </Link>
@@ -134,9 +134,9 @@ export function GalleryListRow({
               )}
             </div>
             {item.projectName && (
-              <div className="flex items-center gap-1 text-xs text-foreground/40">
+              <div className="flex min-w-0 items-center gap-1 text-xs text-foreground/40">
                 <ProjectIcon className="h-3 w-3 shrink-0" />
-                <span className="truncate">{item.projectName}</span>
+                <span className="min-w-0 flex-1 truncate">{item.projectName}</span>
                 {isShared && (
                   <span className="shrink-0 text-sky-500">· shared</span>
                 )}

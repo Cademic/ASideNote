@@ -228,7 +228,7 @@ export function GalleryCard({
                 aria-label="Pinned"
               />
             )}
-            <span className="line-clamp-2 flex-1 text-sm font-semibold leading-snug text-white">
+            <span className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-snug text-white">
               {item.name}
             </span>
             {isShared && (
@@ -259,7 +259,7 @@ export function GalleryCard({
           )}
 
           <div className="relative mt-auto flex items-center justify-between gap-2 pt-2 text-[11px] text-white/80">
-            <span className="truncate">
+            <span className="min-w-0 flex-1 truncate">
               Edited {formatRelativeDate(item.updatedAt)}
             </span>
             {item.projectStatus && (
@@ -333,14 +333,14 @@ export function GalleryCard({
                 aria-label="Pinned"
               />
             )}
-            <span className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+            <span className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
               {item.name}
             </span>
           </div>
           {item.projectName && (
-            <div className="flex items-center gap-1 text-[11px] text-foreground/45">
+            <div className="flex min-w-0 items-center gap-1 text-[11px] text-foreground/45">
               <ProjectIcon className="h-3 w-3 shrink-0" />
-              <span className="truncate">{item.projectName}</span>
+              <span className="min-w-0 flex-1 truncate">{item.projectName}</span>
               {isShared && (
                 <span className="shrink-0 text-sky-500" title="Shared with you">
                   · shared
@@ -355,7 +355,7 @@ export function GalleryCard({
           )}
         </div>
         <div className="flex items-center justify-between gap-2 text-xs text-foreground/50">
-          <span className="truncate">
+          <span className="min-w-0 flex-1 truncate">
             Edited {formatRelativeDate(item.updatedAt)}
           </span>
           {countBadge ? (
