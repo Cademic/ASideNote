@@ -280,11 +280,13 @@ export function CalendarsPage() {
         case "y": setView("year"); break;
         case "a": case "e": setView("events"); break;
         case "t": setCurrentDate(new Date()); break;
+        case "arrowleft": handlePrev(); break;
+        case "arrowright": handleNext(); break;
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dialogOpen, detailsEvent]);
+  }, [dialogOpen, detailsEvent, view]);
 
   // Built-in holidays for a window covering the active view (togglable in Settings).
   const [holidayFrom, holidayTo] = useMemo(() => {
@@ -421,7 +423,7 @@ export function CalendarsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="scrollbar-thin h-full overflow-y-auto bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header — same shape as the Gallery page */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

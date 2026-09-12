@@ -200,7 +200,7 @@ export function Navbar({
           `max-w-md` box sits between two equal `flex-1` groups, so it stays centered
           in the navbar regardless of how wide the breadcrumb or user menu get. */}
       <div
-        className={`mx-2 w-full min-w-0 max-w-md justify-center md:mx-6 ${
+        className={`mx-2 flex-1 min-w-0 max-w-md justify-center md:mx-6 ${
           isMobileDashboard ? "flex" : "hidden sm:flex"
         }`}
       >
