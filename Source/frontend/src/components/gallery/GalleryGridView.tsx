@@ -7,6 +7,7 @@ import {
   Plus,
 } from "lucide-react";
 import { GalleryCard } from "./GalleryCard";
+import { GalleryCarouselRow } from "./GalleryCarouselRow";
 import {
   GALLERY_KIND_LABELS,
   type GalleryGroup,
@@ -43,7 +44,7 @@ interface GalleryGridViewProps {
   activeProjects: Array<{ id: string; name: string }>;
 }
 
-/** Sectioned-by-kind card grid. Every card is the same fixed size; each section leads with a "New X" tile. */
+/** Sectioned-by-kind horizontal carousel. Every card is the same fixed size; each section leads with a "New X" tile. */
 export function GalleryGridView({
   groups,
   visibleKinds,
@@ -93,12 +94,12 @@ export function GalleryGridView({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            <GalleryCarouselRow>
               {kind === "project" ? (
                 <button
                   type="button"
                   onClick={() => onNew(kind)}
-                  className="group relative flex h-44 flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                  className="group relative flex h-52 w-56 shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
                 >
                   {/* dashed folder tab */}
                   <span
@@ -122,7 +123,7 @@ export function GalleryGridView({
                   type="button"
                   onClick={() => onNew(kind)}
                   disabled={newDisabled}
-                  className="group flex h-60 flex-col items-center justify-center gap-2.5 border-2 border-dashed border-border bg-surface/30 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none"
+                  className="group flex h-64 w-56 shrink-0 snap-start flex-col items-center justify-center gap-2.5 border-2 border-dashed border-border bg-surface/30 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none"
                 >
                   <span className="flex h-9 w-9 items-center justify-center border-2 border-dashed border-foreground/25 transition-colors duration-150 group-hover:border-primary/50">
                     <Plus className="h-4 w-4" />
@@ -151,7 +152,7 @@ export function GalleryGridView({
                   activeProjects={activeProjects}
                 />
               ))}
-            </div>
+            </GalleryCarouselRow>
 
             {items.length === 0 && hasActiveNonKindFilter && (
               <p className="mt-3 text-xs text-foreground/40">
