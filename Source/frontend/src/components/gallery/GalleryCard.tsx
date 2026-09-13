@@ -188,7 +188,7 @@ export function GalleryCard({
           event.preventDefault();
           onOpenMenu();
         }}
-        className="group relative flex h-52 w-56 shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
+        className="group relative flex h-52 w-[calc(50%-0.375rem)] shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none lg:w-56"
       >
         {/* tab + back leaf */}
         <span
@@ -295,7 +295,7 @@ export function GalleryCard({
         event.preventDefault();
         onOpenMenu();
       }}
-      className="group relative flex h-64 w-56 shrink-0 snap-start flex-col border border-border bg-background transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none"
+      className="group relative flex h-64 w-[calc(50%-0.375rem)] shrink-0 snap-start flex-col border border-border bg-background transition-[transform,box-shadow,border-color] duration-150 ease-out hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:transform-none lg:w-56"
     >
       <button
         type="button"
