@@ -99,7 +99,7 @@ export function GalleryGridView({
                 <button
                   type="button"
                   onClick={() => onNew(kind)}
-                  className="group relative flex h-52 w-56 shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none"
+                  className="group relative flex h-52 w-[calc(50%-0.375rem)] shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none lg:w-56"
                 >
                   {/* dashed folder tab */}
                   <span
@@ -123,7 +123,7 @@ export function GalleryGridView({
                   type="button"
                   onClick={() => onNew(kind)}
                   disabled={newDisabled}
-                  className="group flex h-64 w-56 shrink-0 snap-start flex-col items-center justify-center gap-2.5 border-2 border-dashed border-border bg-surface/30 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none"
+                  className="group flex h-64 w-[calc(50%-0.375rem)] shrink-0 snap-start flex-col items-center justify-center gap-2.5 border-2 border-dashed border-border bg-surface/30 text-[11px] font-medium uppercase tracking-wide text-foreground/50 transition-colors duration-150 hover:border-primary/50 hover:bg-surface/60 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-surface/30 disabled:hover:text-foreground/50 motion-reduce:transition-none lg:w-56"
                 >
                   <span className="flex h-9 w-9 items-center justify-center border-2 border-dashed border-foreground/25 transition-colors duration-150 group-hover:border-primary/50">
                     <Plus className="h-4 w-4" />

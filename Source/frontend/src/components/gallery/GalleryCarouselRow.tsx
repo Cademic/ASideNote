@@ -46,7 +46,7 @@ export function GalleryCarouselRow({ children }: GalleryCarouselRowProps) {
   }
 
   return (
-    <div className="group/carousel relative">
+    <div className="group/carousel relative -mx-10 lg:mx-0">
       <div
         ref={scrollRef}
         className="flex snap-x snap-proximity gap-3 overflow-x-auto scroll-smooth scrollbar-hide pb-1"
@@ -59,7 +59,7 @@ export function GalleryCarouselRow({ children }: GalleryCarouselRowProps) {
           type="button"
           onClick={() => scrollByPage(-1)}
           aria-label="Scroll left"
-          className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background p-1.5 text-foreground/60 opacity-0 shadow-md transition-opacity hover:text-foreground group-hover/carousel:opacity-100 sm:flex"
+          className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background p-1.5 text-foreground/60 opacity-0 shadow-md transition-opacity hover:text-foreground group-hover/carousel:opacity-100 lg:flex"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -70,7 +70,7 @@ export function GalleryCarouselRow({ children }: GalleryCarouselRowProps) {
           type="button"
           onClick={() => scrollByPage(1)}
           aria-label="Scroll right"
-          className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background p-1.5 text-foreground/60 opacity-0 shadow-md transition-opacity hover:text-foreground group-hover/carousel:opacity-100 sm:flex"
+          className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background p-1.5 text-foreground/60 opacity-0 shadow-md transition-opacity hover:text-foreground group-hover/carousel:opacity-100 lg:flex"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
