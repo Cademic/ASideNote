@@ -112,14 +112,14 @@ export function GalleryListRow({
       }}
       onContextMenu={openFromContextMenu}
     >
-      <td className="max-w-0 py-2 pl-4 pr-3">
+      <td className="py-2 pl-4 pr-3">
         <div className="flex items-center gap-2.5">
           <Icon className={`h-4 w-4 shrink-0 ${iconClass}`} />
-          <div className="min-w-0">
+          <div>
             <div className="flex items-center gap-1.5">
               <Link
                 to={item.to}
-                className="min-w-0 flex-1 truncate font-medium text-foreground hover:underline focus-visible:underline"
+                className="whitespace-nowrap font-medium text-foreground hover:underline focus-visible:underline"
               >
                 {item.name}
               </Link>
@@ -134,9 +134,9 @@ export function GalleryListRow({
               )}
             </div>
             {item.projectName && (
-              <div className="flex min-w-0 items-center gap-1 text-xs text-foreground/40">
+              <div className="flex items-center gap-1 text-xs text-foreground/40">
                 <ProjectIcon className="h-3 w-3 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{item.projectName}</span>
+                <span className="whitespace-nowrap">{item.projectName}</span>
                 {isShared && (
                   <span className="shrink-0 text-sky-500">· shared</span>
                 )}

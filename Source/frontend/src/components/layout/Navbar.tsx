@@ -151,8 +151,6 @@ export function Navbar({
         >
           {breadcrumbs.map((seg, i) => {
             const isLast = i === breadcrumbs.length - 1;
-            const isFirst = i === 0;
-            const showShortFirst = isFirst && seg.label === "Dashboard";
             return (
               <span
                 key={seg.path + i}
@@ -173,16 +171,7 @@ export function Navbar({
                   aria-current={isLast ? "page" : undefined}
                   title={seg.label}
                 >
-                  {showShortFirst ? (
-                    <>
-                      <span className="inline max-[420px]:hidden">
-                        {seg.label}
-                      </span>
-                      <span className="hidden max-[420px]:inline">Dash...</span>
-                    </>
-                  ) : (
-                    seg.label
-                  )}
+                  {seg.label}
                 </Link>
               </span>
             );

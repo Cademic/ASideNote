@@ -161,13 +161,23 @@ export function writeViewMode(mode: GalleryViewMode): void {
   }
 }
 
+/**
+ * First-ever-load default (no saved prefs yet): same as `DEFAULT_FILTERS`
+ * except Completed/Archived projects start hidden. `DEFAULT_FILTERS` itself
+ * stays "everything selected" — it backs the "Select all" toggle and the
+ * fallback for missing facets on a stored-but-malformed filter object.
+ */
+const INITIAL_PROJECT_STATUSES: GalleryProjectStatus[] = ["Active"];
+
 export function readFilters(): GalleryFilterState {
   try {
     const stored = window.localStorage.getItem(GALLERY_FILTERS_KEY);
-    if (!stored) return { ...DEFAULT_FILTERS };
+    if (!stored) {
+      return { ...DEFAULT_FILTERS, projectStatuses: [...INITIAL_PROJECT_STATUSES] };
+    }
     return validateFilterState(JSON.parse(stored));
   } catch {
-    return { ...DEFAULT_FILTERS };
+    return { ...DEFAULT_FILTERS, projectStatuses: [...INITIAL_PROJECT_STATUSES] };
   }
 }
 
