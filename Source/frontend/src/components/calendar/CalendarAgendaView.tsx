@@ -142,21 +142,23 @@ export function CalendarAgendaView({
                     <span
                       className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${dot}`}
                     />
-                    <span className="w-28 flex-shrink-0 text-xs font-medium text-foreground/50">
-                      {event.isAllDay || event.eventType === "Holiday"
-                        ? "All day"
-                        : fmtClock(utc(event.startDate).minutes)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                      {event.eventType === "Note" && "📝 "}
-                      {event.eventType === "Holiday" && "🎉 "}
-                      {projectName && (
-                        <span className="text-foreground/50">
-                          {projectName}:{" "}
-                        </span>
-                      )}
-                      {event.title}
-                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col-reverse gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="flex-shrink-0 text-xs font-medium text-foreground/50 sm:w-28">
+                        {event.isAllDay || event.eventType === "Holiday"
+                          ? "All day"
+                          : fmtClock(utc(event.startDate).minutes)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                        {event.eventType === "Note" && "📝 "}
+                        {event.eventType === "Holiday" && "🎉 "}
+                        {projectName && (
+                          <span className="text-foreground/50">
+                            {projectName}:{" "}
+                          </span>
+                        )}
+                        {event.title}
+                      </span>
+                    </div>
                   </button>
                 );
               })}

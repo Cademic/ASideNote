@@ -435,9 +435,6 @@ export function CalendarsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-foreground">Calendar</h1>
-              <p className="truncate text-sm text-foreground/50">
-                Schedule events, deadlines, and milestones
-              </p>
             </div>
           </div>
 

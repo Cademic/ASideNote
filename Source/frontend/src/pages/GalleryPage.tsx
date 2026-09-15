@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Images, Plus } from "lucide-react";
+import { Images } from "lucide-react";
 import type { AppLayoutContext } from "../components/layout/AppLayout";
 import { useGalleryItems } from "../hooks/useGalleryItems";
 import {
@@ -222,7 +222,7 @@ export function GalleryPage() {
                   <div className="skeleton h-5 w-28" />
                   <div className="skeleton h-5 w-6 rounded-full" />
                 </div>
-                <div className="-mx-10 flex gap-3 overflow-hidden lg:mx-0">
+                <div className="-mx-6 flex gap-3 overflow-hidden lg:mx-0">
                   <div className="h-64 w-[calc(50%-0.375rem)] shrink-0 border-2 border-dashed border-border lg:w-56" />
                   {Array.from({ length: 4 }).map((_, index) => (
                     <div
@@ -270,9 +270,6 @@ export function GalleryPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-foreground">Gallery</h1>
-              <p className="truncate text-sm text-foreground/50">
-                Projects, boards and notebooks in one place
-              </p>
             </div>
           </div>
 
@@ -297,21 +294,7 @@ export function GalleryPage() {
           </p>
         )}
 
-        {gallery.items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface py-20 text-center">
-            <p className="mb-4 text-sm text-foreground/60">
-              Nothing here yet. Create your first project, board or notebook.
-            </p>
-            <button
-              type="button"
-              onClick={() => requestCreate()}
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-xs font-medium text-foreground/70 hover:border-primary hover:text-primary"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Get started
-            </button>
-          </div>
-        ) : viewMode === "grid" ? (
+        {viewMode === "grid" ? (
           <GalleryGridView
             groups={groups}
             visibleKinds={visibleKinds}

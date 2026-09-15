@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -10,8 +12,15 @@ import {
 } from "lucide-react";
 import { GalleryItemMenu } from "./GalleryItemMenu";
 import { formatRelativeDate } from "../../lib/format-relative-date";
+import {
+  constrainFixedBox,
+  DROPDOWN_VIEWPORT_PADDING,
+} from "../../lib/dropdown-viewport";
 import type { ProjectSummaryDto } from "../../types";
 import type { GalleryItem, GalleryKind } from "../../types/gallery";
+
+/** Approx menu width (`w-52`) — used to right-align it under the kebab button. */
+const MENU_WIDTH = 208;
 
 /** Thumbnail treatment per kind: panel background + centred icon colour + optional pattern. */
 const KIND_THUMB: Record<
@@ -138,10 +147,41 @@ export function GalleryCard({
   const isShared = item.ownership === "shared";
   const ProjectIcon = isShared ? Users : FolderOpen;
 
+  const kebabRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0 });
+
+  // Clamp the portalled menu inside the viewport once it has rendered.
+  useLayoutEffect(() => {
+    if (!menuOpen || !menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const { left, top } = constrainFixedBox(
+      anchor.x,
+      anchor.y,
+      rect.width,
+      rect.height,
+      DROPDOWN_VIEWPORT_PADDING,
+    );
+    if (left !== anchor.x || top !== anchor.y) setAnchor({ x: left, y: top });
+  }, [menuOpen, anchor.x, anchor.y]);
+
+  function openFromKebab() {
+    const rect = kebabRef.current?.getBoundingClientRect();
+    if (rect) setAnchor({ x: rect.right - MENU_WIDTH, y: rect.bottom + 4 });
+    onToggleMenu();
+  }
+
+  function openFromContextMenu(event: React.MouseEvent) {
+    event.preventDefault();
+    setAnchor({ x: event.clientX, y: event.clientY });
+    onOpenMenu();
+  }
+
   const kebabButton = (className: string) => (
     <button
+      ref={kebabRef}
       type="button"
-      onClick={onToggleMenu}
+      onClick={openFromKebab}
       data-gallery-item-menu
       aria-haspopup="menu"
       aria-expanded={menuOpen}
@@ -152,20 +192,28 @@ export function GalleryCard({
     </button>
   );
 
-  const menu = menuOpen && (
-    <div className="absolute right-2 top-10 z-30" data-gallery-item-menu>
-      <GalleryItemMenu
-        item={item}
-        onClose={onCloseMenu}
-        onRename={onRename}
-        onDelete={onDelete}
-        onTogglePin={onTogglePin}
-        onMoveToProject={onMoveToProject}
-        onLeave={onLeave}
-        activeProjects={activeProjects}
-      />
-    </div>
-  );
+  const menu =
+    menuOpen &&
+    createPortal(
+      <div
+        ref={menuRef}
+        className="fixed z-[100]"
+        data-gallery-item-menu
+        style={{ left: anchor.x, top: anchor.y }}
+      >
+        <GalleryItemMenu
+          item={item}
+          onClose={onCloseMenu}
+          onRename={onRename}
+          onDelete={onDelete}
+          onTogglePin={onTogglePin}
+          onMoveToProject={onMoveToProject}
+          onLeave={onLeave}
+          activeProjects={activeProjects}
+        />
+      </div>,
+      document.body,
+    );
 
   // ── Project: the whole card is a file folder, with the info printed on its front leaf ──
   if (item.kind === "project") {
@@ -184,10 +232,7 @@ export function GalleryCard({
 
     return (
       <div
-        onContextMenu={(event) => {
-          event.preventDefault();
-          onOpenMenu();
-        }}
+        onContextMenu={openFromContextMenu}
         className="group relative flex h-52 w-[calc(50%-0.375rem)] shrink-0 snap-start flex-col self-end transition-transform duration-150 ease-out hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:transform-none lg:w-56"
       >
         {/* tab + back leaf */}

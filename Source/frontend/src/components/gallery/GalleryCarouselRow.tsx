@@ -46,10 +46,10 @@ export function GalleryCarouselRow({ children }: GalleryCarouselRowProps) {
   }
 
   return (
-    <div className="group/carousel relative -mx-10 lg:mx-0">
+    <div className="group/carousel relative -mx-6 lg:mx-0">
       <div
         ref={scrollRef}
-        className="flex snap-x snap-proximity gap-3 overflow-x-auto scroll-smooth scrollbar-hide pb-1"
+        className="flex snap-x snap-proximity gap-3 overflow-x-auto scroll-smooth scrollbar-hide py-1"
       >
         {children}
       </div>

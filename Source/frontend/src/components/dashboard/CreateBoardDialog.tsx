@@ -137,10 +137,14 @@ export function CreateBoardDialog({
     onClose();
   }
 
+  // Reset every field on open, not just on close — the dialog is a single
+  // persistent instance, and a successful create closes it by flipping
+  // `isOpen` directly (skipping `handleClose`), so stale values from the
+  // just-created item would otherwise still be sitting in the inputs.
   useEffect(() => {
     if (!isOpen) return;
-    setBoardType(defaultBoardType);
-    setTab(hideProjectTab ? "board" : initialTab);
+    resetFields();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultBoardType, hideProjectTab, initialTab]);
 
   function handleSubmitBoard(e: React.FormEvent) {
