@@ -411,10 +411,12 @@ export function CalendarsPage() {
               <div className="skeleton h-5 w-32" />
               <div className="skeleton h-5 w-6 rounded-full" />
             </div>
-            <div className="grid grid-cols-7 overflow-hidden border border-border">
-              {Array.from({ length: 42 }).map((_, i) => (
-                <div key={i} className="skeleton m-px h-28" />
-              ))}
+            <div className="overflow-x-auto">
+              <div className="grid min-w-[700px] grid-cols-7 overflow-hidden border border-border">
+                {Array.from({ length: 42 }).map((_, i) => (
+                  <div key={i} className="skeleton m-px h-28" />
+                ))}
+              </div>
             </div>
           </section>
         </div>
@@ -490,15 +492,19 @@ export function CalendarsPage() {
           </div>
 
           {view === "month" && (
-            <CalendarGrid
-              currentDate={currentDate}
-              events={allEvents}
-              projects={[]}
-              onClickDay={handleClickDay}
-              onSelectDate={(d) => handleSelectDate(d, "day")}
-              onClickEvent={handleClickEvent}
-              projectNameMap={projectNameMap}
-            />
+            <div className="overflow-x-auto">
+              <div className="min-w-[700px]">
+                <CalendarGrid
+                  currentDate={currentDate}
+                  events={allEvents}
+                  projects={[]}
+                  onClickDay={handleClickDay}
+                  onSelectDate={(d) => handleSelectDate(d, "day")}
+                  onClickEvent={handleClickEvent}
+                  projectNameMap={projectNameMap}
+                />
+              </div>
+            </div>
           )}
 
           {view === "day" && (
@@ -513,15 +519,19 @@ export function CalendarsPage() {
           )}
 
           {view === "week" && (
-            <CalendarTimeGrid
-              days={weekDays}
-              events={allEvents}
-              onClickDay={handleClickDay}
-              onClickTimeSlot={handleClickTimeSlot}
-              onSelectDate={(d) => handleSelectDate(d, "day")}
-              onClickEvent={handleClickEvent}
-              projectNameMap={projectNameMap}
-            />
+            <div className="overflow-x-auto">
+              <div className="min-w-[820px]">
+                <CalendarTimeGrid
+                  days={weekDays}
+                  events={allEvents}
+                  onClickDay={handleClickDay}
+                  onClickTimeSlot={handleClickTimeSlot}
+                  onSelectDate={(d) => handleSelectDate(d, "day")}
+                  onClickEvent={handleClickEvent}
+                  projectNameMap={projectNameMap}
+                />
+              </div>
+            </div>
           )}
 
           {view === "year" && (

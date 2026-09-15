@@ -195,7 +195,7 @@ export function GalleryPage() {
   // --- loading / error -------------------------------------------------
   if (gallery.isLoading) {
     return (
-      <div className="h-full overflow-y-auto bg-background">
+      <div className="h-full overflow-y-auto overflow-x-hidden bg-background">
         <div className="mx-auto max-w-[1600px] px-6 py-8">
           {/* header — icon tile + title/subtitle, then the action row */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -260,7 +260,7 @@ export function GalleryPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="h-full overflow-y-auto overflow-x-hidden bg-background">
       <div className="mx-auto max-w-[1600px] px-6 py-8">
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
