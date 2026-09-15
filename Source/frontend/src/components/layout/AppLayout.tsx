@@ -596,7 +596,7 @@ function AppLayoutInner() {
               ? "flex min-h-0 flex-1 flex-col overflow-hidden p-0"
               : isDashboardRoute
                 ? "scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto p-0 lg:overflow-hidden"
-                : "flex-1 overflow-auto p-4 bg-background"
+                : "flex-1 overflow-y-auto overflow-x-hidden p-4 bg-background"
           }
         >
           {isBoardDetailRoute || isDashboardRoute ? (
